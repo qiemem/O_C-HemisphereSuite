@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#define HEM_CLOCKDIV_MAX 8
+#define HEM_CLOCKDIV_MAX 64
 
 class ClockDivider : public HemisphereApplet {
 public:
@@ -67,12 +67,14 @@ public:
                     if (count[ch] >= div[ch]) {
                         count[ch] = 0; // Reset
                         ClockOut(ch);
+                        trigger_countdown[ch] = hem_MIN(1667, cycle_time * div[ch] / 2);
                     }
                 } else {
                     // Calculate next clock for multiplication on each clock
                     int clock_every = (cycle_time / -div[ch]);
                     next_clock[ch] = this_tick + clock_every;
                     ClockOut(ch); // Sync
+                    trigger_countdown[ch] = hem_MIN(1667, clock_every);
                 }
             }
         }
@@ -85,9 +87,12 @@ public:
                     int clock_every = (cycle_time / -div[ch]);
                     next_clock[ch] += clock_every;
                     ClockOut(ch);
+                    trigger_countdown[ch] = hem_MIN(1667, clock_every / 2);
                 }
             }
         }
+
+        ForEachChannel(ch) trigger_countdown[ch]--;
     }
 
     void View() {
@@ -111,14 +116,14 @@ public:
 
     uint32_t OnDataRequest() {
         uint32_t data = 0;
-        Pack(data, PackLocation {0,8}, div[0] + 32);
-        Pack(data, PackLocation {8,8}, div[1] + 32);
+        Pack(data, PackLocation {0,8}, div[0] + HEM_CLOCKDIV_MAX);
+        Pack(data, PackLocation {8,8}, div[1] + HEM_CLOCKDIV_MAX);
         return data;
     }
 
     void OnDataReceive(uint32_t data) {
-        div[0] = Unpack(data, PackLocation {0,8}) - 32;
-        div[1] = Unpack(data, PackLocation {8,8}) - 32;
+        div[0] = Unpack(data, PackLocation {0,8}) - HEM_CLOCKDIV_MAX;
+        div[1] = Unpack(data, PackLocation {8,8}) - HEM_CLOCKDIV_MAX;
     }
 
 protected:
@@ -133,6 +138,7 @@ private:
     int div[2]; // Division data for outputs. Positive numbers are divisions, negative numbers are multipliers
     int count[2]; // Number of clocks since last output (for clock divide)
     int next_clock[2]; // Tick number for the next output (for clock multiply)
+    int trigger_countdown[2];
     int cursor; // Which output is currently being edited
     int cycle_time; // Cycle time between the last two clock inputs
 
@@ -152,6 +158,7 @@ private:
                 gfxPrint(-div[ch]);
                 gfxPrint(" Mult");
             }
+            if (trigger_countdown[ch] > 0) gfxBitmap(56, y, 8, CLOCK_ICON);
         }
     }
 };
