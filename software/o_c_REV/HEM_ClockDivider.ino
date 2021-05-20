@@ -62,14 +62,14 @@ public:
             // At the clock input, handle clock division
             ForEachChannel(ch)
             {
-                count[ch]++;
                 if (div[ch] > 0) { // Positive value indicates clock division
-                    if (count[ch] >= div[ch]) {
-                        count[ch] = 0; // Reset
+                    if (count[ch] == 0) {
                         ClockOut(ch);
                         trigger_countdown[ch] = hem_MIN(1667, cycle_time * div[ch] / 2);
                     }
+                    count[ch] = (count[ch] + 1) % div[ch];
                 } else {
+                    count[ch] = 0; // Reset for if we cv to div
                     // Calculate next clock for multiplication on each clock
                     int clock_every = (cycle_time / -div[ch]);
                     next_clock[ch] = this_tick + clock_every;
