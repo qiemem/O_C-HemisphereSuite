@@ -28,6 +28,9 @@ struct AFStepCoord {
     uint8_t y;
 };
 
+const int NUM_PARAMS = 3;
+const int PARAM_SIZE = 5;
+
 class AnnularFusion : public HemisphereApplet {
 public:
 
@@ -60,7 +63,7 @@ public:
                 int rotation = Proportion(DetentedIn(ch), HEMISPHERE_MAX_CV, length[ch]);
 
                 // Store the pattern for display
-                pattern[ch] = EuclideanPattern(length[ch] - 1, beats[ch], rotation);
+                pattern[ch] = EuclideanPattern(length[ch] - 1, beats[ch], rotation + offset[ch]);
                 int sb = step % length[ch];
                 if ((pattern[ch] >> sb) & 0x01) {
                     ClockOut(ch);
@@ -81,38 +84,48 @@ public:
 
     void OnButtonPress() {
         display_timeout = AF_DISPLAY_TIMEOUT;
-        if (++cursor > 3) cursor = 0;
+        if (++cursor > 5) cursor = 0;
         ResetCursor();
     }
 
     void OnEncoderMove(int direction) {
         display_timeout = AF_DISPLAY_TIMEOUT;
-        int ch = cursor < 2 ? 0 : 1;
-        int f = cursor - (ch * 2); // Cursor function
+        int ch = cursor < NUM_PARAMS ? 0 : 1;
+        int f = cursor - (ch * NUM_PARAMS); // Cursor function
         if (f == 0) {
             length[ch] = constrain(length[ch] + direction, 3, 32);
-            if (beats[ch] > length[ch]) beats[ch] = length[ch];
+            if (beats[ch] > length[ch]) {
+                beats[ch] = length[ch];
+                offset[ch] = length[ch];
+            }
             SetDisplayPositions(ch, 24 - (8 * ch));
         }
         if (f == 1) {
             beats[ch] = constrain(beats[ch] + direction, 1, length[ch]);
         }
+        if (f == 2) {
+            offset[ch] = constrain(offset[ch] + direction, 0, length[ch] - 1);
+        }
     }
-        
+
     uint32_t OnDataRequest() {
         uint32_t data = 0;
-        Pack(data, PackLocation {0,4}, length[0] - 1);
-        Pack(data, PackLocation {4,4}, beats[0] - 1);
-        Pack(data, PackLocation {8,4}, length[1] - 1);
-        Pack(data, PackLocation {12,4}, beats[1] - 1);
+        Pack(data, PackLocation {0 * PARAM_SIZE, PARAM_SIZE}, length[0] - 1);
+        Pack(data, PackLocation {1 * PARAM_SIZE, PARAM_SIZE}, beats[0] - 1);
+        Pack(data, PackLocation {2 * PARAM_SIZE, PARAM_SIZE}, length[1] - 1);
+        Pack(data, PackLocation {3 * PARAM_SIZE, PARAM_SIZE}, beats[1] - 1);
+        Pack(data, PackLocation {4 * PARAM_SIZE, PARAM_SIZE}, offset[0]);
+        Pack(data, PackLocation {5 * PARAM_SIZE, PARAM_SIZE}, offset[1]);
         return data;
     }
 
     void OnDataReceive(uint32_t data) {
-        length[0] = Unpack(data, PackLocation {0,4}) + 1;
-        beats[0] = Unpack(data, PackLocation {4,4}) + 1;
-        length[1] = Unpack(data, PackLocation {8,4}) + 1;
-        beats[1] = Unpack(data, PackLocation {12,4}) + 1;
+        length[0] = Unpack(data, PackLocation {0 * PARAM_SIZE, PARAM_SIZE}) + 1;
+        beats[0]  = Unpack(data, PackLocation {1 * PARAM_SIZE, PARAM_SIZE}) + 1;
+        length[1] = Unpack(data, PackLocation {2 * PARAM_SIZE, PARAM_SIZE}) + 1;
+        beats[1]  = Unpack(data, PackLocation {3 * PARAM_SIZE, PARAM_SIZE}) + 1;
+        offset[0] = Unpack(data, PackLocation {4 * PARAM_SIZE, PARAM_SIZE});
+        offset[1] = Unpack(data, PackLocation {5 * PARAM_SIZE, PARAM_SIZE});
     }
 
 protected:
@@ -121,10 +134,10 @@ protected:
         help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Reset";
         help[HEMISPHERE_HELP_CVS]      = "Rotate 1=Ch1 2=Ch2";
         help[HEMISPHERE_HELP_OUTS]     = "Clock A=Ch1 B=Ch2";
-        help[HEMISPHERE_HELP_ENCODER]  = "Length/Hits Ch1,2";
+        help[HEMISPHERE_HELP_ENCODER]  = "Len/Hits/Rot Ch1,2";
         //                               "------------------" <-- Size Guide
     }
-    
+
 private:
     int step;
     int cursor = 0; // Ch1: 0=Length, 1=Hits; Ch2: 2=Length 3=Hits
@@ -132,10 +145,11 @@ private:
     uint32_t pattern[2];
     int last_clock;
     uint32_t display_timeout;
-    
+
     // Settings
     int length[2];
     int beats[2];
+    int offset[2];
 
     void DrawSteps() {
         ForEachChannel(ch)
@@ -167,8 +181,8 @@ private:
     }
 
     void DrawEditor() {
-        int ch = cursor < 2 ? 0 : 1; // Cursor channel
-        int f = cursor - (ch * 2); // Cursor function
+        int ch = cursor < NUM_PARAMS ? 0 : 1; // Cursor channel
+        int f = cursor - (ch * NUM_PARAMS); // Cursor function
 
         // Length cursor
         gfxBitmap(1, 15, 8, LOOP_ICON);
@@ -179,6 +193,11 @@ private:
         gfxBitmap(1, 25, 8, X_NOTE_ICON);
         gfxPrint(12 + pad(10, beats[ch]), 25, beats[ch]);
         if (f == 1) gfxCursor(13, 33, 12);
+
+        // Offset cursor
+        gfxBitmap(1, 35, 8, LEFT_RIGHT_ICON);
+        gfxPrint(12 + pad(10, offset[ch]), 35, offset[ch]);
+        if (f == 2) gfxCursor(13, 43, 12);
 
         // Ring indicator
         gfxCircle(8, 52, 8);
