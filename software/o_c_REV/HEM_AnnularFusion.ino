@@ -49,8 +49,6 @@ public:
             pattern[ch] = EuclideanPattern(length[ch], beats[ch], 0);;
         }
         step = 0;
-        SetDisplayPositions(0);
-        SetDisplayPositions(1);
         last_clock = OC::CORE::ticks;
     }
 
@@ -103,7 +101,6 @@ public:
             length[ch] = constrain(length[ch] + direction, 3, 32);
             if (beats[ch] > length[ch]) beats[ch] = length[ch];
             if (offset[ch] > length[ch]) offset[ch] = length[ch];
-            SetDisplayPositions(ch);
         }
         if (f == 1) {
             beats[ch] = constrain(beats[ch] + direction, 1, length[ch]);
@@ -131,8 +128,6 @@ public:
         beats[1]  = Unpack(data, PackLocation {3 * PARAM_SIZE, PARAM_SIZE}) + 1;
         offset[0] = Unpack(data, PackLocation {4 * PARAM_SIZE, PARAM_SIZE});
         offset[1] = Unpack(data, PackLocation {5 * PARAM_SIZE, PARAM_SIZE});
-        SetDisplayPositions(0);
-        SetDisplayPositions(1);
     }
 
 protected:
@@ -160,81 +155,29 @@ private:
 
     void DrawSteps() {
         //int spacing = 1;
+        gfxLine(0, 45, 63, 45);
+        gfxLine(0, 62, 63, 62);
+        gfxLine(0, 53, 63, 53);
+        gfxLine(0, 54, 63, 54);
         ForEachChannel(ch) {
-            for (int i=0; i < 32; i++) {
+            for (int i = 0; i < 16; i++) {
                 if ((pattern[ch] >> ((i + step) % length[ch])) & 0x1) {
-                    gfxLine(i * 2, 46 + 9 * ch, i * 2, 46 + 9 * ch + 8);
+                    gfxRect(4 * i + 1, 48 + 9 * ch, 3, 3);
+                    //gfxLine(4 * i + 2, 47 + 9 * ch, 4 * i + 2, 47 + 9 * ch + 4);
+                } else {
+                    gfxPixel(4 * i + 2, 47 + 9 * ch + 2);
                 }
-            }
-            /*
-            float w = float(64 * 1 + spacing) / length[ch];
-            for (int i = 0; i < length[ch]; i++) {
-                int x = int(w * i);
-                if ((pattern[ch] >> i) & 0x1) {
-                    gfxRect(x, 46 + 9 * ch, w - spacing, 6);
+
+                if ((i + step) % length[ch] == 0) {
+                    //gfxLine(4 * i, 46 + 9 * ch, 4 * i, 52 + 9 * ch);
+                    gfxLine(4 * i, 46 + 9 * ch, 4 * i, 46 + 9 * ch + 1);
+                    gfxLine(4 * i, 52 + 9 * ch - 1, 4 * i, 52 + 9 * ch);
                 }
-                if ((step % length[ch]) == i) {
-                    gfxLine(x - 1, 46 + 9 * ch + 7, x + w - 1, 46 + 9 * ch + 7);
-                }
-            }
-            */
-            /*
-            DrawActiveSegment(ch);
-            DrawPatternPoints(ch);
-            */
-        }
-    }
-
-    void DrawActiveSegment(int ch) {
-        if (last_clock && OC::CORE::ticks - last_clock < 166666) {
-            int s1 = step % length[ch];
-            int s2 = s1 + 1 == length[ch] ? 0 : s1 + 1;
-
-            AFStepCoord s1_c = disp_coord[ch][s1];
-            AFStepCoord s2_c = disp_coord[ch][s2];
-            gfxLine(s1_c.x, s1_c.y, s2_c.x, s2_c.y);
-        }
-    }
-
-    void DrawPatternPoints(int ch) {
-        for (int p = 0; p < length[ch]; p++)
-        {
-            if ((pattern[ch] >> p) & 0x01) {
-                gfxPixel(disp_coord[ch][p].x, disp_coord[ch][p].y);
-                gfxPixel(disp_coord[ch][p].x + 1, disp_coord[ch][p].y);
             }
         }
     }
 
     void DrawEditor() {
-        /*
-        int spacing = 23;
-        int extra_pad = 0;
-
-        int lenx = 1;
-        int beatx = lenx + spacing;
-        int offx = beatx + spacing;
-
-        ForEachChannel (ch) {
-            int y = 15 + 10 * ch;
-
-            // Length cursor
-            gfxBitmap(lenx, y, 8, LOOP_ICON);
-            gfxPrint(lenx + extra_pad + 8 + pad(10, length[ch]), y, length[ch]);
-            if (cursor == 0 + ch * NUM_PARAMS) gfxCursor(lenx + extra_pad + 9, y + 7, 12);
-
-            // Beats cursor
-            gfxBitmap(beatx, y, 8, X_NOTE_ICON);
-            gfxPrint(beatx + extra_pad + 8 + pad(10, beats[ch]), y, beats[ch]);
-            if (cursor == 1 + ch * NUM_PARAMS) gfxCursor(beatx + extra_pad + 9, y + 7, 12);
-
-            // Offset cursor
-            gfxBitmap(offx, y, 8, LEFT_RIGHT_ICON);
-            gfxPrint(offx + extra_pad + 8 + pad(10, offset[ch]), y, offset[ch]);
-            if (cursor == 2 + ch * NUM_PARAMS) gfxCursor(offx + extra_pad + 9, y + 7, 12);
-        }
-        */
-
         int spacing = 25;
 
         gfxBitmap(1 + 0 * spacing, 15, 8, LOOP_ICON);
@@ -253,29 +196,6 @@ private:
             if (cursor == 2 + ch * NUM_PARAMS) gfxCursor(1 + 2 * spacing, y + 7, 12);
         }
 
-        // Ring indicator
-        //gfxCircle(8, 52, 8);
-        //gfxCircle(8, 52, 4);
-
-        //if (ch == 0) gfxCircle(8, 52, 7);
-        //else gfxCircle(8, 52, 5);
-    }
-
-    /* Get coordinates of circle in two halves, from the top and from the bottom */
-    void SetDisplayPositions(int ch) {
-        int r = ch == 0 ? OUTER_RADIUS : INNER_RADIUS;
-        int cx = 31; // Center coordinates
-        int cy = 39;
-        int di = 0; // Display index (positions actually used in the display)
-        const float pi = 3.14159265358979323846f;
-        float step_radians = 2.0f * pi / length[ch];
-
-        for (int i = 0; i < length[ch]; i++) {
-            float rads = i * step_radians - pi / 2.0f;
-            uint8_t x = uint8_t(r * cos(rads) + cx);
-            uint8_t y = uint8_t(r * sin(rads) + cy);
-            disp_coord[ch][di++] = AFStepCoord {x, y};
-        }
     }
 };
 
