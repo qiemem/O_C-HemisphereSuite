@@ -21,12 +21,6 @@
 // SOFTWARE.
 
 #include "bjorklund.h"
-#define AF_DISPLAY_TIMEOUT 330000
-
-struct AFStepCoord {
-    uint8_t x;
-    uint8_t y;
-};
 
 const int NUM_PARAMS = 3;
 const int PARAM_SIZE = 5;
@@ -41,7 +35,6 @@ public:
     }
 
     void Start() {
-        display_timeout = AF_DISPLAY_TIMEOUT;
         ForEachChannel(ch)
         {
             length[ch] = 16;
@@ -77,24 +70,20 @@ public:
             // Plan for the thing to run forever and ever
             if (++step >= length[0] * length[1]) step = 0;
         }
-        if (display_timeout > 0) --display_timeout;
     }
 
     void View() {
         gfxHeader(applet_name());
         DrawSteps();
-        //if (display_timeout > 0) DrawEditor();
         DrawEditor();
     }
 
     void OnButtonPress() {
-        display_timeout = AF_DISPLAY_TIMEOUT;
         if (++cursor > 5) cursor = 0;
         ResetCursor();
     }
 
     void OnEncoderMove(int direction) {
-        display_timeout = AF_DISPLAY_TIMEOUT;
         int ch = cursor < NUM_PARAMS ? 0 : 1;
         int f = cursor - (ch * NUM_PARAMS); // Cursor function
         if (f == 0) {
@@ -143,10 +132,8 @@ protected:
 private:
     int step;
     int cursor = 0; // Ch1: 0=Length, 1=Hits; Ch2: 2=Length 3=Hits
-    AFStepCoord disp_coord[2][32];
     uint32_t pattern[2];
     int last_clock;
-    uint32_t display_timeout;
 
     // Settings
     int length[2];
