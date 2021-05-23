@@ -30,6 +30,8 @@ struct AFStepCoord {
 
 const int NUM_PARAMS = 3;
 const int PARAM_SIZE = 5;
+const int OUTER_RADIUS = 24;
+const int INNER_RADIUS = 16;
 
 class AnnularFusion : public HemisphereApplet {
 public:
@@ -47,23 +49,27 @@ public:
             pattern[ch] = EuclideanPattern(length[ch] - 1, beats[ch], 0);;
         }
         step = 0;
-        SetDisplayPositions(0, 24);
-        SetDisplayPositions(1, 16);
+        SetDisplayPositions(0);
+        SetDisplayPositions(1);
         last_clock = OC::CORE::ticks;
     }
 
     void Controller() {
         if (Clock(1)) step = 0; // Reset
 
+        ForEachChannel(ch) {
+            int rotation = Proportion(DetentedIn(ch), HEMISPHERE_MAX_CV, length[ch]);
+            // Store the pattern for display
+            pattern[ch] = EuclideanPattern(length[ch] - 1, beats[ch], rotation + offset[ch]);
+        }
+
+
         // Advance both rings
         if (Clock(0)) {
             last_clock = OC::CORE::ticks;
             ForEachChannel(ch)
             {
-                int rotation = Proportion(DetentedIn(ch), HEMISPHERE_MAX_CV, length[ch]);
 
-                // Store the pattern for display
-                pattern[ch] = EuclideanPattern(length[ch] - 1, beats[ch], rotation + offset[ch]);
                 int sb = step % length[ch];
                 if ((pattern[ch] >> sb) & 0x01) {
                     ClockOut(ch);
@@ -94,11 +100,9 @@ public:
         int f = cursor - (ch * NUM_PARAMS); // Cursor function
         if (f == 0) {
             length[ch] = constrain(length[ch] + direction, 3, 32);
-            if (beats[ch] > length[ch]) {
-                beats[ch] = length[ch];
-                offset[ch] = length[ch];
-            }
-            SetDisplayPositions(ch, 24 - (8 * ch));
+            if (beats[ch] > length[ch]) beats[ch] = length[ch];
+            if (offset[ch] > length[ch]) offset[ch] = length[ch];
+            SetDisplayPositions(ch);
         }
         if (f == 1) {
             beats[ch] = constrain(beats[ch] + direction, 1, length[ch]);
@@ -126,6 +130,8 @@ public:
         beats[1]  = Unpack(data, PackLocation {3 * PARAM_SIZE, PARAM_SIZE}) + 1;
         offset[0] = Unpack(data, PackLocation {4 * PARAM_SIZE, PARAM_SIZE});
         offset[1] = Unpack(data, PackLocation {5 * PARAM_SIZE, PARAM_SIZE});
+        SetDisplayPositions(0);
+        SetDisplayPositions(1);
     }
 
 protected:
@@ -195,9 +201,9 @@ private:
         if (f == 1) gfxCursor(13, 33, 12);
 
         // Offset cursor
-        gfxBitmap(1, 35, 8, LEFT_RIGHT_ICON);
-        gfxPrint(12 + pad(10, offset[ch]), 35, offset[ch]);
-        if (f == 2) gfxCursor(13, 43, 12);
+        gfxBitmap(39, 15, 8, LEFT_RIGHT_ICON);
+        gfxPrint(50 + pad(10, offset[ch]), 15, offset[ch]);
+        if (f == 2) gfxCursor(51, 23, 12);
 
         // Ring indicator
         gfxCircle(8, 52, 8);
@@ -208,54 +214,19 @@ private:
     }
 
     /* Get coordinates of circle in two halves, from the top and from the bottom */
-    void SetDisplayPositions(int ch, int r) {
+    void SetDisplayPositions(int ch) {
+        int r = ch == 0 ? OUTER_RADIUS : INNER_RADIUS;
         int cx = 31; // Center coordinates
         int cy = 39;
         int di = 0; // Display index (positions actually used in the display)
-        int c_count = 0; // Count of pixels along the circumference
-        int x_per_step = (r * 4) / 32;
-        uint32_t pattern = EuclideanPattern(31, length[ch], 0);
+        const float pi = 3.14159265358979323846f;
+        float step_radians = 2.0f * pi / length[ch];
 
-        // Sweep across the top of the circle looking for positions within the
-        // radius of the circle. Left to right:
-        for (uint8_t x = 0; x < 63; x++)
-        {
-            // Top down
-            for (uint8_t y = 0; y < 63; y++)
-            {
-                int rx = cx - x; // Positions relative to center
-                int ry = cy - y;
-
-                // Is this point within the radius?
-                if (rx * rx + ry * ry < r * r + 1) {
-                    if (c_count++ % x_per_step == 0) {
-                        if (pattern & 0x01) disp_coord[ch][di++] = AFStepCoord {x, y};
-                        pattern = pattern >> 0x01;
-                    }
-                    break; // Only use the first point
-                }
-            }
-        }
-
-        // Sweep across the top of the circle looking for positions within the
-        // radius of the circle. Right to left:
-        for (uint8_t x = 63; x > 0; x--)
-        {
-            // Bottom up
-            for (uint8_t y = 63; y > 0; y--)
-            {
-                int rx = cx - x; // Positions relative to center
-                int ry = cy - y;
-
-                // Is this point within the radius?
-                if (rx * rx + ry * ry < r * r + 1) {
-                    if (c_count++ % x_per_step == 0) {
-                        if (pattern & 0x01) disp_coord[ch][di++] = AFStepCoord {x, y};
-                        pattern = pattern >> 0x01;
-                    }
-                    break; // Only use the first point
-                }
-            }
+        for (int i = 0; i < length[ch]; i++) {
+            float rads = i * step_radians - pi / 2.0f;
+            uint8_t x = uint8_t(r * cos(rads) + cx);
+            uint8_t y = uint8_t(r * sin(rads) + cy);
+            disp_coord[ch][di++] = AFStepCoord {x, y};
         }
     }
 };
