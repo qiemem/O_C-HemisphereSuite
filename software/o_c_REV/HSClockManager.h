@@ -42,6 +42,16 @@ class ClockManager {
     bool forwarded; // Master clock forwarding is enabled when true
 
     ClockManager() {
+        RestoreDefaults();
+    }
+
+public:
+    static ClockManager *get() {
+        if (!instance) instance = new ClockManager;
+        return instance;
+    }
+
+    void RestoreDefaults() {
         SetTempoBPM(120);
         SetMultiply(1);
         running = 0;
@@ -52,12 +62,6 @@ class ClockManager {
         count = 0;
         tock = 0;
         forwarded = 0;
-    }
-
-public:
-    static ClockManager *get() {
-        if (!instance) instance = new ClockManager;
-        return instance;
     }
 
     void SetMultiply(int8_t multiply) {
