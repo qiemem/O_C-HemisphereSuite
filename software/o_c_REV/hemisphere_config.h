@@ -43,6 +43,7 @@
     DECLARE_APPLET(150, 0x20, hMIDIIn), \
     DECLARE_APPLET( 27, 0x20, hMIDIOut), \
     DECLARE_APPLET( 33, 0x10, MixerBal), \
+    DECLARE_APPLET( 59, 0x02, Ngram), \
     DECLARE_APPLET( 20, 0x02, Palimpsest), \
     DECLARE_APPLET( 44, 0x01, RunglBook), \
     DECLARE_APPLET( 26, 0x08, ScaleDuet), \
