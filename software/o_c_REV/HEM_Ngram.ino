@@ -72,6 +72,12 @@ int mod(int n, int q) {
     return m;
 }
 
+uint8_t ilog2(int n) {
+    uint8_t i = 0;
+    while (n >>= 1) i++;
+    return i;
+}
+
 class Ngram : public HemisphereApplet {
 public:
 
@@ -191,22 +197,28 @@ public:
 
     uint32_t OnDataRequest() {
         uint32_t data = 0;
-        //Pack(data, PackLocation {0,7}, p[0]);
-        //Pack(data, PackLocation {7,7}, p[1]);
+        Pack(data, PackLocation {0, 8}, scale);
+        Pack(data, PackLocation {8, 4}, root);
+        Pack(data, PackLocation {12, 4}, patt_size);
+        Pack(data, PackLocation {16, 4}, smoothing);
+        Pack(data, PackLocation {20, 2}, learn_mode);
         return data;
     }
 
     void OnDataReceive(uint32_t data) {
-        //p[0] = Unpack(data, PackLocation {0,7});
-        //p[1] = Unpack(data, PackLocation {7,7});
+        scale = Unpack(data, PackLocation {0, 8});
+        root = Unpack(data, PackLocation {8, 4});
+        patt_size = Unpack(data, PackLocation {12, 4});
+        smoothing = Unpack(data, PackLocation {16, 4});
+        learn_mode = (LearnMode) Unpack(data, PackLocation {20, 2});
     }
 
 protected:
     void SetHelp() {
-        help[HEMISPHERE_HELP_DIGITALS] = "Clock Ch1, Ch2";
-        help[HEMISPHERE_HELP_CVS]      = "p Mod Ch1, Ch2";
-        help[HEMISPHERE_HELP_OUTS]     = "Clock Ch1, Ch2";
-        help[HEMISPHERE_HELP_ENCODER]  = "Set p";
+        help[HEMISPHERE_HELP_DIGITALS] = "Sample, Lrn/Rst";
+        help[HEMISPHERE_HELP_CVS]      = "P, Signal";
+        help[HEMISPHERE_HELP_OUTS]     = "Sampled out, Thru";
+        help[HEMISPHERE_HELP_ENCODER]  = "Scl,root,n,p,lrn";
     }
 
 private:
@@ -220,12 +232,12 @@ private:
     uint8_t smoothing = 0;
 
     enum LearnMode {
+        FEEDBACK,
         AUTO,
         MANUAL,
-        FEEDBACK,
         OFF
     };
-    LearnMode learn_mode;
+    LearnMode learn_mode = AUTO;
 
     enum CursorMode {
         SCALE,
