@@ -64,6 +64,14 @@ private:
     size_t count;
 };
 
+int mod(int n, int q) {
+    int m = n % q;
+    if (m < 0) {
+        m += q;
+    }
+    return m;
+}
+
 class Ngram : public HemisphereApplet {
 public:
 
@@ -77,12 +85,32 @@ public:
     }
 
     void Controller() {
-        if (Clock(1)) {
-            if (learn) {
-                buff.push(quantizer.Process(In(1), root << 7, 0));
-                sampled_ix--;
-            }
+        int input = learn_mode == FEEDBACK ? patt.last() : In(1);
+        bool learn = false;
+        bool reset = false;
+        switch (learn_mode) {
+            case FEEDBACK:
+            case AUTO:
+                reset = Clock(1);
+                learn = Clock(0);
+                break;
+            case MANUAL:
+                learn = Clock(1);
+                break;
+            case OFF:
+                break;
         }
+
+        if (reset) {
+            buff.clear();
+            patt.clear();
+        }
+
+        if (learn) {
+            buff.push(quantizer.Process(input, root << 7, 0));
+            sampled_ix--;
+        }
+
         if (Clock(0) && !buff.isEmpty()) {
             sampled_ix = Sample();
             int sample = buff[sampled_ix];
@@ -98,17 +126,26 @@ public:
     void View() {
         gfxHeader(applet_name());
 
-        gfxPrint(0, 15, "N: ");
-        gfxPrint(patt_size);
-        gfxPrint(" ");
-        if (!buff.isEmpty()) {
-            gfxPrint(0, 25, buff.first());
-            gfxPrint(0, 35, buff.last());
-        }
+        gfxPrint(0, 15, OC::scale_names_short[scale]);
+        if (cursor == SCALE) gfxCursor(0, 23, 30);
+        gfxPrint(36, 15, OC::Strings::note_names_unpadded[root]);
+        if (cursor == ROOT) gfxCursor(36, 23, 12);
 
-        if (cursor == 0) {
-            gfxCursor(26, 23, 30);
+        gfxPrint(0, 25, "N: ");
+        gfxPrint(patt_size);
+        if (cursor == N) gfxCursor(18, 33, 6);
+        gfxPrint(" P: ");
+        gfxPrint(smoothing);
+        if (cursor == SMOOTH) gfxCursor(48, 33, 6);
+
+        gfxPrint(0, 35, "Lrn: ");
+        switch (learn_mode) {
+            case AUTO: gfxPrint("Auto"); break;
+            case MANUAL: gfxPrint("Man"); break;
+            case FEEDBACK: gfxPrint("Fdbck"); break;
+            case OFF: gfxPrint("Off"); break;
         }
+        if (cursor == LEARN) gfxCursor(30, 43, 33);
 
         for (size_t i=0; i < buff.size(); i++) {
             gfxPixel(i, 53 - int(8 * float(buff[i]) / HEMISPHERE_MAX_CV));
@@ -119,14 +156,37 @@ public:
         for (size_t i=0; i < patt.size(); i++) {
             gfxPixel(i, 63 - int(8 * float(patt[i]) / HEMISPHERE_MAX_CV));
         }
-
     }
 
     void OnButtonPress() {
+        cursor++;
+        if (cursor == LAST) {
+            cursor = 0;
+        }
     }
 
     void OnEncoderMove(int direction) {
-        patt_size = hem_MIN(hem_MAX(patt_size + direction, 1), 8);
+        switch (cursor) {
+            case SCALE:
+                scale = mod(scale + direction, OC::Scales::NUM_SCALES);
+                quantizer.Configure(OC::Scales::GetScale(scale), 0xffff);
+                break;
+            case ROOT:
+                root = constrain(root + direction, 0, 11);
+                break;
+            case N:
+                patt_size = constrain(patt_size + direction, 0, NGRAM_PATT_LEN);
+                break;
+            case SMOOTH:
+                smoothing = constrain(smoothing + direction, 0, NGRAM_PATT_LEN);
+                break;
+            case LEARN:
+                learn_mode = (LearnMode) constrain(
+                        learn_mode + direction,
+                        LearnMode::AUTO,
+                        LearnMode::OFF);
+                break;
+        }
     }
 
     uint32_t OnDataRequest() {
@@ -158,10 +218,26 @@ private:
     CircularBuffer<int, NGRAM_PATT_LEN> patt;
     uint8_t patt_size = 1;
     uint8_t smoothing = 0;
-    size_t sampled_ix = -1;
-    bool learn = true;
 
+    enum LearnMode {
+        AUTO,
+        MANUAL,
+        FEEDBACK,
+        OFF
+    };
+    LearnMode learn_mode;
+
+    enum CursorMode {
+        SCALE,
+        ROOT,
+        N,
+        SMOOTH,
+        LEARN,
+        LAST
+    };
     uint8_t cursor;
+
+    size_t sampled_ix = -1;
 
     int Sample() {
         if (random(0, 99) < smoothing) {
