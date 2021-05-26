@@ -3,9 +3,6 @@
 #include "braids_quantizer_scales.h"
 #include "OC_scales.h"
 
-const int NGRAM_BUFF_LEN = 64;
-const int NGRAM_PATT_LEN = 8;
-
 // based on https://github.com/rlogiacco/CircularBuffer
 template<typename T, size_t N>
 class CircularBuffer {
@@ -87,7 +84,8 @@ public:
 
     void Start() {
         quantizer.Init();
-        quantizer.Configure(OC::Scales::GetScale(scale), 0xffff);
+        // init quantizer
+        set_scale(scale);
     }
 
     void Controller() {
@@ -166,32 +164,18 @@ public:
 
     void OnButtonPress() {
         cursor++;
-        if (cursor == LAST) {
+        if (cursor == CM_LAST) {
             cursor = 0;
         }
     }
 
     void OnEncoderMove(int direction) {
         switch (cursor) {
-            case SCALE:
-                scale = mod(scale + direction, OC::Scales::NUM_SCALES);
-                quantizer.Configure(OC::Scales::GetScale(scale), 0xffff);
-                break;
-            case ROOT:
-                root = constrain(root + direction, 0, 11);
-                break;
-            case N:
-                patt_size = constrain(patt_size + direction, 0, NGRAM_PATT_LEN);
-                break;
-            case SMOOTH:
-                smoothing = constrain(smoothing + direction, 0, NGRAM_PATT_LEN);
-                break;
-            case LEARN:
-                learn_mode = (LearnMode) constrain(
-                        learn_mode + direction,
-                        LearnMode::AUTO,
-                        LearnMode::OFF);
-                break;
+            case SCALE: set_scale(scale + direction); break;
+            case ROOT: set_root(root + direction); break;
+            case N: set_patt_size(patt_size + direction); break;
+            case SMOOTH: set_smoothing(smoothing + direction); break;
+            case LEARN: set_learn_mode(learn_mode + direction); break;
         }
     }
 
@@ -206,11 +190,11 @@ public:
     }
 
     void OnDataReceive(uint32_t data) {
-        scale = Unpack(data, PackLocation {0, 8});
-        root = Unpack(data, PackLocation {8, 4});
-        patt_size = Unpack(data, PackLocation {12, 4});
-        smoothing = Unpack(data, PackLocation {16, 4});
-        learn_mode = (LearnMode) Unpack(data, PackLocation {20, 2});
+        set_scale(Unpack(data, PackLocation {0, 8}));
+        set_root(Unpack(data, PackLocation {8, 4}));
+        set_patt_size(Unpack(data, PackLocation {12, 4}));
+        set_smoothing(Unpack(data, PackLocation {16, 4}));
+        set_learn_mode(Unpack(data, PackLocation {20, 2}));
     }
 
 protected:
@@ -221,13 +205,38 @@ protected:
         help[HEMISPHERE_HELP_ENCODER]  = "Scl,root,n,p,lrn";
     }
 
+    void set_scale(const int new_scale) {
+        scale = mod(new_scale, OC::Scales::NUM_SCALES);
+        quantizer.Configure(OC::Scales::GetScale(scale), 0xffff);
+    }
+
+    void set_root(const int new_root) {
+        root = constrain(new_root, 0, 11);
+    }
+
+    void set_patt_size(const int new_patt_size) {
+        patt_size = constrain(new_patt_size, 0, NGRAM_PATT_LEN);
+    }
+
+    void set_smoothing(const int new_smoothing) {
+        smoothing = constrain(new_smoothing, 0, NGRAM_PATT_LEN);
+    }
+
+    void set_learn_mode(const int new_learn_mode) {
+        learn_mode = (LearnMode) constrain(new_learn_mode, 0, OFF);
+    }
+
 private:
+
+    const static int NGRAM_BUFF_LEN = 64;
+    const static int NGRAM_PATT_LEN = 8;
+
     braids::Quantizer quantizer;
     int scale = 5;
     int root = 0;
 
-    CircularBuffer<int, NGRAM_BUFF_LEN> buff;
-    CircularBuffer<int, NGRAM_PATT_LEN> patt;
+    CircularBuffer<int16_t, NGRAM_BUFF_LEN> buff;
+    CircularBuffer<int16_t, NGRAM_BUFF_LEN> patt;
     uint8_t patt_size = 1;
     uint8_t smoothing = 0;
 
@@ -245,7 +254,7 @@ private:
         N,
         SMOOTH,
         LEARN,
-        LAST
+        CM_LAST
     };
     uint8_t cursor;
 
