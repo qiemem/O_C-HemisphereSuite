@@ -261,38 +261,41 @@ private:
     size_t sampled_ix = -1;
 
     int Sample() {
-        if (random(0, 99) < smoothing) {
-            //return buff[random(0, buff.size())];
-            return random(buff.size());
-        }
-
         //size_t sample = random(buff.size());//buff.size() - 1;//buff.last();
-        size_t sample = buff.size() - 1;
-        size_t n = hem_MIN(patt_size, patt.size());
-        size_t matches = 0;
-        size_t m = buff.size();
-        size_t best_match = 0;
-        for (size_t i = n; i < m; i++) {
-            bool match = true;
-            for (size_t j = 1; j <= n; j++) {
-                if (buff[i - j] != patt[patt.size()-j]) {
-                    match = false;
-                    break;
-                }
-                if (best_match < j) {
-                    best_match = j;
-                    matches = 0;
+        int sample = buff.size() - 1;
+        int n = hem_MIN(patt_size, patt.size());
+        //size_t matches = 0;
+        int total = 0;
+        int m = buff.size();
+        int best = 0;
+        for (int i = n; i < m; i++) {
+            int matches = 0;
+            for (int j = 1; j <= n; j++) {
+                if (buff[i - j] == patt[patt.size() - j]) {
+                    matches++;
                 }
             }
-            if (match) {
-                if (random(++matches) == 0) {
-                    //sample = buff[i + n];
+            if (best < matches && best < n - smoothing) {
+                best = hem_MIN(matches, n - smoothing);
+                total = 0;
+            }
+
+            matches = matches - n + smoothing + 1;
+
+            if (matches > 0) {
+                total += matches;
+                if (int(random(total)) <= matches) {
                     sample = i;
                 }
             }
         }
-        return sample;
+        if (buff[sample] == buff[sampled_ix + 1]) {
+            return sampled_ix + 1;
+        } else {
+            return sample;
+        }
     }
+
 };
 
 
