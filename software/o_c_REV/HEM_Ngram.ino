@@ -89,17 +89,20 @@ public:
     }
 
     void Controller() {
+        ForEachChannel (ch) if (Clock(ch)) StartADCLag(ch);
+
         int input = learn_mode == FEEDBACK ? patt.last() : In(1);
         bool learn = false;
         bool reset = false;
+        bool play_next = EndOfADCLag(0);
         switch (learn_mode) {
             case FEEDBACK:
             case AUTO:
                 reset = Clock(1);
-                learn = Clock(0);
+                learn = play_next;
                 break;
             case MANUAL:
-                learn = Clock(1);
+                learn = EndOfADCLag(1);
                 break;
             case OFF:
                 break;
@@ -115,7 +118,8 @@ public:
             sampled_ix--;
         }
 
-        if (Clock(0) && !buff.isEmpty()) {
+        // Use end here because the newest learned value should be used
+        if (play_next && !buff.isEmpty()) {
             sampled_ix = Sample();
             int sample = buff[sampled_ix];
             //int sample = buff.first();
@@ -151,14 +155,55 @@ public:
         }
         if (cursor == LEARN) gfxCursor(30, 43, 33);
 
+
+        int max_cv = -HEMISPHERE_3V_CV;
+        int min_cv = HEMISPHERE_MAX_CV;
+
         for (size_t i=0; i < buff.size(); i++) {
-            gfxPixel(i, 53 - int(8 * float(buff[i]) / HEMISPHERE_MAX_CV));
-            if (i == sampled_ix) {
-                gfxLine(i, 53, i, 45);
+            if (buff[i] > max_cv) {
+                max_cv = buff[i];
+            }
+            if (buff[i] < min_cv) {
+                min_cv = buff[i];
             }
         }
         for (size_t i=0; i < patt.size(); i++) {
-            gfxPixel(i, 63 - int(8 * float(patt[i]) / HEMISPHERE_MAX_CV));
+            if (patt[i] > max_cv) {
+                max_cv = patt[i];
+            }
+            if (patt[i] < min_cv) {
+                min_cv = buff[i];
+            }
+        }
+        const int cv_range = max_cv - min_cv + 1;
+
+        const int TRACK_HEIGHT = 8;
+        const int BUFF_Y = 45;
+        const int PATT_Y = 56;
+
+        gfxLine(0, BUFF_Y - 1, 63, BUFF_Y - 1);
+        for (size_t i=0; i < buff.size(); i++) {
+            int v = int(TRACK_HEIGHT * float(buff[i] - min_cv) / cv_range);
+            gfxPixel(i, BUFF_Y + TRACK_HEIGHT - 1 - v);
+            if (i == sampled_ix) {
+                gfxLine(i, BUFF_Y, i, BUFF_Y + TRACK_HEIGHT);
+            }
+        }
+        gfxLine(0, BUFF_Y + TRACK_HEIGHT, 63, BUFF_Y + TRACK_HEIGHT);
+
+        gfxLine(0, PATT_Y - 1, 63, PATT_Y - 1);
+        for (size_t i=0; i < patt.size(); i++) {
+            int v = int(TRACK_HEIGHT * float(patt[i] - min_cv) / cv_range);
+            gfxPixel(i, PATT_Y + TRACK_HEIGHT - 1 - v);
+        }
+        gfxLine(0, PATT_Y + TRACK_HEIGHT, 63, PATT_Y + TRACK_HEIGHT);
+
+        gfxInvert(patt.size() - hem_MIN(patt_size, patt.size()), PATT_Y,
+                  hem_MIN(patt_size, patt.size()),               TRACK_HEIGHT);
+
+        if (cursor == RESET && CursorBlink()) {
+            gfxLine(0, BUFF_Y, 63, 63);
+            gfxLine(63, BUFF_Y, 0, 63);
         }
     }
 
@@ -176,6 +221,7 @@ public:
             case N: set_patt_size(patt_size + direction); break;
             case SMOOTH: set_smoothing(smoothing + direction); break;
             case LEARN: set_learn_mode(learn_mode + direction); break;
+            case RESET: buff.clear(); patt.clear(); break;
         }
     }
 
@@ -254,6 +300,7 @@ private:
         N,
         SMOOTH,
         LEARN,
+        RESET,
         CM_LAST
     };
     uint8_t cursor;
@@ -261,33 +308,35 @@ private:
     size_t sampled_ix = -1;
 
     int Sample() {
-        //size_t sample = random(buff.size());//buff.size() - 1;//buff.last();
-        int sample = buff.size() - 1;
-        int n = hem_MIN(patt_size, patt.size());
+        int sample = -1;
+        int s = smoothing;
+        int n = hem_MIN(hem_MIN(patt_size, patt.size()), buff.size() - 1);
         //size_t matches = 0;
-        int total = 0;
         int m = buff.size();
         int best = 0;
-        for (int i = n; i < m; i++) {
-            int matches = 0;
-            for (int j = 1; j <= n; j++) {
-                if (buff[i - j] == patt[patt.size() - j]) {
-                    matches++;
+        while (sample < 0) {
+            int total = 0;
+            for (int i = n; i < m; i++) {
+                int matches = 0;
+                for (int j = 1; j <= n; j++) {
+                    if (buff[i - j] == patt[patt.size() - j]) {
+                        matches++;
+                    }
+                }
+                if (best < matches) {
+                    best = matches;
+                }
+
+                matches = matches - n + s + 1;
+
+                if (matches > 0) {
+                    total += matches;
+                    if (int(random(total)) <= matches) {
+                        sample = i;
+                    }
                 }
             }
-            if (best < matches && best < n - smoothing) {
-                best = hem_MIN(matches, n - smoothing);
-                total = 0;
-            }
-
-            matches = matches - n + smoothing + 1;
-
-            if (matches > 0) {
-                total += matches;
-                if (int(random(total)) <= matches) {
-                    sample = i;
-                }
-            }
+            s += n - best;
         }
         if (buff[sample] == buff[sampled_ix + 1]) {
             return sampled_ix + 1;
