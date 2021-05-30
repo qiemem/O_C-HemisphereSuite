@@ -1,4 +1,3 @@
-#include <cstdint>
 #include "braids_quantizer.h"
 #include "braids_quantizer_scales.h"
 #include "OC_scales.h"
@@ -139,12 +138,14 @@ public:
         gfxPrint(36, 15, OC::Strings::note_names_unpadded[root]);
         if (cursor == ROOT) gfxCursor(36, 23, 12);
 
+        /*
         gfxPrint(0, 25, "N: ");
         gfxPrint(patt_size);
         if (cursor == N) gfxCursor(18, 33, 6);
-        gfxPrint(" P: ");
+        */
+        gfxPrint(0, 25, "P: ");
         gfxPrint(smoothing);
-        if (cursor == SMOOTH) gfxCursor(48, 33, 6);
+        if (cursor == SMOOTH) gfxCursor(18, 33, 36);
 
         gfxPrint(0, 35, "Lrn: ");
         switch (learn_mode) {
@@ -218,7 +219,7 @@ public:
         switch (cursor) {
             case SCALE: set_scale(scale + direction); break;
             case ROOT: set_root(root + direction); break;
-            case N: set_patt_size(patt_size + direction); break;
+            //case N: set_patt_size(patt_size + direction); break;
             case SMOOTH: set_smoothing(smoothing + direction); break;
             case LEARN: set_learn_mode(learn_mode + direction); break;
             case RESET: buff.clear(); patt.clear(); break;
@@ -229,18 +230,18 @@ public:
         uint32_t data = 0;
         Pack(data, PackLocation {0, 8}, scale);
         Pack(data, PackLocation {8, 4}, root);
-        Pack(data, PackLocation {12, 4}, patt_size);
-        Pack(data, PackLocation {16, 4}, smoothing);
-        Pack(data, PackLocation {20, 2}, learn_mode);
+        //Pack(data, PackLocation {12, 4}, patt_size);
+        Pack(data, PackLocation {12, 7}, smoothing);
+        Pack(data, PackLocation {19, 2}, learn_mode);
         return data;
     }
 
     void OnDataReceive(uint32_t data) {
         set_scale(Unpack(data, PackLocation {0, 8}));
         set_root(Unpack(data, PackLocation {8, 4}));
-        set_patt_size(Unpack(data, PackLocation {12, 4}));
-        set_smoothing(Unpack(data, PackLocation {16, 4}));
-        set_learn_mode(Unpack(data, PackLocation {20, 2}));
+        //set_patt_size(Unpack(data, PackLocation {12, 4}));
+        set_smoothing(Unpack(data, PackLocation {12, 7}));
+        set_learn_mode(Unpack(data, PackLocation {19, 2}));
     }
 
 protected:
@@ -265,7 +266,7 @@ protected:
     }
 
     void set_smoothing(const int new_smoothing) {
-        smoothing = constrain(new_smoothing, 0, NGRAM_PATT_LEN);
+        smoothing = constrain(new_smoothing, 0, 100);
     }
 
     void set_learn_mode(const int new_learn_mode) {
@@ -283,7 +284,7 @@ private:
 
     CircularBuffer<int16_t, NGRAM_BUFF_LEN> buff;
     CircularBuffer<int16_t, NGRAM_BUFF_LEN> patt;
-    uint8_t patt_size = 1;
+    uint8_t patt_size = 8;
     uint8_t smoothing = 0;
 
     enum LearnMode {
@@ -297,7 +298,7 @@ private:
     enum CursorMode {
         SCALE,
         ROOT,
-        N,
+        //N,
         SMOOTH,
         LEARN,
         RESET,
@@ -309,40 +310,56 @@ private:
 
     int Sample() {
         int sample = -1;
-        int s = smoothing;
         int n = hem_MIN(hem_MIN(patt_size, patt.size()), buff.size() - 1);
         //size_t matches = 0;
         int m = buff.size();
-        int best = 0;
-        while (sample < 0) {
-            int total = 0;
-            for (int i = n; i < m; i++) {
-                int matches = 0;
-                for (int j = 1; j <= n; j++) {
-                    if (buff[i - j] == patt[patt.size() - j]) {
-                        matches++;
-                    }
-                }
-                if (best < matches) {
-                    best = matches;
-                }
-
-                matches = matches - n + s + 1;
-
-                if (matches > 0) {
-                    total += matches;
-                    if (int(random(total)) <= matches) {
-                        sample = i;
-                    }
+        float total = 0.0f;
+        for (int i = 0; i < m; i++) {
+            float score = 1.0f;
+            for (int j = 1; j <= n && j <= i; j++) {
+                if (buff[i - j] == patt[patt.size() - j]) {
+                    // Because pow causes code size to increase too much...
+                    // This definitely isn't pow, but it gets at the same idea
+                    // At max weight, a match will increase chance of being by 8x
+                    score *= 7.0f * weight(j) + 1.0f;
                 }
             }
-            s += n - best;
+
+            total += score;
+            float p = random(1e6) / 1e6f;
+            if (p <= score / total) {
+                sample = i;
+            }
         }
         if (buff[sample] == buff[sampled_ix + 1]) {
             return sampled_ix + 1;
         } else {
             return sample;
         }
+    }
+
+    // Weight with a flipped sigmoid offset by smoothing such that the higher
+    // the smoothing and the higher the index, the closer to 0 and vice versa
+    // for 1.
+    // i should range from 1 to patt_size, where this is how far back this
+    // particular match is from the sample we're considering.
+    float weight(int i) const {
+        float x = 1.0f - float(smoothing) / 100.0f - float(i - 1) / patt_size + 0.4f;
+        float y = 1.0f - x;
+
+        // x ^ 8
+        x *= x;
+        x *= x;
+        x *= x;
+
+        // y ^ 8
+        y *= y;
+        y *= y;
+        y *= y;
+
+        // This will result in a sigmoid where the midpoint of the sigmoid has
+        // slope equal to the power of the above exponents.
+        return x / (x + y);
     }
 
 };
