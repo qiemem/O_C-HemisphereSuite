@@ -136,7 +136,7 @@ public:
         for (int i = 0; i < patt_size; i++) {
             float w = weight(patt_size - i);
             int height = hem_MIN(int(w * 8), 7);
-            gfxRect(32 + i * 4, 33 - height, 3, height);
+            gfxRect(32 + i * 4, 32 - height, 3, height);
         }
         if (cursor == SMOOTH) gfxCursor(32, 33, 32);
 
@@ -173,7 +173,7 @@ public:
 
         const int TRACK_HEIGHT = 8;
         const int BUFF_Y = 45;
-        const int PATT_Y = 56;
+        const int PATT_Y = 55;
 
         gfxLine(0, BUFF_Y - 1, 63, BUFF_Y - 1);
         for (size_t i=0; i < buff.size(); i++) {
