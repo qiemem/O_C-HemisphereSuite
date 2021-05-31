@@ -68,12 +68,6 @@ int mod(int n, int q) {
     return m;
 }
 
-uint8_t ilog2(int n) {
-    uint8_t i = 0;
-    while (n >>= 1) i++;
-    return i;
-}
-
 class Ngram : public HemisphereApplet {
 public:
 
@@ -138,14 +132,13 @@ public:
         gfxPrint(36, 15, OC::Strings::note_names_unpadded[root]);
         if (cursor == ROOT) gfxCursor(36, 23, 12);
 
-        /*
-        gfxPrint(0, 25, "N: ");
-        gfxPrint(patt_size);
-        if (cursor == N) gfxCursor(18, 33, 6);
-        */
-        gfxPrint(0, 25, "P: ");
-        gfxPrint(smoothing);
-        if (cursor == SMOOTH) gfxCursor(18, 33, 36);
+        gfxPrint(0, 25, "Wght: ");
+        for (int i = 0; i < patt_size; i++) {
+            float w = weight(patt_size - i);
+            int height = hem_MIN(int(w * 8), 7);
+            gfxRect(32 + i * 4, 33 - height, 3, height);
+        }
+        if (cursor == SMOOTH) gfxCursor(32, 33, 32);
 
         gfxPrint(0, 35, "Lrn: ");
         switch (learn_mode) {
@@ -247,9 +240,9 @@ public:
 protected:
     void SetHelp() {
         help[HEMISPHERE_HELP_DIGITALS] = "Sample, Lrn/Rst";
-        help[HEMISPHERE_HELP_CVS]      = "P, Signal";
+        help[HEMISPHERE_HELP_CVS]      = "Weight, Signal";
         help[HEMISPHERE_HELP_OUTS]     = "Sampled out, Thru";
-        help[HEMISPHERE_HELP_ENCODER]  = "Scl,root,n,p,lrn";
+        help[HEMISPHERE_HELP_ENCODER]  = "Scl,root,wght,lrn";
     }
 
     void set_scale(const int new_scale) {
@@ -266,7 +259,7 @@ protected:
     }
 
     void set_smoothing(const int new_smoothing) {
-        smoothing = constrain(new_smoothing, 0, 100);
+        smoothing = constrain(new_smoothing, 0, NGRAM_MAX_SMOOTHING);
     }
 
     void set_learn_mode(const int new_learn_mode) {
@@ -277,6 +270,7 @@ private:
 
     const static int NGRAM_BUFF_LEN = 64;
     const static int NGRAM_PATT_LEN = 8;
+    const static int NGRAM_MAX_SMOOTHING = 32;
 
     braids::Quantizer quantizer;
     int scale = 5;
@@ -311,7 +305,6 @@ private:
     int Sample() {
         int sample = -1;
         int n = hem_MIN(hem_MIN(patt_size, patt.size()), buff.size() - 1);
-        //size_t matches = 0;
         int m = buff.size();
         float total = 0.0f;
         for (int i = 0; i < m; i++) {
@@ -344,18 +337,19 @@ private:
     // i should range from 1 to patt_size, where this is how far back this
     // particular match is from the sample we're considering.
     float weight(int i) const {
-        float x = 1.0f - float(smoothing) / 100.0f - float(i - 1) / patt_size + 0.4f;
+        float x = 1.0f - float(smoothing) / NGRAM_MAX_SMOOTHING
+            - float(i - 1) / patt_size + 0.4f;
         float y = 1.0f - x;
 
-        // x ^ 8
+        // x ^ 4
         x *= x;
         x *= x;
-        x *= x;
+        //x *= x;
 
-        // y ^ 8
+        // y ^ 4
         y *= y;
         y *= y;
-        y *= y;
+        //y *= y;
 
         // This will result in a sigmoid where the midpoint of the sigmoid has
         // slope equal to the power of the above exponents.
