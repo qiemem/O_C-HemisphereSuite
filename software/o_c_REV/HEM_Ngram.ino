@@ -212,7 +212,6 @@ public:
         switch (cursor) {
             case SCALE: set_scale(scale + direction); break;
             case ROOT: set_root(root + direction); break;
-            //case N: set_patt_size(patt_size + direction); break;
             case SMOOTH: set_smoothing(smoothing + direction); break;
             case LEARN: set_learn_mode(learn_mode + direction); break;
             case RESET: buff.clear(); patt.clear(); break;
@@ -223,18 +222,16 @@ public:
         uint32_t data = 0;
         Pack(data, PackLocation {0, 8}, scale);
         Pack(data, PackLocation {8, 4}, root);
-        //Pack(data, PackLocation {12, 4}, patt_size);
-        Pack(data, PackLocation {12, 7}, smoothing);
-        Pack(data, PackLocation {19, 2}, learn_mode);
+        Pack(data, PackLocation {12, 5}, smoothing);
+        Pack(data, PackLocation {17, 2}, learn_mode);
         return data;
     }
 
     void OnDataReceive(uint32_t data) {
         set_scale(Unpack(data, PackLocation {0, 8}));
         set_root(Unpack(data, PackLocation {8, 4}));
-        //set_patt_size(Unpack(data, PackLocation {12, 4}));
-        set_smoothing(Unpack(data, PackLocation {12, 7}));
-        set_learn_mode(Unpack(data, PackLocation {19, 2}));
+        set_smoothing(Unpack(data, PackLocation {12, 5}));
+        set_learn_mode(Unpack(data, PackLocation {17, 2}));
     }
 
 protected:
