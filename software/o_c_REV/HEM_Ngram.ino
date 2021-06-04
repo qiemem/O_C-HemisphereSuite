@@ -77,7 +77,6 @@ public:
 
     void Start() {
         quantizer.Init();
-        // init quantizer
         set_scale(scale);
     }
 
@@ -88,6 +87,7 @@ public:
         bool learn = false;
         bool reset = false;
         bool play_next = EndOfADCLag(0);
+        smoothing_cv = Proportion(DetentedIn(0), HEMISPHERE_MAX_CV, NGRAM_MAX_SMOOTHING);
         switch (learn_mode) {
             case FEEDBACK:
             case AUTO:
@@ -115,9 +115,6 @@ public:
         if (play_next && !buff.isEmpty()) {
             sampled_ix = Sample();
             int sample = buff[sampled_ix];
-            //int sample = buff.first();
-            //int sample = buff[random(0, buff.size())];
-            //int sample = buff.last();
             patt.push(sample);
             Out(0, sample);
             Out(1, buff.last());
@@ -165,7 +162,7 @@ public:
                 max_cv = patt[i];
             }
             if (patt[i] < min_cv) {
-                min_cv = buff[i];
+                min_cv = patt[i];
             }
         }
         const int cv_range = max_cv - min_cv + 1;
@@ -276,6 +273,7 @@ private:
     CircularBuffer<int16_t, NGRAM_BUFF_LEN> patt;
     uint8_t patt_size = 8;
     uint8_t smoothing = 0;
+    int8_t smoothing_cv = 0;
 
     enum LearnMode {
         FEEDBACK,
@@ -288,7 +286,6 @@ private:
     enum CursorMode {
         SCALE,
         ROOT,
-        //N,
         SMOOTH,
         LEARN,
         RESET,
@@ -299,7 +296,7 @@ private:
     size_t sampled_ix = -1;
 
     int Sample() {
-        int sample = -1;
+        int sample = buff.size() - 1;
         int n = hem_MIN(hem_MIN(patt_size, patt.size()), buff.size() - 1);
         int m = buff.size();
         uint32_t total = 0;
@@ -315,7 +312,7 @@ private:
             }
 
             total += score;
-            if (score > random(total)) {
+            if (random(total) < score) {
                 sample = i;
             }
         }
@@ -332,7 +329,8 @@ private:
     // i should range from 1 to patt_size, where this is how far back this
     // particular match is from the sample we're considering.
     uint32_t weight(int i) const {
-        return constrain(36 - smoothing - 4 * (i - 1), 1, 8);
+        uint8_t s = constrain(smoothing + smoothing_cv, 0, NGRAM_MAX_SMOOTHING);
+        return constrain(36 - s - 4 * (i - 1), 1, 8);
     }
 };
 
