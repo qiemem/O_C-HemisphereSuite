@@ -107,7 +107,11 @@ public:
         }
 
         if (learn) {
-            buff.push(quantizer.Process(input, root << 7, 0));
+            if (scale > 0) {
+                buff.push(quantizer.Process(input, root << 7, 0));
+            } else {
+                buff.push(input > HEMISPHERE_3V_CV ? HEMISPHERE_MAX_CV : 0);
+            }
             sampled_ix--;
         }
 
@@ -116,15 +120,27 @@ public:
             sampled_ix = Sample();
             int sample = buff[sampled_ix];
             patt.push(sample);
-            Out(0, sample);
-            Out(1, buff.last());
+            if (scale > 0) {
+                Out(0, sample);
+            } else if (sample >= HEMISPHERE_3V_CV) {
+                ClockOut(0);
+            }
+            if (scale > 0) {
+                Out(1, buff.last());
+            } else if (buff.last() >= HEMISPHERE_3V_CV) {
+                ClockOut(1);
+            }
         }
     }
 
     void View() {
         gfxHeader(applet_name());
 
-        gfxPrint(0, 15, OC::scale_names_short[scale]);
+        if (scale > 0) {
+            gfxPrint(0, 15, OC::scale_names_short[scale - 1]);
+        } else {
+            gfxPrint(0, 15, "TRIG");
+        }
         if (cursor == SCALE) gfxCursor(0, 23, 30);
         gfxPrint(36, 15, OC::Strings::note_names_unpadded[root]);
         if (cursor == ROOT) gfxCursor(36, 23, 12);
@@ -241,8 +257,10 @@ protected:
     }
 
     void set_scale(const int new_scale) {
-        scale = mod(new_scale, OC::Scales::NUM_SCALES);
-        quantizer.Configure(OC::Scales::GetScale(scale), 0xffff);
+        scale = mod(new_scale, OC::Scales::NUM_SCALES + 1);
+        if (scale != 0) {
+            quantizer.Configure(OC::Scales::GetScale(scale - 1), 0xffff);
+        }
     }
 
     void set_root(const int new_root) {
@@ -268,13 +286,13 @@ private:
     const static int NGRAM_MAX_SMOOTHING = 35;
 
     braids::Quantizer quantizer;
-    int scale = 5;
+    int scale = 6; // SEMI
     int root = 0;
 
     CircularBuffer<int16_t, NGRAM_BUFF_LEN> buff;
     CircularBuffer<int16_t, NGRAM_BUFF_LEN> patt;
     uint8_t patt_size = 8;
-    uint8_t smoothing = 0;
+    uint8_t smoothing = 16;
     int8_t smoothing_cv = 0;
 
     enum LearnMode {
