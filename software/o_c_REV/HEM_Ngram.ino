@@ -171,25 +171,27 @@ public:
         const int BUFF_Y = 45;
         const int PATT_Y = 55;
 
-        gfxLine(0, BUFF_Y - 1, 63, BUFF_Y - 1);
         for (size_t i=0; i < buff.size(); i++) {
-            int v = int(TRACK_HEIGHT * float(buff[i] - min_cv) / cv_range);
-            gfxPixel(i, BUFF_Y + TRACK_HEIGHT - 1 - v);
+            int v = Proportion(buff[i] - min_cv, cv_range, TRACK_HEIGHT);
+            gfxLine(i, BUFF_Y + TRACK_HEIGHT - 1 - v, i, BUFF_Y + TRACK_HEIGHT - 1);
             if (i == sampled_ix) {
-                gfxLine(i, BUFF_Y, i, BUFF_Y + TRACK_HEIGHT);
+                gfxInvert(i, BUFF_Y, 1, TRACK_HEIGHT);
             }
         }
-        gfxLine(0, BUFF_Y + TRACK_HEIGHT, 63, BUFF_Y + TRACK_HEIGHT);
 
-        gfxLine(0, PATT_Y - 1, 63, PATT_Y - 1);
         for (size_t i=0; i < patt.size(); i++) {
-            int v = int(TRACK_HEIGHT * float(patt[i] - min_cv) / cv_range);
-            gfxPixel(i, PATT_Y + TRACK_HEIGHT - 1 - v);
+            int v = Proportion(patt[i] - min_cv, cv_range, TRACK_HEIGHT);
+            gfxLine(i, PATT_Y + TRACK_HEIGHT - 1 - v, i, PATT_Y + TRACK_HEIGHT - 1);
         }
-        gfxLine(0, PATT_Y + TRACK_HEIGHT, 63, PATT_Y + TRACK_HEIGHT);
 
-        gfxInvert(patt.size() - hem_MIN(patt_size, patt.size()), PATT_Y,
-                  hem_MIN(patt_size, patt.size()),               TRACK_HEIGHT);
+        int patt_border_w = patt.size() - 1 - hem_MIN(patt_size, patt.size() - 1);
+        int patt_width = hem_MIN(patt_size, patt.size() - 1);
+        gfxLine(patt_border_w, PATT_Y - 1,
+                patt_border_w, PATT_Y + TRACK_HEIGHT);
+        gfxLine(patt_border_w, PATT_Y - 1,
+                patt_border_w + patt_width, PATT_Y - 1);
+        gfxLine(patt_border_w, PATT_Y + TRACK_HEIGHT,
+                patt_border_w + patt_width, PATT_Y + TRACK_HEIGHT);
 
         if (cursor == RESET && CursorBlink()) {
             gfxLine(0, BUFF_Y, 63, 63);
