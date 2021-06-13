@@ -41,11 +41,11 @@ public:
         return *tail;
     }
 
-    bool isEmpty() {
+    bool isEmpty() const {
         return count == 0;
     }
 
-    size_t size() {
+    size_t size() const {
         return count;
     }
 
@@ -86,6 +86,7 @@ public:
         int input = learn_mode == FEEDBACK ? patt.last() : In(1);
         bool learn = false;
         bool reset = false;
+        // Use end here because the newest learned value should be used
         bool play_next = EndOfADCLag(0);
         smoothing_cv = Proportion(DetentedIn(0), HEMISPHERE_MAX_CV, NGRAM_MAX_SMOOTHING);
         switch (learn_mode) {
@@ -104,6 +105,7 @@ public:
         if (reset) {
             buff.clear();
             patt.clear();
+            ResetSampler();
         }
 
         if (learn) {
@@ -112,17 +114,45 @@ public:
             } else {
                 buff.push(input > HEMISPHERE_3V_CV ? HEMISPHERE_MAX_CV : 0);
             }
-            sampled_ix--;
+            if (last_sampled_ix > 0) last_sampled_ix--;
+
+            // The sampled value might drop off the beginning of the buffer;
+            // that's okay; we basically just virtually extend the buffer
+            // length until we play. We could just try to re-adjust everything
+            // to remove the effect of the lost value on score totals, and
+            // approximate resampling or something, but it would be a total
+            // pain. This is pretty reasonable behavior and is way simpler.
+            if (sampled_ix > 0) sampled_ix--;
+            if (sampler_ix > 0) sampler_ix--;
+
+            if (SampleIndex(patt, buff.size() - 1, total)) {
+                sampled_ix = buff.size() - 1;
+                sampled_value = buff[sampled_ix];
+            }
         }
 
-        // Use end here because the newest learned value should be used
+        int iters = 8;
+        while (iters-- && sampler_ix > 0) {
+            if (SampleIndex(patt, --sampler_ix, total)) {
+                sampled_ix = sampler_ix;
+                sampled_value = buff[sampled_ix];
+            }
+        }
+
+
         if (play_next && !buff.isEmpty()) {
-            sampled_ix = Sample();
-            int sample = buff[sampled_ix];
-            patt.push(sample);
+
+            if (last_sampled_ix < buff.size() - 1
+                    && buff[last_sampled_ix + 1] == sampled_value) {
+                sampled_ix = last_sampled_ix + 1;
+            }
+            last_sampled_ix = sampled_ix;
+            patt.push(sampled_value);
+
+
             if (scale > 0) {
-                Out(0, sample);
-            } else if (sample >= HEMISPHERE_3V_CV) {
+                Out(0, sampled_value);
+            } else if (sampled_value >= HEMISPHERE_3V_CV) {
                 ClockOut(0);
             }
             if (scale > 0) {
@@ -130,6 +160,8 @@ public:
             } else if (buff.last() >= HEMISPHERE_3V_CV) {
                 ClockOut(1);
             }
+
+            ResetSampler();
         }
     }
 
@@ -146,8 +178,8 @@ public:
         if (cursor == ROOT) gfxCursor(36, 23, 12);
 
         gfxPrint(0, 25, "Wght: ");
-        for (int i = 0; i < patt_size; i++) {
-            int height = weight(patt_size - i);
+        for (size_t i = 0; i < NGRAM_PATT_LEN; i++) {
+            int height = weight(NGRAM_PATT_LEN - i);
             gfxRect(32 + i * 4, 32 - height, 3, height);
         }
         if (cursor == SMOOTH) gfxCursor(32, 33, 32);
@@ -190,7 +222,7 @@ public:
         for (size_t i=0; i < buff.size(); i++) {
             int v = Proportion(buff[i] - min_cv, cv_range, TRACK_HEIGHT);
             gfxLine(i, BUFF_Y + TRACK_HEIGHT - 1 - v, i, BUFF_Y + TRACK_HEIGHT - 1);
-            if (i == sampled_ix) {
+            if (i == last_sampled_ix) {
                 gfxInvert(i, BUFF_Y, 1, TRACK_HEIGHT);
             }
         }
@@ -200,8 +232,9 @@ public:
             gfxLine(i, PATT_Y + TRACK_HEIGHT - 1 - v, i, PATT_Y + TRACK_HEIGHT - 1);
         }
 
-        int patt_border_w = patt.size() - 1 - hem_MIN(patt_size, patt.size() - 1);
-        int patt_width = hem_MIN(patt_size, patt.size() - 1);
+        int patt_border_w = hem_MAX(patt.size() - NGRAM_PATT_LEN - 1, 0);
+        int patt_width = hem_MAX(hem_MIN(NGRAM_PATT_LEN, patt.size() - 1), 0);
+
         gfxLine(patt_border_w, PATT_Y - 1,
                 patt_border_w, PATT_Y + TRACK_HEIGHT);
         gfxLine(patt_border_w, PATT_Y - 1,
@@ -267,10 +300,6 @@ protected:
         root = constrain(new_root, 0, 11);
     }
 
-    void set_patt_size(const int new_patt_size) {
-        patt_size = constrain(new_patt_size, 0, NGRAM_PATT_LEN);
-    }
-
     void set_smoothing(const int new_smoothing) {
         smoothing = constrain(new_smoothing, 0, NGRAM_MAX_SMOOTHING);
     }
@@ -281,8 +310,8 @@ protected:
 
 private:
 
-    const static int NGRAM_BUFF_LEN = 64;
-    const static int NGRAM_PATT_LEN = 8;
+    const static size_t NGRAM_BUFF_LEN = 64;
+    const static size_t NGRAM_PATT_LEN = 8;
     const static int NGRAM_MAX_SMOOTHING = 35;
 
     braids::Quantizer quantizer;
@@ -291,7 +320,6 @@ private:
 
     CircularBuffer<int16_t, NGRAM_BUFF_LEN> buff;
     CircularBuffer<int16_t, NGRAM_BUFF_LEN> patt;
-    uint8_t patt_size = 8;
     uint8_t smoothing = 16;
     int8_t smoothing_cv = 0;
 
@@ -313,40 +341,49 @@ private:
     };
     uint8_t cursor;
 
-    size_t sampled_ix = -1;
+    size_t last_sampled_ix = 0;
+    int sampled_value = 0;
+    size_t sampled_ix = 0;
+    size_t sampler_ix = 0;
+    uint32_t total = 0;
+    const static size_t MAX_SAMPLER_ITERS = NGRAM_BUFF_LEN;
 
-    int Sample() {
-        int sample = buff.size() - 1;
-        int n = hem_MIN(hem_MIN(patt_size, patt.size()), buff.size() - 1);
-        int m = buff.size();
-        uint32_t total = 0;
-        for (int i = 0; i < m; i++) {
-            uint32_t score = 1;
-            for (int j = 1; j <= n && j <= i; j++) {
-                if (buff[i - j] == patt[patt.size() - j]) {
-                    // Because pow causes code size to increase too much...
-                    // This definitely isn't pow, but it gets at the same idea
-                    // At max weight, a match will increase chance of being by 8x
-                    score *= weight(j);
-                }
-            }
-
-            total += score;
-            if (random(total) < score) {
-                sample = i;
-            }
-        }
-        if (buff[sample] == buff[sampled_ix + 1]) {
-            return sampled_ix + 1;
-        } else {
-            return sample;
-        }
+    bool SampleIndex(const CircularBuffer<int16_t, NGRAM_BUFF_LEN>& pattern, size_t index, uint32_t& total) {
+        uint32_t score = ScoreMatch(pattern, index);
+        total += score;
+        return random(total) < score;
     }
+
+    uint32_t ScoreMatch(const CircularBuffer<int16_t, NGRAM_BUFF_LEN>& pattern, size_t index) {
+        size_t n = hem_MAX(
+                hem_MIN(
+                    hem_MIN(NGRAM_PATT_LEN, pattern.size()),
+                    buff.size() - 1),
+                0);
+        uint32_t score = 1;
+        for (size_t j = 1; j <= n && j <= index; j++) {
+            if (buff[index - j] == patt[patt.size() - j]) {
+                // Because pow causes code size to increase too much...
+                // This definitely isn't pow, but it gets at the same idea
+                // At max weight, a match will increase chance of being by 8x
+                score *= weight(j);
+            }
+        }
+        return score;
+    }
+
+    void ResetSampler() {
+        sampled_ix = hem_MAX(buff.size() - 1, 0);
+        sampler_ix = hem_MAX(buff.size() - 1, 0);
+        sampled_value = buff.isEmpty() ? 0 : buff[sampled_ix];
+        total = buff.isEmpty() ? 0 : ScoreMatch(patt, sampler_ix);
+    }
+
 
     // Weight with a flipped sigmoid offset by smoothing such that the higher
     // the smoothing and the higher the index, the closer to 0 and vice versa
     // for 1.
-    // i should range from 1 to patt_size, where this is how far back this
+    // i should range from 1 to NGRAM_PATT_LEN, where this is how far back this
     // particular match is from the sample we're considering.
     uint32_t weight(int i) const {
         uint8_t s = constrain(smoothing + smoothing_cv, 0, NGRAM_MAX_SMOOTHING);
