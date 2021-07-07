@@ -86,26 +86,40 @@ public:
         int input = learn_mode == FEEDBACK ? patt.last() : In(1);
         bool learn = false;
         bool reset = false;
+        bool copy = false;
         // Use end here because the newest learned value should be used
         bool play_next = EndOfADCLag(0);
         smoothing_cv = Proportion(DetentedIn(0), HEMISPHERE_MAX_CV, NGRAM_MAX_SMOOTHING);
         switch (learn_mode) {
             case FEEDBACK:
             case AUTO:
-                reset = Clock(1);
+                //reset = Clock(1);
+                // Use beginning of clock instead of EndOfADCLag because the
+                // goal is to sync with the buffer input. Thus, it should be
+                // trying to predict the buffer's currently incoming value.
+                copy = EndOfADCLag(1);
                 learn = play_next;
                 break;
             case MANUAL:
                 learn = EndOfADCLag(1);
                 break;
             case OFF:
+                copy = EndOfADCLag(1);
                 break;
         }
 
         if (reset) {
             buff.clear();
             patt.clear();
+            hist.clear();
             ResetSampler();
+        }
+
+        if (copy) {
+            size_t l = hem_MIN(NGRAM_PATT_LEN, buff.size());
+            for (size_t i=buff.size() - l; i < buff.size(); i++) {
+                patt.push(buff[i]);
+            }
         }
 
         if (learn) {
@@ -132,7 +146,7 @@ public:
         }
 
         int iters = 8;
-        while (iters-- && sampler_ix > 0) {
+        while (sampler_ix < buff.size() && sampler_ix > 0 && iters--) {
             if (SampleIndex(patt, --sampler_ix, total)) {
                 sampled_ix = sampler_ix;
                 sampled_value = buff[sampled_ix];
@@ -148,7 +162,7 @@ public:
             }
             last_sampled_ix = sampled_ix;
             patt.push(sampled_value);
-
+            hist.push(sampled_value);
 
             if (scale > 0) {
                 Out(0, sampled_value);
@@ -205,46 +219,39 @@ public:
                 min_cv = buff[i];
             }
         }
-        for (size_t i=0; i < patt.size(); i++) {
-            if (patt[i] > max_cv) {
-                max_cv = patt[i];
+        for (size_t i=0; i < hist.size(); i++) {
+            if (hist[i] > max_cv) {
+                max_cv = hist[i];
             }
-            if (patt[i] < min_cv) {
-                min_cv = patt[i];
+            if (hist[i] < min_cv) {
+                min_cv = hist[i];
             }
         }
-        const int cv_range = max_cv - min_cv + 1;
 
         const int TRACK_HEIGHT = 8;
         const int BUFF_Y = 45;
-        const int PATT_Y = 55;
+        const int HIST_Y = 55;
 
-        for (size_t i=0; i < buff.size(); i++) {
-            int v = Proportion(buff[i] - min_cv, cv_range, TRACK_HEIGHT);
-            gfxLine(i, BUFF_Y + TRACK_HEIGHT - 1 - v, i, BUFF_Y + TRACK_HEIGHT - 1);
-            if (i == last_sampled_ix) {
-                gfxInvert(i, BUFF_Y, 1, TRACK_HEIGHT);
-            }
+        DrawLandscape(0, BUFF_Y, TRACK_HEIGHT, buff, min_cv, max_cv);
+        if (last_sampled_ix < buff.size()) {
+            gfxInvert(last_sampled_ix, BUFF_Y, 1, TRACK_HEIGHT);
         }
 
-        for (size_t i=0; i < patt.size(); i++) {
-            int v = Proportion(patt[i] - min_cv, cv_range, TRACK_HEIGHT);
-            gfxLine(i, PATT_Y + TRACK_HEIGHT - 1 - v, i, PATT_Y + TRACK_HEIGHT - 1);
-        }
-
-        int patt_border_w = hem_MAX(patt.size() - NGRAM_PATT_LEN - 1, 0);
-        int patt_width = hem_MAX(hem_MIN(NGRAM_PATT_LEN, patt.size() - 1), 0);
-
-        gfxLine(patt_border_w, PATT_Y - 1,
-                patt_border_w, PATT_Y + TRACK_HEIGHT);
-        gfxLine(patt_border_w, PATT_Y - 1,
-                patt_border_w + patt_width, PATT_Y - 1);
-        gfxLine(patt_border_w, PATT_Y + TRACK_HEIGHT,
-                patt_border_w + patt_width, PATT_Y + TRACK_HEIGHT);
-
+        DrawLandscape(0, HIST_Y, TRACK_HEIGHT, hist, min_cv, max_cv);
         if (cursor == RESET && CursorBlink()) {
             gfxLine(0, BUFF_Y, 63, 63);
             gfxLine(63, BUFF_Y, 0, 63);
+        }
+    }
+
+    template<typename T, size_t N>
+    void DrawLandscape(
+            int x, int y, int h,
+            const CircularBuffer<T, N>& values, int min_val, int max_val) {
+        int val_range = max_val - min_val + 1;
+        for (size_t i = 0; i < values.size() && x + i < 64 && x + i >= 0; i++) {
+            int v = Proportion(values[i] - min_val, val_range, h);
+            gfxLine(x + i, y + h - 1 - v, x + i, y + h - 1);
         }
     }
 
@@ -261,7 +268,12 @@ public:
             case ROOT: set_root(root + direction); break;
             case SMOOTH: set_smoothing(smoothing + direction); break;
             case LEARN: set_learn_mode(learn_mode + direction); break;
-            case RESET: buff.clear(); patt.clear(); break;
+            case RESET:
+                buff.clear();
+                patt.clear();
+                hist.clear();
+                ResetSampler();
+                break;
         }
     }
 
@@ -274,7 +286,7 @@ public:
         return data;
     }
 
-    void OnDataReceive(uint32_t data) {
+    void OnDataReceive(uint64_t data) {
         set_scale(Unpack(data, PackLocation {0, 8}));
         set_root(Unpack(data, PackLocation {8, 4}));
         set_smoothing(Unpack(data, PackLocation {12, 6}));
@@ -283,7 +295,7 @@ public:
 
 protected:
     void SetHelp() {
-        help[HEMISPHERE_HELP_DIGITALS] = "Sample, Lrn/Rst";
+        help[HEMISPHERE_HELP_DIGITALS] = "Sample, Lrn/Sync";
         help[HEMISPHERE_HELP_CVS]      = "Weight, Signal";
         help[HEMISPHERE_HELP_OUTS]     = "Sampled out, Thru";
         help[HEMISPHERE_HELP_ENCODER]  = "Scl,root,wght,lrn";
@@ -319,7 +331,8 @@ private:
     int root = 0;
 
     CircularBuffer<int16_t, NGRAM_BUFF_LEN> buff;
-    CircularBuffer<int16_t, NGRAM_BUFF_LEN> patt;
+    CircularBuffer<int16_t, NGRAM_PATT_LEN> patt;
+    CircularBuffer<int16_t, NGRAM_BUFF_LEN> hist;
     uint8_t smoothing = 16;
     int8_t smoothing_cv = 0;
 
@@ -348,13 +361,15 @@ private:
     uint32_t total = 0;
     const static size_t MAX_SAMPLER_ITERS = NGRAM_BUFF_LEN;
 
-    bool SampleIndex(const CircularBuffer<int16_t, NGRAM_BUFF_LEN>& pattern, size_t index, uint32_t& total) {
+    template<typename T, size_t N>
+    bool SampleIndex(const CircularBuffer<T, N>& pattern, size_t index, uint32_t& total) {
         uint32_t score = ScoreMatch(pattern, index);
         total += score;
         return random(total) < score;
     }
 
-    uint32_t ScoreMatch(const CircularBuffer<int16_t, NGRAM_BUFF_LEN>& pattern, size_t index) {
+    template<typename T, size_t N>
+    uint32_t ScoreMatch(const CircularBuffer<T, N>& pattern, size_t index) {
         size_t n = hem_MAX(
                 hem_MIN(
                     hem_MIN(NGRAM_PATT_LEN, pattern.size()),
