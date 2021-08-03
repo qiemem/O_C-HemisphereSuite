@@ -11,7 +11,7 @@
 // * Category filtering is deprecated at 1.8, but I'm leaving the per-applet categorization
 // alone to avoid breaking forked codebases by other developers.
 
-#define HEMISPHERE_AVAILABLE_APPLETS 54
+#define HEMISPHERE_AVAILABLE_APPLETS 55
 
 //////////////////  id  cat   class name
 #define HEMISPHERE_APPLETS { \
@@ -26,6 +26,7 @@
     DECLARE_APPLET( 31, 0x04, Burst), \
     DECLARE_APPLET( 12, 0x10, Calculate),\
     DECLARE_APPLET( 32, 0x0a, Carpeggio), \
+    DECLARE_APPLET( 60, 0x08, Chordinator), \
     DECLARE_APPLET(  6, 0x04, ClockDivider), \
     DECLARE_APPLET( 28, 0x04, ClockSkip), \
     DECLARE_APPLET( 30, 0x10, Compare), \
