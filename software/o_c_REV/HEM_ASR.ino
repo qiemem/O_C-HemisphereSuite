@@ -32,7 +32,8 @@ public:
     void Start() {
         scale = OC::Scales::SCALE_SEMI;
         buffer_m->SetIndex(1);
-        quantizer.Configure(OC::Scales::GetScale(scale), 0xffff); // Semi-tone
+        Quantizer(0).Init();
+        ConfigureQuantizer(0, scale);
     }
 
     void Controller() {
@@ -49,7 +50,7 @@ public:
             ForEachChannel(ch)
             {
                 int cv = buffer_m->ReadNextValue(ch, hemisphere, index_mod);
-                int quantized = quantizer.Process(cv, 0, 0);
+                int quantized = Quantizer(0).Process(cv, 0, 0);
                 Out(ch, quantized);
             }
             buffer_m->Advance();
@@ -75,10 +76,10 @@ public:
             scale += direction;
             if (scale >= OC::Scales::NUM_SCALES) scale = 0;
             if (scale < 0) scale = OC::Scales::NUM_SCALES - 1;
-            quantizer.Configure(OC::Scales::GetScale(scale), 0xffff);
+            ConfigureQuantizer(0, scale);
         }
     }
-        
+
     uint32_t OnDataRequest() {
         uint32_t data = 0;
         byte ix = buffer_m->GetIndex();
@@ -101,14 +102,13 @@ protected:
         help[HEMISPHERE_HELP_ENCODER]  = "Index/Scale";
         //                               "------------------" <-- Size Guide
     }
-    
+
 private:
     int cursor;
     RingBufferManager *buffer_m = buffer_m->get();
-    braids::Quantizer quantizer;
     int scale;
     int index_mod; // Effect of modulation
-    
+
     void DrawInterface() {
         // Show Link icon if linked with another ASR
         if (buffer_m->IsLinked(hemisphere)) gfxIcon(56, 1, LINK_ICON);

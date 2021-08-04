@@ -27,8 +27,6 @@
  * Thanks to Jon Wheeler for the CV length and probability updates
  */
 
-#include "braids_quantizer.h"
-#include "braids_quantizer_scales.h"
 #include "OC_scales.h"
 
 // Logarhythm mod: Allow all scales, even though only the first 64 serialize correctly
@@ -51,23 +49,23 @@ public:
         length = 16;
         quant_range = 24;  //APD: Quantizer range
         cursor = 0;
-        quantizer.Init();
+        Quantizer(0).Init();
         scale = OC::Scales::SCALE_SEMI;
-        quantizer.Configure(OC::Scales::GetScale(scale), 0xffff); // Semi-tone
+        ConfigureQuantizer(0, scale, 0xffff);
     }
 
     void Controller() {
 
         // CV 1 control over length
         int lengthCv = DetentedIn(0);
-        if (lengthCv < 0) length = TM_MIN_LENGTH;        
+        if (lengthCv < 0) length = TM_MIN_LENGTH;
         if (lengthCv > 0) {
             length = constrain(ProportionCV(lengthCv, TM_MAX_LENGTH + 1), TM_MIN_LENGTH, TM_MAX_LENGTH);
         }
-      
+
         // CV 2 bi-polar modulation of probability
         int pCv = Proportion(DetentedIn(1), HEMISPHERE_MAX_CV, 100);
-        
+
         if (Clock(0)) {
             // If the cursor is not on the p value, and Digital 2 is not gated, the sequence remains the same
             int prob = (cursor == 1 || Gate(1)) ? p + pCv : 0;
@@ -93,8 +91,8 @@ public:
         simfloat x = int2simfloat(note) / (int32_t)0x1f;
         note = simfloat2int(x);
         //tmp = note;
-        
-        Out(0, quantizer.Lookup(note + 64));
+
+        Out(0, Quantizer(0).Lookup(note + 64));
 
         // Send 8-bit proportioned CV
         int cv = Proportion(reg & 0x00ff, 255, HEMISPHERE_MAX_CV);
@@ -118,13 +116,13 @@ public:
             scale += direction;
             if (scale >= TM_MAX_SCALE) scale = 0;
             if (scale < 0) scale = TM_MAX_SCALE - 1;
-            quantizer.Configure(OC::Scales::GetScale(scale), 0xffff);
+            ConfigureQuantizer(0, scale, 0xffff);
         }
         if(cursor == 3){
            quant_range = constrain(quant_range += direction, 1, 32);
         }
     }
-        
+
     uint32_t OnDataRequest() {
         uint32_t data = 0;
         Pack(data, PackLocation {0,16}, reg);
@@ -143,7 +141,7 @@ public:
         p = Unpack(data, PackLocation {16,7});
         length = Unpack(data, PackLocation {23,4}) + 1;
         scale = Unpack(data, PackLocation {27,6});
-        quantizer.Configure(OC::Scales::GetScale(scale), 0xffff);
+        ConfigureQuantizer(0, scale, 0xffff);
     }
 
 protected:
@@ -155,11 +153,10 @@ protected:
         help[HEMISPHERE_HELP_ENCODER]  = "Len/Prob/Scl/Range";
         //                               "------------------" <-- Size Guide
     }
-    
+
 private:
     int length; // Sequence length
     int cursor;  // 0 = length, 1 = p, 2 = scale
-    braids::Quantizer quantizer;
 
     // Settings
     uint16_t reg; // 16-bit sequence register

@@ -29,14 +29,12 @@
 // Thanks to Github/Muffwiggler user Qiemem for adding reseed(), to break the small cycle of available seed values that was occurring in practice
 
 
-#include "braids_quantizer.h"
-#include "braids_quantizer_scales.h"
 #include "OC_scales.h"
 
 #define ACID_HALF_STEPS 16
 #define ACID_MAX_STEPS 32
 
-class TB_3PO : public HemisphereApplet 
+class TB_3PO : public HemisphereApplet
 {
   public:
 
@@ -46,39 +44,39 @@ class TB_3PO : public HemisphereApplet
         return "TB-3PO";
     }
 
-    void Start() 
+    void Start()
     {
       manual_reset_flag = 0;
       rand_apply_anim = 0;
       curr_step_semitone = 0;
-      
+
       root = 0;
       octave_offset = 0;
-      
+
       // Init the quantizer for selecting pitches / CVs from
       scale = 29;  // GUNA scale sounds cool   //OC::Scales::SCALE_SEMI; // semi sounds pretty bunk
-      quantizer.Init();
+      Quantizer(0).Init();
       set_quantizer_scale(scale);
 
       // This quantizer is for displaying a keyboard graphic, mapping the current scale to semitones
-      display_semi_quantizer.Init();
-      display_semi_quantizer.Configure(OC::Scales::GetScale(OC::Scales::SCALE_SEMI), 0xffff);
-      
+      Quantizer(1).Init();
+      ConfigureQuantizer(1, OC::Scales::SCALE_SEMI, 0xffff);
+
       density = 12;
       density_encoder_display = 0;
 
       num_steps = 16;
-      
+
       gate_off_clock = 0;
       cycle_time = 0;
 
       curr_gate_cv = 0;
       curr_pitch_cv = 0;
-      
+
       slide_start_cv = 0;
       slide_end_cv = 0;
-      
-      //transpose_note_in = 0;    
+
+      //transpose_note_in = 0;
 
       lock_seed = 0;
       reseed();
@@ -122,12 +120,12 @@ class TB_3PO : public HemisphereApplet
         // This will accuarately get notes from an imperfect cv keyboard in semitones
         //transpose_cv = display_semi_quantizer.Process(In(0), 0, 0);  // Use root == 0 to start at c
         //transpose_note_in = display_semi_quantizer.GetLatestNoteNumber() - 64;
-        
+
         // Quantize the transpose CV to the same scale as the sequence, always based on c.
         // This allows a CV keyboard or sequencer to work reliably to transpose (e.g. every c is another octave) regardless of scale.
         // However, the transposition is limited to only in-scale notes so arpeggiations via LFOs, etc are still easily done.
         // (This CV is summed to the sequence pitch CV directly before output, rather than affecting its note indices.)
-        transpose_cv = quantizer.Process(In(0), 0, 0);  // Use root == 0 to start at c
+        transpose_cv = Quantizer(0).Process(In(0), 0, 0);  // Use root == 0 to start at c
         //transpose_note_in = quantizer.GetLatestNoteNumber() - 64;  // For debug readout!
        }
 
@@ -415,24 +413,21 @@ class TB_3PO : public HemisphereApplet
         help[HEMISPHERE_HELP_ENCODER]  = "seed/dens/qnt/len";
         //                               "------------------" <-- Size Guide
     }
-    
+
   private:
     int cursor = 0;
 
-    braids::Quantizer quantizer;  // Helper for note index --> pitch cv
-    braids::Quantizer display_semi_quantizer;  // Quantizer to interpret the current note for display on a keyboard
-    
-  
+
     // User settings
-    
+
     // Bool
     int manual_reset_flag = 0;  // Manual trigger to reset/regen
 
-    // bool 
+    // bool
     int lock_seed;  // If 1, the seed won't randomize (and manual editing is enabled)
-    
+
     uint16_t seed;  // The random seed that deterministically builds the sequence
-    
+
     int scale;      // Active quantization & generation scale
     uint8_t root;   // Root note
     int8_t octave_offset; // Manual octave offset (based on size of current scale, added to root note)
@@ -511,12 +506,12 @@ class TB_3PO : public HemisphereApplet
       int out_note = constrain(quant_note, 0, 127);
 
       // New: Transpose post-quantize
-      int pitch_cv = quantizer.Lookup(out_note) + transpose_cv;
+      int pitch_cv = Quantizer(0).Lookup(out_note) + transpose_cv;
       return pitch_cv;
 
       // Original: Output quantized after transposition added
       //return quantizer.Lookup( out_note );
-      
+
       //return quantizer.Lookup( 64 );  // Test: note 64 is definitely 0v=c4 if output directly, on ALL scales
     }
 
@@ -524,17 +519,17 @@ class TB_3PO : public HemisphereApplet
     {
       // Don't add in octaves-- use the current quantizer limited to the base octave
       int quant_note = 64 + notes[step_num] + root;// + transpose_note_in;
-      int32_t cv_note = quantizer.Lookup( constrain(quant_note, 0, 127));
-      display_semi_quantizer.Process(cv_note, 0, 0);  // Use root == 0 to start at c
-      return display_semi_quantizer.GetLatestNoteNumber() % 12;
-    } 
+      int32_t cv_note = Quantizer(0).Lookup( constrain(quant_note, 0, 127));
+      Quantizer(1).Process(cv_note, 0, 0);  // Use root == 0 to start at c
+      return Quantizer(1).GetLatestNoteNumber() % 12;
+    }
 
     void reseed()
     {
       randomSeed(micros());
       seed = random(0, 65535); // 16 bits
     }
-    
+
   	// Trigger generating the sequence deterministically using the seed (over the next couple of Controller() calls)
   	void regenerate_all()
   	{
@@ -770,10 +765,10 @@ class TB_3PO : public HemisphereApplet
     void set_quantizer_scale(int new_scale)
     {
       const braids::Scale & quant_scale = OC::Scales::GetScale(new_scale);
-      quantizer.Configure(quant_scale, 0xffff);
+      ConfigureQuantizer(0, new_scale, 0xffff);
       scale_size = quant_scale.num_notes;  // Track this scale size for octaves and display
     }
-  
+
     void DrawGraphics()
     {
       // Wiggle the icon when the sequence regenerates

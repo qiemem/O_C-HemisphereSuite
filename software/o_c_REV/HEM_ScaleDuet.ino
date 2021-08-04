@@ -20,8 +20,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "braids_quantizer.h"
-#include "braids_quantizer_scales.h"
 #include "OC_scales.h"
 
 class ScaleDuet : public HemisphereApplet {
@@ -36,8 +34,8 @@ public:
         {
             mask[scale] = 0xffff;
         }
-        quantizer.Init();
-        quantizer.Configure(OC::Scales::GetScale(5), mask[0]);
+        Quantizer(0).Init();
+        ConfigureQuantizer(0, 5, mask[0]);
         last_scale = 0;
         adc_lag_countdown = 0;
     }
@@ -50,11 +48,11 @@ public:
         if (EndOfADCLag()) {
             uint8_t scale = Gate(1);
             if (scale != last_scale) {
-                quantizer.Configure(OC::Scales::GetScale(5), mask[scale]);
+                ConfigureQuantizer(0, 5, mask[scale]);
                 last_scale = scale;
             }
             int32_t pitch = In(0);
-            int32_t quantized = quantizer.Process(pitch, 0, 0);
+            int32_t quantized = Quantizer(0).Process(pitch, 0, 0);
             Out(0, quantized);
         }
     }
@@ -71,7 +69,7 @@ public:
 
         // Toggle the mask bit at the cursor position
         mask[scale] ^= (0x01 << bit);
-        if (scale == last_scale) quantizer.Configure(OC::Scales::GetScale(5), mask[scale]);
+        if (scale == last_scale) ConfigureQuantizer(0, 5, mask[scale]);
     }
 
     void OnEncoderMove(int direction) {
@@ -79,7 +77,7 @@ public:
         cursor = constrain(cursor += direction, 0, 23);
         ResetCursor();
     }
-        
+
     uint32_t OnDataRequest() {
         uint32_t data = 0;
         Pack(data, PackLocation {0,12}, mask[0]);
@@ -91,7 +89,7 @@ public:
         mask[0] = Unpack(data, PackLocation {0,12});
         mask[1] = Unpack(data, PackLocation {12,12});
 
-        ForEachChannel(ch) quantizer.Configure(OC::Scales::GetScale(5), mask[ch]);
+        ForEachChannel(ch) ConfigureQuantizer(0, 5, mask[ch]);
     }
 
 protected:
@@ -103,9 +101,8 @@ protected:
         help[HEMISPHERE_HELP_ENCODER]  = "T=Note P=Toggle";
         //                               "------------------" <-- Size Guide
     }
-    
+
 private:
-    braids::Quantizer quantizer;
     uint16_t mask[2];
     uint8_t cursor; // 0-11=Scale 1; 12-23=Scale 2
     uint8_t last_scale; // The most-recently-used scale (used to set the mask when necessary)

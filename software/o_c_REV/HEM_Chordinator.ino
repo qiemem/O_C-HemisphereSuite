@@ -29,9 +29,12 @@ public:
 
     void Start() {
         scale = 5;
-        root_quantizer.Init();
-        chord_quantizer.Init();
+        Quantizer(0).Init();
+        Quantizer(1).Init();
+        continuous[0] = 1;
+        continuous[1] = 1;
         set_scale(scale);
+        update_chord_quantizer();
     }
 
     void Controller() {
@@ -43,7 +46,7 @@ public:
 
         if (continuous[0] || EndOfADCLag(0)) {
             chord_root_raw = In(0);
-            int32_t new_root_pitch = root_quantizer.Process(chord_root_raw, root, 0);
+            int32_t new_root_pitch = Quantizer(0).Process(chord_root_raw, root << 7, 0);
             if (new_root_pitch != chord_root_pitch) {
                 update_chord_quantizer();
                 chord_root_pitch = new_root_pitch;
@@ -52,7 +55,7 @@ public:
         }
 
         if(continuous[1] || EndOfADCLag(1)) {
-            int32_t pitch = chord_quantizer.Process(In(0), root, 0);
+            int32_t pitch = Quantizer(1).Process(In(1) + chord_root_pitch, root << 7, 0);
             Out(1, pitch);
         }
     }
@@ -75,6 +78,7 @@ public:
             if (cursor - 2 == i) {
                 gfxCursor(4 * i, 30, 3);
             }
+            mask >>= 1;
         }
 
     }
@@ -122,8 +126,6 @@ protected:
 
 private:
 
-    braids::Quantizer root_quantizer;
-    braids::Quantizer chord_quantizer;
     size_t scale; // SEMI
     int16_t root;
     bool continuous[2];
@@ -139,16 +141,16 @@ private:
 
     void update_chord_quantizer() {
         size_t num_notes = active_scale.num_notes;
-        chord_root_pitch = root_quantizer.Process(chord_root_raw, root, 0);
-        uint16_t chord_root = root_quantizer.GetLatestNoteNumber() % num_notes;
+        chord_root_pitch = Quantizer(0).Process(chord_root_raw, root, 0);
+        uint16_t chord_root = Quantizer(0).GetLatestNoteNumber() % num_notes;
         uint16_t mask = rotl32(chord_mask, num_notes, chord_root);
-        chord_quantizer.Configure(active_scale, mask);
+        ConfigureQuantizer(1, scale, mask);
     }
 
     void set_scale(size_t value) {
         scale = value;
         active_scale = OC::Scales::GetScale(scale);
-        root_quantizer.Configure(active_scale);
+        ConfigureQuantizer(0, scale);
     }
 };
 

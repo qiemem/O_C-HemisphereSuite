@@ -28,6 +28,8 @@
 #include "HSicons.h"
 #include "HSClockManager.h"
 
+#include "braids_quantizer.h"
+
 #define LEFT_HEMISPHERE 0
 #define RIGHT_HEMISPHERE 1
 #ifdef BUCHLA_4U
@@ -453,6 +455,24 @@ protected:
     /* Master Clock Forwarding is activated. This is updated with each ISR cycle by the Hemisphere Manager */
     bool MasterClockForwarded() {return master_clock_bus;}
 
+    braids::Quantizer& Quantizer(int i) {
+        if (is_quantizer_dirty(i)) {
+            ConfigureQuantizer(i, scale[i], mask[i]);
+        }
+        return quantizer[2 * hemisphere + i];
+    }
+
+    void ConfigureQuantizer(int i, int scale_, uint16_t mask_ = 0xffff) {
+        scale[i] = scale_;
+        mask[i] = mask_;
+        if(is_quantizer_dirty(i)) {
+            serial_printf("configure %d %d %d %d\n", hemisphere, i, scale_, mask_);
+            quantizer[2 * hemisphere + i].Configure(OC::Scales::GetScale(scale[i]), mask[i]);
+            cur_scale[2 * hemisphere + i] = scale[i];
+            cur_mask[2 * hemisphere + i] = mask[i];
+        }
+    }
+
 private:
     int gfx_offset; // Graphics offset, based on the side
     int io_offset; // Input/Output offset, based on the side
@@ -469,4 +489,16 @@ private:
     int help_active;
     bool changed_cv[2]; // Has the input changed by more than 1/8 semitone since the last read?
     int last_cv[2]; // For change detection
+
+    bool is_quantizer_dirty(int i) {
+        return cur_scale[2 * hemisphere + i] != scale[i]
+            || cur_mask[2 * hemisphere + i] != mask[i];
+    }
+    static braids::Quantizer quantizer[4];
+    static int cur_scale[4];
+    static uint16_t cur_mask[4];
+
+    int scale[2];
+    uint16_t mask[2];
+
 };

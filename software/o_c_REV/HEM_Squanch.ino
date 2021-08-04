@@ -20,8 +20,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "braids_quantizer.h"
-#include "braids_quantizer_scales.h"
 #include "OC_scales.h"
 
 class Squanch : public HemisphereApplet {
@@ -32,9 +30,9 @@ public:
     }
 
     void Start() {
-        quantizer.Init();
+        Quantizer(0).Init();
         scale = 5;
-        quantizer.Configure(OC::Scales::GetScale(scale), 0xffff);
+        ConfigureQuantizer(0, scale);
     }
 
     void Controller() {
@@ -52,7 +50,7 @@ public:
                 // output, the output is raised by one octave when Digital 2 is gated.
                 int32_t shift_alt = (ch == 1) ? DetentedIn(1) : Gate(1) * (12 << 7);
 
-                int32_t quantized = quantizer.Process(pitch, 0, shift[ch]);
+                int32_t quantized = Quantizer(0).Process(pitch, 0, shift[ch]);
                 Out(ch, quantized + shift_alt);
                 last_note[ch] = quantized;
             }
@@ -74,13 +72,14 @@ public:
             scale += direction;
             if (scale >= OC::Scales::NUM_SCALES) scale = 0;
             if (scale < 0) scale = OC::Scales::NUM_SCALES - 1;
-            quantizer.Configure(OC::Scales::GetScale(scale), 0xffff);
+
+            ConfigureQuantizer(0, scale);
             continuous = 1; // Re-enable continuous mode when scale is changed
         } else {
             shift[cursor] = constrain(shift[cursor] + direction, -48, 48);
         }
     }
-        
+
     uint32_t OnDataRequest() {
         uint32_t data = 0;
         Pack(data, PackLocation {0,8}, scale);
@@ -93,7 +92,7 @@ public:
         scale = Unpack(data, PackLocation {0,8});
         shift[0] = Unpack(data, PackLocation {8,8}) - 48;
         shift[1] = Unpack(data, PackLocation {16,8}) - 48;
-        quantizer.Configure(OC::Scales::GetScale(scale), 0xffff);
+        ConfigureQuantizer(0, scale);
     }
 
 protected:
@@ -105,12 +104,11 @@ protected:
         help[HEMISPHERE_HELP_ENCODER]  = "Shift/Scale";
         //                               "------------------" <-- Size Guide
     }
-    
+
 private:
     int cursor; // 0=A shift, 1=B shift, 2=Scale
     bool continuous = 1;
     int last_note[2]; // Last quantized note
-    braids::Quantizer quantizer;
 
     // Settings
     int scale;

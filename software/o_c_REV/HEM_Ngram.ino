@@ -20,8 +20,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "braids_quantizer.h"
-#include "braids_quantizer_scales.h"
 #include "OC_scales.h"
 
 // based on https://github.com/rlogiacco/CircularBuffer
@@ -98,7 +96,7 @@ public:
     }
 
     void Start() {
-        quantizer.Init();
+        Quantizer(0).Init();
         set_scale(scale);
     }
 
@@ -146,7 +144,7 @@ public:
 
         if (learn) {
             if (scale > 0) {
-                buff.push(quantizer.Process(input, root << 7, 0));
+                buff.push(Quantizer(0).Process(input, root << 7, 0));
             } else {
                 buff.push(input > HEMISPHERE_3V_CV ? HEMISPHERE_MAX_CV : 0);
             }
@@ -326,7 +324,7 @@ protected:
     void set_scale(const int new_scale) {
         scale = mod(new_scale, OC::Scales::NUM_SCALES + 1);
         if (scale != 0) {
-            quantizer.Configure(OC::Scales::GetScale(scale - 1), 0xffff);
+            ConfigureQuantizer(0, scale - 1, 0xffff);
         }
     }
 
@@ -348,7 +346,6 @@ private:
     const static size_t NGRAM_PATT_LEN = 8;
     const static int NGRAM_MAX_SMOOTHING = 35;
 
-    braids::Quantizer quantizer;
     int scale = 6; // SEMI
     int root = 0;
 
