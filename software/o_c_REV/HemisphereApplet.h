@@ -466,7 +466,6 @@ protected:
         scale[i] = scale_;
         mask[i] = mask_;
         if(is_quantizer_dirty(i)) {
-            serial_printf("configure %d %d %d %d\n", hemisphere, i, scale_, mask_);
             quantizer[2 * hemisphere + i].Configure(OC::Scales::GetScale(scale[i]), mask[i]);
             cur_scale[2 * hemisphere + i] = scale[i];
             cur_mask[2 * hemisphere + i] = mask[i];

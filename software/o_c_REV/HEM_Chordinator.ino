@@ -24,7 +24,7 @@ class Chordinator : public HemisphereApplet {
 public:
 
     const char* applet_name() {
-        return "Chordinator";
+        return "Chordinate";
     }
 
     void Start() {
@@ -55,8 +55,8 @@ public:
         }
 
         if(continuous[1] || EndOfADCLag(1)) {
-            int32_t pitch = Quantizer(1).Process(In(1) + chord_root_pitch, root << 7, 0);
-            Out(1, pitch);
+            harm_pitch = Quantizer(1).Process(In(1) + chord_root_pitch, root << 7, 0);
+            Out(1, harm_pitch);
         }
     }
 
@@ -71,15 +71,20 @@ public:
         uint16_t mask = chord_mask;
         for (size_t i = 0; i < active_scale.num_notes; i++) {
             if (mask & 1) {
-                gfxRect(4 * i, 25, 3, 3);
+                gfxRect(5 * i, 25, 4, 4);
             } else {
-                gfxPixel(4 * i + 1, 26);
+                gfxFrame(5 * i, 25, 4, 4);
             }
             if (cursor - 2 == i) {
-                gfxCursor(4 * i, 30, 3);
+                gfxCursor(5 * i, 31, 4);
             }
+
             mask >>= 1;
         }
+
+        size_t root_ix = note_ix(chord_root_pitch);
+        gfxBitmap(5 * root_ix, 35, 8, NOTE4_ICON);
+        gfxBitmap(5 * note_ix(harm_pitch), 45, 8, NOTE4_ICON);
 
     }
 
@@ -139,12 +144,28 @@ private:
     int16_t chord_root_raw = 0;
     int16_t chord_root_pitch = 0;
 
+    int16_t harm_pitch = 0;
+
     void update_chord_quantizer() {
         size_t num_notes = active_scale.num_notes;
         chord_root_pitch = Quantizer(0).Process(chord_root_raw, root, 0);
-        uint16_t chord_root = Quantizer(0).GetLatestNoteNumber() % num_notes;
+        size_t chord_root=note_ix(chord_root_pitch);
         uint16_t mask = rotl32(chord_mask, num_notes, chord_root);
         ConfigureQuantizer(1, scale, mask);
+    }
+
+    size_t note_ix(int pitch) {
+        int rel_pitch = pitch % active_scale.span;
+        int d = active_scale.span;
+        size_t p = 0;
+        for (size_t i=0; i < active_scale.num_notes; i++) {
+            int e = abs(rel_pitch - active_scale.notes[i]);
+            if (e < d) {
+                p = i;
+                d = e;
+            }
+        }
+        return p;
     }
 
     void set_scale(size_t value) {
