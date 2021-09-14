@@ -108,11 +108,11 @@ public:
             else if (freq[ch] > 10000) direction *= 1000;
             else if (freq[ch] > 1000) direction *= 100;
             else if (freq[ch] > 300) direction *= 10;
-            freq[ch] = constrain(freq[ch] + direction, 10, 99900);
+            freq[ch] = constrain(freq[ch] + direction, 1, 99900);
             osc[ch].SetFrequency(freq[ch]);
         }
     }
-        
+
     uint32_t OnDataRequest() {
         uint32_t data = 0;
         Pack(data, PackLocation {0,6}, waveform_number[0]);
@@ -137,7 +137,7 @@ protected:
         help[HEMISPHERE_HELP_ENCODER]  = "Freq./Waveform";
         //                               "------------------" <-- Size Guide
     }
-    
+
 private:
     int cursor; // 0=Freq A; 1=Waveform A; 2=Freq B; 3=Waveform B
     VectorOscillator osc[2];
@@ -145,7 +145,7 @@ private:
     // Settings
     int waveform_number[2];
     int freq[2];
-    
+
     void DrawInterface() {
         byte c = cursor;
         byte ch = cursor < 2 ? 0 : 1;
