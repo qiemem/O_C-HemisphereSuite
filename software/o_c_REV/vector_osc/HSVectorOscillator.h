@@ -110,7 +110,11 @@ public:
 
     /* frequency is centihertz (e.g., 440 Hz is 44000) */
     void SetFrequency(uint32_t frequency_) {
-        frequency = frequency_;
+        SetFrequency_uHz(10000 * frequency_);
+    }
+
+    void SetFrequency_uHz(uint32_t frequency_) {
+        frequency = frequency_ / 100;
         // We're not actually changing or restarting the segment, so preserve progress.
         vosignal_t trun = total_run;
         calculate_rise(segment_index);
@@ -308,7 +312,7 @@ private:
         vosignal_t starting = scale_level(level);
 
         //run = Proportion(time, total_time, 1666667);
-        run = time * 1666667 / total_time;
+        run = time * 166666667 / total_time;
         rise = (target - starting);
         total_run = 0;
         // The following line is here to deal with the cases where the signal is coming from a different

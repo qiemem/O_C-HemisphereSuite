@@ -42,8 +42,8 @@ public:
         // Input 1 is frequency modulation for channel 1
         if (Changed(0)) {
             int mod = Proportion(DetentedIn(0), HEMISPHERE_3V_CV, 3000);
-            mod = constrain(mod, -3000, 3000);
-            if (mod + freq[0] > 10) osc[0].SetFrequency(freq[0] + mod);
+            mod = constrain(mod, -3000, 3000) * 10000;
+            if (mod + freq[0] > 10) osc[0].SetFrequency_uHz(freq[0] + mod);
         }
 
         // Input 2 determines signal 1's attenuation on the B/D output mix; at 0V, signal 1
@@ -60,7 +60,7 @@ public:
                 int new_freq = 1666666 / ticks;
                 new_freq = constrain(new_freq, 3, 99900);
                 osc[ch].SetFrequency(new_freq);
-                freq[ch] = new_freq;
+                freq[ch] = new_freq * 10000;
                 osc[ch].Reset();
             }
 
@@ -104,12 +104,10 @@ public:
             ForEachChannel(ch) osc[ch].Reset();
         }
         if (c == 0) { // Frequency
-            if (freq[ch] > 100000) direction *= 10000;
-            else if (freq[ch] > 10000) direction *= 1000;
-            else if (freq[ch] > 1000) direction *= 100;
-            else if (freq[ch] > 300) direction *= 10;
-            freq[ch] = constrain(freq[ch] + direction, 1, 99900);
-            osc[ch].SetFrequency(freq[ch]);
+            freq_ix[ch] += direction;
+            freq_ix[ch] = constrain(freq_ix[ch], 0, 1023);
+            freq[ch] = ix_to_uHz(freq_ix[ch]);
+            osc[ch].SetFrequency_uHz(freq[ch]);
         }
     }
 
@@ -117,13 +115,15 @@ public:
         uint32_t data = 0;
         Pack(data, PackLocation {0,6}, waveform_number[0]);
         Pack(data, PackLocation {6,6}, waveform_number[1]);
-        Pack(data, PackLocation {12,10}, freq[0] & 0x03ff);
-        Pack(data, PackLocation {22,10}, freq[1] & 0x03ff);
+        Pack(data, PackLocation {12,10}, freq_ix[0] & 0x03ff);
+        Pack(data, PackLocation {22,10}, freq_ix[1] & 0x03ff);
         return data;
     }
     void OnDataReceive(uint32_t data) {
-        freq[0] = Unpack(data, PackLocation {12,10});
-        freq[1] = Unpack(data, PackLocation {22,10});
+        freq_ix[0] = Unpack(data, PackLocation {12,10});
+        freq_ix[1] = Unpack(data, PackLocation {22,10});
+        freq[0] = ix_to_uHz(freq_ix[0]);
+        freq[1] = ix_to_uHz(freq_ix[1]);
         SwitchWaveform(0, Unpack(data, PackLocation {0,6}));
         SwitchWaveform(1, Unpack(data, PackLocation {6,6}));
     }
@@ -144,6 +144,7 @@ private:
 
     // Settings
     int waveform_number[2];
+    int freq_ix[2];
     int freq[2];
 
     void DrawInterface() {
@@ -157,12 +158,16 @@ private:
         else gfxPrint(ch ? "D" : "C");
         gfxInvert(1, 14, 7, 9);
 
-        gfxPrint(10, 15, ones(freq[ch]));
-        gfxPrint(".");
-        int h = hundredths(freq[ch]);
-        if (h < 10) gfxPrint("0");
-        gfxPrint(h);
-        gfxPrint(" Hz");
+        int f = freq[ch] / 100;
+
+        if (f < 10000) {
+            printFixedDec4(10, 15, 100000000 / f);
+            gfxPrint(" S");
+        } else {
+            printFixedDec4(10, 15, f);
+            gfxPrint(" Hz");
+        }
+
         DrawWaveform(ch);
 
         if (c == 0) gfxCursor(8, 23, 55);
@@ -194,7 +199,7 @@ private:
     void SwitchWaveform(byte ch, int waveform) {
         osc[ch] = WaveformManager::VectorOscillatorFromWaveform(waveform);
         waveform_number[ch] = waveform;
-        osc[ch].SetFrequency(freq[ch]);
+        osc[ch].SetFrequency_uHz(freq[ch]);
 #ifdef BUCHLA_4U
         osc[ch].Offset((12 << 7) * 4);
         osc[ch].SetScale((12 << 7) * 4);
@@ -205,8 +210,76 @@ private:
 
     int ones(int n) {return (n / 100);}
     int hundredths(int n) {return (n % 100);}
+
+    void printFixedDec4(int x, int y, int n) {
+        gfxPos(x, y);
+        int digits_printed = 0;
+        int first_digit = 0;
+        for (int i = 8; i > 0; i--) {
+            if (i == 4) {
+                gfxPrint(".");
+            }
+            int digit = (n / 10000000);
+            n         = (n % 10000000) * 10;
+            if (digit != 0 && i > first_digit) {
+                first_digit = i;
+            }
+            if (digit != 0 || digits_printed > 0 || i <= 5) {
+                gfxPrint(digit);
+                if (first_digit > 0) {
+                    digits_printed++;
+                }
+            }
+            if (digits_printed > 2 && i <= 5) {
+                return;
+            }
+        }
+    }
 };
 
+int ix_to_uHz(int ix) {
+    const int twos_steps = 60;
+    const int fives_steps = 50;
+    const int tens_steps = 50;
+    const int ones_steps = 900 - (2 * twos_steps + 5 * fives_steps + 10 * tens_steps);
+    const int steps = ones_steps + twos_steps + fives_steps + tens_steps;
+
+    const int twos_max = ones_steps + twos_steps;
+    const int fives_max = twos_max + fives_steps;
+
+
+    // Start with step size of 100, which is the smallest unit that matters.
+    ix += ones_steps + twos_steps + fives_steps;
+    int oom = ix / steps;
+    int result = 100;
+    int fine = ix % steps;
+    if (fine < ones_steps) {
+        result += fine * 1;
+    } else if (fine < twos_max) {
+        result += ones_steps + (fine - ones_steps) * 2;
+    } else if (fine < fives_max) {
+        result += ones_steps + 2 * twos_steps + (fine - twos_max) * 5;
+    } else {
+        result += ones_steps + 2 * twos_steps + 5 * fives_steps + (fine - fives_max) * 10;
+    }
+    return result * pow10(1 + oom);
+}
+
+int pow10(int n) {
+    static int pow10_lut[] = {
+        1,
+        10,
+        100,
+        1000,
+        10000,
+        100000,
+        1000000,
+        10000000,
+        100000000,
+        1000000000
+    };
+    return pow10_lut[n];
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //// Hemisphere Applet Functions
