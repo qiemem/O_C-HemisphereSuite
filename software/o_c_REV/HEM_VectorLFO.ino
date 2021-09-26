@@ -40,11 +40,8 @@ public:
 
     void Controller() {
         // Input 1 is frequency modulation for channel 1
-        if (Changed(0)) {
-            int mod = Proportion(DetentedIn(0), HEMISPHERE_3V_CV, 3000);
-            mod = constrain(mod, -3000, 3000) * 10000;
-            if (mod + freq[0] > 10) osc[0].SetFrequency_uHz(freq[0] + mod);
-        }
+        float f = constrain(scale_freq(freq[0], In(0)), 1, 40000000);
+        osc[0].SetFrequency_4dec(f);
 
         // Input 2 determines signal 1's attenuation on the B/D output mix; at 0V, signal 1
         // accounts for 50% of the B/D output. At 5V, signal 1 accounts for none of the
@@ -106,8 +103,8 @@ public:
         if (c == 0) { // Frequency
             freq_ix[ch] += direction;
             freq_ix[ch] = constrain(freq_ix[ch], 0, 1023);
-            freq[ch] = ix_to_uHz(freq_ix[ch]);
-            osc[ch].SetFrequency_uHz(freq[ch]);
+            freq[ch] = ix_to_4dec(freq_ix[ch]);
+            osc[ch].SetFrequency_4dec(freq[ch]);
         }
     }
 
@@ -122,8 +119,8 @@ public:
     void OnDataReceive(uint32_t data) {
         freq_ix[0] = Unpack(data, PackLocation {12,10});
         freq_ix[1] = Unpack(data, PackLocation {22,10});
-        freq[0] = ix_to_uHz(freq_ix[0]);
-        freq[1] = ix_to_uHz(freq_ix[1]);
+        freq[0] = ix_to_4dec(freq_ix[0]);
+        freq[1] = ix_to_4dec(freq_ix[1]);
         SwitchWaveform(0, Unpack(data, PackLocation {0,6}));
         SwitchWaveform(1, Unpack(data, PackLocation {6,6}));
     }
@@ -158,13 +155,13 @@ private:
         else gfxPrint(ch ? "D" : "C");
         gfxInvert(1, 14, 7, 9);
 
-        int f = freq[ch] / 100;
+        int f = freq[ch];
 
         if (f < 10000) {
-            printFixedDec4(10, 15, 100000000 / f);
+            print4Dec(10, 15, 100000000 / f);
             gfxPrint(" S");
         } else {
-            printFixedDec4(10, 15, f);
+            print4Dec(10, 15, f);
             gfxPrint(" Hz");
         }
 
@@ -199,7 +196,7 @@ private:
     void SwitchWaveform(byte ch, int waveform) {
         osc[ch] = WaveformManager::VectorOscillatorFromWaveform(waveform);
         waveform_number[ch] = waveform;
-        osc[ch].SetFrequency_uHz(freq[ch]);
+        osc[ch].SetFrequency_4dec(freq[ch]);
 #ifdef BUCHLA_4U
         osc[ch].Offset((12 << 7) * 4);
         osc[ch].SetScale((12 << 7) * 4);
@@ -211,7 +208,7 @@ private:
     int ones(int n) {return (n / 100);}
     int hundredths(int n) {return (n % 100);}
 
-    void printFixedDec4(int x, int y, int n) {
+    void print4Dec(int x, int y, int n) {
         gfxPos(x, y);
         int digits_printed = 0;
         int first_digit = 0;
@@ -237,7 +234,7 @@ private:
     }
 };
 
-int ix_to_uHz(int ix) {
+int ix_to_4dec(int ix) {
     const int twos_steps = 60;
     const int fives_steps = 50;
     const int tens_steps = 50;
@@ -262,7 +259,7 @@ int ix_to_uHz(int ix) {
     } else {
         result += ones_steps + 2 * twos_steps + 5 * fives_steps + (fine - fives_max) * 10;
     }
-    return result * pow10(1 + oom);
+    return result * pow10(oom) / 10;
 }
 
 int pow10(int n) {
@@ -279,6 +276,31 @@ int pow10(int n) {
         1000000000
     };
     return pow10_lut[n];
+}
+
+int pitch_to_freq_scalar(int pitch) {
+    // avoid overflow in voltage range
+    return exp2_s15_16(pitch * 512 / 12) * 100 / 64 * 100 / 1024;
+}
+
+int scale_freq(int freq_4dec, int pitch) {
+    // fuck it I'm lazy
+    return int32_t(int64_t(freq_4dec) * pitch_to_freq_scalar(pitch) / 10000);
+}
+
+// From https://stackoverflow.com/questions/36550388/power-of-2-approximation-in-fixed-point
+int32_t exp2_s15_16 (int32_t a) {
+    int32_t i, f, r, s;
+    /* split a = i + f, such that f in [-0.5, 0.5] */
+    i = (a + 0x8000) & ~0xffff; // 0.5
+    f = a - i;
+    s = ((15 << 16) - i) >> 16;
+    /* minimax approximation for exp2(f) on [-0.5, 0.5] */
+    r = 0x00000e20;                 // 5.5171669058037949e-2
+    r = (r * f + 0x3e1cc333) >> 17; // 2.4261112219321804e-1
+    r = (r * f + 0x58bd46a6) >> 16; // 6.9326098546062365e-1
+    r = r * f + 0x7ffde4a3;         // 9.9992807353939517e-1
+    return (uint32_t)r >> s;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

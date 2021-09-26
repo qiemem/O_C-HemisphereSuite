@@ -78,6 +78,7 @@ public:
         sustained = 0;
         segment_index = segment_count - 1;
         calculate_rise(segment_index);
+        total_run = 0;
     }
 
     /* The offset amount will be added to each voltage output */
@@ -110,15 +111,11 @@ public:
 
     /* frequency is centihertz (e.g., 440 Hz is 44000) */
     void SetFrequency(uint32_t frequency_) {
-        SetFrequency_uHz(10000 * frequency_);
+        SetFrequency_4dec(100 * frequency_);
     }
 
-    void SetFrequency_uHz(uint32_t frequency_) {
-        frequency = frequency_ / 100;
-        // We're not actually changing or restarting the segment, so preserve progress.
-        vosignal_t trun = total_run;
-        calculate_rise(segment_index);
-        total_run = trun;
+    void SetFrequency_4dec(uint32_t frequency_) {
+        frequency = frequency_;
     }
 
     bool GetEOC() {return eoc;}
@@ -136,6 +133,7 @@ public:
         segment_index = 0;
         signal = scale_level(segments[segment_count - 1].level);
         calculate_rise(segment_index);
+        total_run = 0;
         sustained = 0;
         eoc = !cycle;
     }
@@ -258,7 +256,10 @@ private:
             if (++segment_index >= segment_count) {
                 if (cycle) Reset();
                 eoc = 1;
-            } else calculate_rise(segment_index);
+            } else {
+                calculate_rise(segment_index);
+                total_run = 0;
+            }
             sustained = 0;
         }
     }
@@ -314,7 +315,6 @@ private:
         //run = Proportion(time, total_time, 1666667);
         run = time * 166666667 / total_time;
         rise = (target - starting);
-        total_run = 0;
         // The following line is here to deal with the cases where the signal is coming from a different
         // direction than it would be coming from if it were coming from the previous segment. This can
         // only happen when the Vector Oscillator is being used as an envelope generator with Sustain/Release,
