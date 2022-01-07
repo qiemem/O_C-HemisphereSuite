@@ -1,6 +1,7 @@
-// Copyright 2015 Émilie Gillet.
+// Copyright 2015 Emilie Gillet.
 //
-// Author: Émilie Gillet (ol.gillet@gmail.com)
+// Author: Emilie Gillet (emilie.o.gillet@gmail.com)
+// Re-implemented by Bryan Head to eliminate codebook
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -8,10 +9,10 @@
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included in
 // all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -19,7 +20,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-// 
+//
 // See http://creativecommons.org/licenses/MIT/ for more information.
 //
 // -----------------------------------------------------------------------------
@@ -28,6 +29,7 @@
 
 #include "braids_quantizer.h"
 #include "OC_options.h"
+#include "util/util_misc.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -38,16 +40,12 @@ void SortScale(Scale &scale) {
   std::sort(scale.notes, scale.notes + scale.num_notes);
 }
 
-
 void Quantizer::Init() {
   enabled_ = true;
   codeword_ = 0;
   transpose_ = 0;
   previous_boundary_ = 0;
   next_boundary_ = 0;
-  for (int16_t i = 0; i < 128; ++i) {
-    codebook_[i] = (i - 64) << 7;
-  }
 }
 
 int32_t Quantizer::Process(int32_t pitch, int32_t root, int32_t transpose) {
@@ -61,38 +59,44 @@ int32_t Quantizer::Process(int32_t pitch, int32_t root, int32_t transpose) {
   #else
     pitch -= ((12 << 7) << 1);
   #endif
-  if (!requantize_ && (pitch >= previous_boundary_ && pitch <= next_boundary_ && transpose == transpose_)) {
+
+  if (!requantize_ && pitch >= previous_boundary_ && pitch <= next_boundary_ && transpose == transpose_) {
     // We're still in the voronoi cell for the active codeword.
     pitch = codeword_;
   } else {
-    // Search for the nearest neighbour in the codebook.
-    int16_t upper_bound_index = std::upper_bound(
-        &codebook_[3],
-        &codebook_[126],
-        static_cast<int16_t>(pitch)) - &codebook_[0];
-    int16_t lower_bound_index = upper_bound_index - 2;
+    int16_t octave = pitch / span_ - (pitch < 0 ? 1 : 0);
+    int16_t rel_pitch = pitch - span_ * octave;
 
     int16_t best_distance = 16384;
     int16_t q = -1;
-    for (int16_t i = lower_bound_index; i <= upper_bound_index; ++i) {
-      int16_t distance = abs(pitch - codebook_[i]);
+    for (int16_t i = 0; i < num_notes_; i++) {
+      int16_t distance = abs(rel_pitch - notes_[i]);
       if (distance < best_distance) {
         best_distance = distance;
         q = i;
       }
     }
 
-    // Enlarge the current voronoi cell a bit for hysteresis.
-    previous_boundary_ = (9 * codebook_[q - 1] + 7 * codebook_[q]) >> 4;
-    next_boundary_ = (9 * codebook_[q + 1] + 7 * codebook_[q]) >> 4;
+    if (abs(pitch - (octave + 1) * span_ + notes_[0]) < best_distance) {
+      octave++;
+      q = 0;
+    } else if (abs(pitch - (octave - 1) * span_ + notes_[num_notes_ - 1]) < best_distance) {
+      octave--;
+      q = num_notes_ - 1;
+    }
 
-    // Apply transpose after setting up boundaries
-    q += transpose;
-    if (q < 1) q = 1;
-    else if (q > 126) q = 126;
-    note_number_ = q;
-    codeword_ = codebook_[q];
-    transpose_ = transpose;
+    note_number_ = octave * num_notes_ + q;
+    codeword_ = notes_[q] + octave * span_;
+    previous_boundary_ = q == 0
+      ? notes_[num_notes_ - 1] + (octave - 1) * span_
+      : notes_[q - 1] + octave * span_;
+
+    previous_boundary_ = (9 * previous_boundary_ + 7 * codeword_) >> 4;
+    next_boundary_ = q == num_notes_ - 1
+      ? notes_[0] + (octave + 1) * span_
+      : notes_[q + 1] + octave * span_;
+    next_boundary_ = (9 * next_boundary_ + 7 * codeword_) >> 4;
+
     pitch = codeword_;
   }
   pitch += root;
@@ -105,16 +109,10 @@ int32_t Quantizer::Process(int32_t pitch, int32_t root, int32_t transpose) {
 }
 
 int32_t Quantizer::Lookup(int32_t index) const {
-  if (index < 0)
-    return codebook_[0];
-  else if (index > 127)
-    return codebook_[127];
-  else
-    return codebook_[index];
+  index -= 64;
+  int16_t octave = index / num_notes_ - (index < 0 ? 1 : 0);
+  int16_t rel_ix = index - octave * num_notes_;
+  int32_t pitch = notes_[rel_ix] + octave * span_;
+  return pitch;
 }
-
-void Quantizer::Requantize() {
-    requantize_ = 1;
-}
-
 }  // namespace braids

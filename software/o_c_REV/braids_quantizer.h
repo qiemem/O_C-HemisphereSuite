@@ -1,6 +1,7 @@
-// Copyright 2015 Émilie Gillet.
+// Copyright 2015 Emilie Gillet.
 //
-// Author: Émilie Gillet (ol.gillet@gmail.com)
+// Author: Emilie Gillet (emilie.o.gillet@gmail.com)
+// Re-implemented by Bryan Head to eliminate codebook
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -8,10 +9,10 @@
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included in
 // all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -19,21 +20,25 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-// 
+//
 // See http://creativecommons.org/licenses/MIT/ for more information.
 //
 // -----------------------------------------------------------------------------
 //
+
 // Note quantizer
+// Heavily modified from the one included in Braids to remove the use a
+// codebook. This significantly reduces the amount of memory required.
+// Furthermore, it enables
+//
 
 #ifndef BRAIDS_QUANTIZER_H_
 #define BRAIDS_QUANTIZER_H_
 
-//#include "stmlib/stmlib.h"
 #include "util/util_macros.h"
 
 namespace braids {
-  
+
 struct Scale {
   int16_t span;
   size_t num_notes;
@@ -41,90 +46,55 @@ struct Scale {
 };
 
 void SortScale(Scale &);
-
 class Quantizer {
  public:
-  Quantizer() { }
-  ~Quantizer() { }
-  
+  Quantizer() {}
+  ~Quantizer() {}
+
   void Init();
-  
+
   int32_t Process(int32_t pitch) {
     return Process(pitch, 0, 0);
   }
-  
+
   int32_t Process(int32_t pitch, int32_t root, int32_t transpose);
-  
+
   void Configure(const Scale& scale, uint16_t mask = 0xffff) {
-    Configure(scale.notes, scale.span, scale.num_notes, mask);
+    num_notes_ = 0;
+    for (uint16_t i = 0; i < scale.num_notes; i++) {
+      if (mask & 1) notes_[num_notes_++] = scale.notes[i];
+      mask >>= 1;
+    }
+    span_ = scale.span;
+    enabled_ = notes_ != NULL && num_notes_ != 0 && span_ != 0;
   }
 
   bool enabled() const {
     return enabled_;
   }
 
-  // HACK for TM
   int32_t Lookup(int32_t index) const;
+  uint16_t GetLatestNoteNumber() { return note_number_; }
 
-  // HACK for TB-3PO
-  uint16_t GetLatestNoteNumber() { return note_number_;}
-
-  // Force Process to process again
-  void Requantize();
+  // Force Process to process again (for after re-configuring)
+  void Requantize() { requantize_ = true; }
 
  private:
   bool enabled_;
-  int16_t enabled_notes_[16];
-  int16_t codebook_[128];
   int32_t codeword_;
   int32_t transpose_;
   int32_t previous_boundary_;
   int32_t next_boundary_;
+  int32_t span_;
+  int16_t notes_[16];
+  uint8_t num_notes_;
+
   uint16_t note_number_;
   bool requantize_;
-
-  inline void Configure(const int16_t* notes, int16_t scale_span, size_t num_notes, uint16_t mask)
-  {  
-    enabled_ = notes != NULL && num_notes != 0 && scale_span != 0 && (mask & ~(0xffff<<num_notes));
-    if (enabled_) {
-  
-      // Build up array that contains only the enabled notes, and use that to
-      // generate the codebook. This avoids a bunch of issues and checks in the
-      // main generating loop.
-      size_t num_enabled_notes = 0;
-      for (size_t i = 0; i < num_notes; ++i) {
-        if (mask & 1)
-          enabled_notes_[num_enabled_notes++] = notes[i];
-        mask >>= 1;
-      }
-      notes = enabled_notes_;
-     
-      int32_t octave = 0;
-      size_t note = 0;
-      int16_t span = scale_span;
-      int16_t *codebook;
-      
-      codebook = &codebook_[0];
-    
-      for (int32_t i = 0; i < 64; ++i) {
-        int32_t up = notes[note] + span * octave;
-        int32_t down = notes[num_enabled_notes - 1 - note] + (-octave - 1) * span;
-        CLIP(up)
-        CLIP(down)
-        *(codebook + 64 + i) = up;
-        *(codebook + 63 - i) = down;
-        ++note;
-        if (note >= num_enabled_notes) {
-          note = 0;
-          ++octave;
-        }
-      }
-    }
-  }
 
   DISALLOW_COPY_AND_ASSIGN(Quantizer);
 };
 
-}  // namespace braids
+}  // namespace stages
 
-#endif // BRAIDS_QUANTIZER_H_
+#endif
