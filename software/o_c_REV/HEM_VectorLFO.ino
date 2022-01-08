@@ -40,7 +40,7 @@ public:
 
     void Controller() {
         // Input 1 is frequency modulation for channel 1
-        float f = constrain(scale_freq(freq[0], In(0)), 1, 40000000);
+        int f = constrain(scale_freq(freq[0], In(0)), 1, 40000000);
         osc[0].SetFrequency_4dec(f);
 
         // Input 2 determines signal 1's attenuation on the B/D output mix; at 0V, signal 1

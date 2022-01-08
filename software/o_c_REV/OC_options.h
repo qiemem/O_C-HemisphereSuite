@@ -30,8 +30,8 @@
 /* (Default is to disable Captain MIDI to make enough space for the additions to applets.)             */
 
 //#define ENABLE_APP_CAPTAIN_MIDI
-#define ENABLE_APP_DARKEST_TIMELINE
-#define ENABLE_APP_PONG
+//#define ENABLE_APP_DARKEST_TIMELINE
+//#define ENABLE_APP_PONG
 
 // Define this to include some new, custom scales for Hemispheres Logarhythm Mod (optional if porting individual applets)
 // This uses approximately 640 additional bytes of program storage space

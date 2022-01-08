@@ -68,7 +68,7 @@ struct GlobalSettings {
   bool reserved1;
   uint32_t DAC_scaling;
   uint16_t current_app_id;
-  
+
   OC::Scale user_scales[OC::Scales::SCALE_USER_LAST];
   OC::Pattern user_patterns[OC::Patterns::PATTERN_USER_ALL];
   HS::TuringMachine user_turing_machines[HS::TURING_MACHINE_COUNT];
@@ -116,7 +116,7 @@ void save_global_settings() {
   memcpy(global_settings.auto_calibration_data, OC::auto_calibration_data, sizeof(OC::auto_calibration_data));
   // scaling settings:
   global_settings.DAC_scaling = OC::DAC::store_scaling();
-  
+
   global_settings_storage.Save(global_settings);
   SERIAL_PRINTLN("Saved global settings: page_index %d", global_settings_storage.page_index());
 }
@@ -235,7 +235,7 @@ void Init(bool reset_settings) {
   global_settings.encoders_enable_acceleration = OC_ENCODERS_ENABLE_ACCELERATION_DEFAULT;
   global_settings.reserved0 = false;
   global_settings.reserved1 = false;
-  global_settings.DAC_scaling = VOLTAGE_SCALING_1V_PER_OCT; 
+  global_settings.DAC_scaling = VOLTAGE_SCALING_1V_PER_OCT;
 
   if (reset_settings) {
     if (ui.ConfirmReset()) {
