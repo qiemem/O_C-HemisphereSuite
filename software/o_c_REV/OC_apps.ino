@@ -43,7 +43,7 @@ OC::App available_apps[] = {
     DECLARE_APP('D','2', "Darkest Timeline", TheDarkestTimeline),
   #endif
   DECLARE_APP('E','N', "Enigma", EnigmaTMWS),
-  DECLARE_APP('N','N', "Neural Net", NeuralNetwork),
+  //DECLARE_APP('N','N', "Neural Net", NeuralNetwork),
   DECLARE_APP('S','C', "Scale Editor", SCALEEDITOR),
   DECLARE_APP('W','A', "Waveform Editor", WaveformEditor),
   //DECLARE_APP('R','F', "References", REFS),  // commenting captain MIDI and adding this seems to work
