@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "grids_resources.h"
+#include "packmacros.h"
 
 #define HEM_DRUMMAP_PULSE_ANIMATION_TICKS 500
 #define HEM_DRUMMAP_VALUE_ANIMATION_TICKS 16000
@@ -42,25 +43,6 @@ public:
         cv1 = Proportion(DetentedIn(0), HEMISPHERE_MAX_CV, 255);
         cv2 = Proportion(DetentedIn(1), HEMISPHERE_MAX_CV, 255);
 
-        int _fill[2] = {fill[0], fill[1]};
-        if (cv_mode == 0) {
-          _fill[0] = constrain(_fill[0]+cv1, 0, 255);
-          _fill[1] = constrain(_fill[1]+cv2, 0, 255);
-        }
-
-        int _x = x;
-        int _y = y;
-        if (cv_mode == 1) {
-          _x = constrain(_x+cv1, 0, 255);
-          _y = constrain(_y+cv2, 0, 255);
-        }
-
-        int _chaos = chaos;
-        if (cv_mode == 2) {
-          _fill[0] = constrain(_fill[0]+cv1, 0, 255);
-          _chaos = constrain(_chaos+cv2, 0, 255);
-        }
-        
 
         if (Clock(1)) Reset(); // Reset
 
@@ -68,17 +50,17 @@ public:
             // generate randomness for each drum type on first step of the pattern
             if (step == 0) {
                 for (int i = 0; i < 3; i++) {
-                    randomness[i] = random(0, _chaos >> 2);
+                    randomness[i] = random(0, chaos_final() >> 2);
                 }
             }
 
             ForEachChannel(ch) {
                 // accent on ch 1 will be for whatever part ch 0 is set to
                 uint8_t part = (ch == 1 && mode[ch] == 3) ? mode[0] : mode[ch];
-                int level = ReadDrumMap(step, part, _x, _y);
+                int level = ReadDrumMap(step, part, x_final(), y_final());
                 level = constrain(level + randomness[part], 0, 255);
                 // use ch 0 fill if ch 1 is in accent mode
-                uint8_t threshold = (ch == 1 && mode[ch] == 3) ? ~_fill[0] : ~_fill[ch];
+                uint8_t threshold = (ch == 1 && mode[ch] == 3) ? ~fill_final(0) : ~fill_final(ch);
                 if (level > threshold) {
                     if (mode[ch] < 3) {
                         // normal part
@@ -110,16 +92,11 @@ public:
           value_animation--;
         }
 
-        // decrease knob acceleration
-        if (knob_accel > 256) {
-          knob_accel--;
-        }
-
         // auto-reset after ~2 seconds of no clock
         if (OC::CORE::ticks - last_clock > HEM_DRUMMAP_AUTO_RESET_TICKS && step != 0) {
             Reset();
         }
-        
+
     }
 
     void View() {
@@ -133,7 +110,6 @@ public:
     }
 
     void OnEncoderMove(int direction) {
-        int accel = knob_accel >> 8;
         // modes
         if (cursor == 0) {
             mode[0] += direction;
@@ -146,45 +122,36 @@ public:
             if (mode[1] < 0) mode[1] = 3;
         }
         // fill
-        if (cursor == 2) fill[0] = constrain(fill[0] += (direction * accel), 0, 255);
-        if (cursor == 3) fill[1] = constrain(fill[1] += (direction * accel), 0, 255);
+        if (cursor == 2) fill[0] = constrain(fill[0] += direction, 0, max_fill);
+        if (cursor == 3) fill[1] = constrain(fill[1] += direction, 0, max_fill);
         // x/y
-        if (cursor == 4) x = constrain(x += (direction * accel), 0, 255);
-        if (cursor == 5) y = constrain(y += (direction * accel), 0, 255);
+        if (cursor == 4) x = constrain(x += direction, 0, max_xy);
+        if (cursor == 5) y = constrain(y += direction, 0, max_xy);
         // chaos
-        if (cursor == 6) chaos = constrain(chaos += (direction * accel), 0, 255);
+        if (cursor == 6) chaos = constrain(chaos += direction, 0, max_chaos);
         // cv assign
         if (cursor == 7) {
           cv_mode += direction;
           if (cv_mode > 2) cv_mode = 0;
           if (cv_mode < 0) cv_mode = 2;
         }
-
-        // knob acceleration and value display for slider params
-        if (cursor >= 2 && cursor <= 6 && knob_accel < 2049) {
-          if (knob_accel < 300) {
-            knob_accel = knob_accel << 1;
-          }
-          knob_accel = knob_accel << 2;
+        if (cursor >= 2 && cursor <= 6) {
           value_animation = HEM_DRUMMAP_VALUE_ANIMATION_TICKS;
         }
     }
-        
-    uint32_t OnDataRequest() {
-        uint32_t data = 0;
-        Pack(data, PackLocation {0,8}, fill[0]); 
-        Pack(data, PackLocation {8,8}, fill[1]); 
-        Pack(data, PackLocation {16,8}, x); 
-        Pack(data, PackLocation {24,8}, y); 
-        return data;
-    }
 
-    void OnDataReceive(uint32_t data) {
-        fill[0] = Unpack(data, PackLocation {0,8});
-        fill[1] = Unpack(data, PackLocation {8,8});
-        x = Unpack(data, PackLocation {16,8});
-        y = Unpack(data, PackLocation {24,8});
-    }
+    #define PACK_SPEC(PACK_OP) \
+      PACK_OP(fill[0], fill_bits) \
+      PACK_OP(fill[1], fill_bits) \
+      PACK_OP(x,       xy_bits) \
+      PACK_OP(y,       xy_bits) \
+      PACK_OP(chaos,   chaos_bits) \
+      PACK_OP(mode[0], mode_bits) \
+      PACK_OP(mode[1], mode_bits) \
+      PACK_OP(cv_mode, cv_mode_bits)
+
+    ON_DATA_REQUEST(PACK_SPEC)
+    ON_DATA_RECEIVE(PACK_SPEC)
 
 protected:
     void SetHelp() {
@@ -195,7 +162,7 @@ protected:
         help[HEMISPHERE_HELP_ENCODER]  = "Params/Config";
         //                               "------------------" <-- Size Guide
     }
-    
+
 private:
     const uint8_t *MODE_ICONS[3] = {BD_ICON,SN_ICON,HH_ICON};
     const char *CV_MODE_NAMES[3] = {"FILL A/B", "X/Y", "FA/CHAOS"};
@@ -204,18 +171,57 @@ private:
     uint8_t randomness[3] = {0, 0, 0};
     int pulse_animation[2] = {0, 0};
     int value_animation = 0;
-    int knob_accel = 256;
     uint32_t last_clock;
-    
+
     // settings
     int8_t mode[2] = {0, 1};
-    int fill[2] = {128, 128}; 
+    int fill[2] = {128, 128};
     int x = 0;
     int y = 0;
     int chaos = 0;
     int8_t cv_mode = 0; // 0 = Fill A/B, 1 = X/Y, 2 = Fill A/Chaos
     int cv1 = 0; // internal tracking of cv inputs
     int cv2 = 0;
+
+    static const int mode_bits = 2;
+    static const int fill_bits = 5;
+    static const int xy_bits = 6;
+    static const int chaos_bits = 4;
+    static const int cv_mode_bits = 2;
+
+    CHECK_PACK_SIZE(PACK_SPEC)
+    #undef PACK_SPEC
+
+    const int max_fill = (1 << fill_bits) - 1;
+    const int max_xy = (1 << xy_bits) - 1;
+    const int max_chaos = (1 << chaos_bits) - 1;
+
+    inline int fill_scaled(int i) const { return fill[i] * 255 / max_fill; }
+    inline int fill_final(int i) const {
+      int cv = 0;
+      if (i == 0 && (cv_mode == 0 || cv_mode == 2)) {
+        cv = cv1;
+      } else if (i == 1 && cv_mode == 0) {
+        cv = cv2;
+      }
+      return constrain(fill_scaled(i) + cv, 0, 255);
+    }
+
+    int x_scaled() const { return x * 255 / max_xy; }
+    int x_final() const {
+      return constrain(x_scaled() + (cv_mode == 1 ? cv1 : 0), 0, 255);
+    }
+
+    int y_scaled() const { return y * 255 / max_xy; }
+    int y_final() const {
+      return constrain(y_scaled() + (cv_mode == 1 ? cv2 : 0), 0, 255);
+    }
+
+    int chaos_scaled() const { return chaos * 255 / max_chaos; }
+    int chaos_final() const {
+      return constrain(chaos_scaled() + (cv_mode == 2 ? cv2 : 0), 0, 255);
+    }
+
 
     uint8_t ReadDrumMap(uint8_t step, uint8_t part, uint8_t x, uint8_t y) {
       uint8_t i = x >> 6;
@@ -232,12 +238,12 @@ private:
       uint8_t quad_x = x << 2;
       uint8_t quad_y = y << 2;
       // return U8Mix(U8Mix(a, b, x << 2), U8Mix(c, d, x << 2), y << 2);
-      // U8Mix returns b * x + a * (255 - x) >> 8 
+      // U8Mix returns b * x + a * (255 - x) >> 8
       uint8_t ab_fade = (b * quad_x + a * (255 - quad_x)) >> 8;
       uint8_t cd_fade = (d * quad_x + c * (255 - quad_x)) >> 8;
       return (cd_fade * quad_y + ab_fade * (255 - quad_y)) >> 8;
     }
-    
+
     void DrawInterface() {
         // output selection
         gfxPrint(1,15,"A:");
@@ -260,35 +266,24 @@ private:
 
         // fill
         gfxPrint(1,25,"F");
-        // add cv1 to fill_a value if cv1 mode is set to Fill A
-        int fa = fill[0];
-        if (cv_mode == 0 || cv_mode == 2) fa = constrain(fa+cv1, 0, 255);
-        DrawKnobAt(9,25,20,fa,cursor == 2);
+        DrawKnobAt(9,25,20,fill_final(0),cursor == 2);
         // don't show fill for channel b if it is an accent mode
         if (mode[1] < 3) {
             gfxPrint(32,25,"F");
             // add cv1 to fill_a value if cv1 mode is set to Fill A
-            int fb = fill[1];
-            if (cv_mode == 0) fb = constrain(fb+cv2, 0, 255);
-            DrawKnobAt(40,25,20,fb,cursor == 3);
+            DrawKnobAt(40,25,20,fill_final(1),cursor == 3);
         }
-        
+
         // x & y
-        int _x = x;
-        if (cv_mode == 1) _x = constrain(_x+cv1, 0, 255);
         gfxPrint(1,35,"X");
-        DrawKnobAt(9,35,20,_x,cursor == 4);
-        int _y = y;
-        if (cv_mode == 1) _y = constrain(_y+cv2, 0, 255);
+        DrawKnobAt(9,35,20,x_final(),cursor == 4);
         gfxPrint(32,35,"Y");
-        DrawKnobAt(40,35,20,_y,cursor == 5);
-        
+        DrawKnobAt(40,35,20,y_final(),cursor == 5);
+
         // chaos
-        int _chaos = chaos;
-        if (cv_mode == 2) _chaos = constrain(_chaos+cv2, 0, 255);
         gfxPrint(1,45,"CHAOS");
-        DrawKnobAt(32,45,28,_chaos,cursor == 6);
-        
+        DrawKnobAt(32,45,28,chaos_final(),cursor == 6);
+
         // cv input assignment
         gfxIcon(1,57,CV_ICON);
         gfxPrint(10,55,CV_MODE_NAMES[cv_mode]);
@@ -300,7 +295,7 @@ private:
         if (cursor == 0) gfxCursor(14,23,16); // Part A
         if (cursor == 1) gfxCursor(45,23,16); // Part B
         if (cursor == 7) gfxCursor(10,63,50); // CV Assign
-        
+
         // display value for knobs
         if (value_animation > 0 && cursor >= 2 && cursor <= 6) {
           gfxRect(1, 54, 60, 10);
@@ -308,19 +303,19 @@ private:
           int val = 0;
           switch (cursor) {
             case 2:
-              val = fill[0];
+              val = fill_scaled(0);
               break;
             case 3:
-              val = fill[1];
+              val = fill_scaled(1);
               break;
             case 4:
-              val = x;
+              val = x_scaled();
               break;
             case 5:
-              val = y;
+              val = y_scaled();
               break;
             case 6:
-              val = chaos;
+              val = chaos_scaled();
               break;
           }
           int xPos = 27;
