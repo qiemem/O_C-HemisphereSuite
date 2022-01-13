@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "grids_resources.h"
+#include "packmacros.h"
 
 #define HEM_DRUMMAP_PULSE_ANIMATION_TICKS 500
 #define HEM_DRUMMAP_VALUE_ANIMATION_TICKS 16000
@@ -42,25 +43,6 @@ public:
         cv1 = Proportion(DetentedIn(0), HEMISPHERE_MAX_CV, 255);
         cv2 = Proportion(DetentedIn(1), HEMISPHERE_MAX_CV, 255);
 
-        int _fill[2] = {fill[0], fill[1]};
-        if (cv_mode == 0) {
-          _fill[0] = constrain(_fill[0]+cv1, 0, 255);
-          _fill[1] = constrain(_fill[1]+cv2, 0, 255);
-        }
-
-        int _x = x;
-        int _y = y;
-        if (cv_mode == 1) {
-          _x = constrain(_x+cv1, 0, 255);
-          _y = constrain(_y+cv2, 0, 255);
-        }
-
-        int _chaos = chaos;
-        if (cv_mode == 2) {
-          _fill[0] = constrain(_fill[0]+cv1, 0, 255);
-          _chaos = constrain(_chaos+cv2, 0, 255);
-        }
-
 
         if (Clock(1)) Reset(); // Reset
 
@@ -68,17 +50,17 @@ public:
             // generate randomness for each drum type on first step of the pattern
             if (step == 0) {
                 for (int i = 0; i < 3; i++) {
-                    randomness[i] = random(0, _chaos >> 2);
+                    randomness[i] = random(0, chaos_() >> 2);
                 }
             }
 
             ForEachChannel(ch) {
                 // accent on ch 1 will be for whatever part ch 0 is set to
                 uint8_t part = (ch == 1 && mode[ch] == 3) ? mode[0] : mode[ch];
-                int level = ReadDrumMap(step, part, _x, _y);
+                int level = ReadDrumMap(step, part, x_(), y_());
                 level = constrain(level + randomness[part], 0, 255);
                 // use ch 0 fill if ch 1 is in accent mode
-                uint8_t threshold = (ch == 1 && mode[ch] == 3) ? ~_fill[0] : ~_fill[ch];
+                uint8_t threshold = (ch == 1 && mode[ch] == 3) ? ~fill_(0) : ~fill_(ch);
                 if (level > threshold) {
                     if (mode[ch] < 3) {
                         // normal part
@@ -133,7 +115,8 @@ public:
     }
 
     void OnEncoderMove(int direction) {
-        int accel = knob_accel >> 8;
+        //int accel = knob_accel >> 8;
+        int accel = 1;
         // modes
         if (cursor == 0) {
             mode[0] += direction;
@@ -146,13 +129,13 @@ public:
             if (mode[1] < 0) mode[1] = 3;
         }
         // fill
-        if (cursor == 2) fill[0] = constrain(fill[0] += (direction * accel), 0, 255);
-        if (cursor == 3) fill[1] = constrain(fill[1] += (direction * accel), 0, 255);
+        if (cursor == 2) fill[0] = constrain(fill[0] += (direction * accel), 0, max_fill);
+        if (cursor == 3) fill[1] = constrain(fill[1] += (direction * accel), 0, max_fill);
         // x/y
-        if (cursor == 4) x = constrain(x += (direction * accel), 0, 255);
-        if (cursor == 5) y = constrain(y += (direction * accel), 0, 255);
+        if (cursor == 4) x = constrain(x += (direction * accel), 0, max_xy);
+        if (cursor == 5) y = constrain(y += (direction * accel), 0, max_xy);
         // chaos
-        if (cursor == 6) chaos = constrain(chaos += (direction * accel), 0, 255);
+        if (cursor == 6) chaos = constrain(chaos += (direction * accel), 0, max_chaos);
         // cv assign
         if (cursor == 7) {
           cv_mode += direction;
@@ -170,29 +153,18 @@ public:
         }
     }
 
-    uint32_t OnDataRequest() {
-        uint32_t data = 0;
-        Pack(data, PackLocation {0,5}, fill[0] >> 3);
-        Pack(data, PackLocation {5,5}, fill[1] >> 3);
-        Pack(data, PackLocation {10,5}, x >> 3);
-        Pack(data, PackLocation {15,5}, y >> 3);
-        Pack(data, PackLocation {20,5}, chaos >> 3);
-        Pack(data, PackLocation {25, 2}, mode[0]);
-        Pack(data, PackLocation {27, 2}, mode[1]);
-        Pack(data, PackLocation {29, 2}, cv_mode);
-        return data;
-    }
+    #define PACK_SPEC(PACK_OP) \
+      PACK_OP(fill[0], fill_bits) \
+      PACK_OP(fill[1], fill_bits) \
+      PACK_OP(x,       xy_bits) \
+      PACK_OP(y,       xy_bits) \
+      PACK_OP(chaos,   chaos_bits) \
+      PACK_OP(mode[0], mode_bits) \
+      PACK_OP(mode[1], mode_bits) \
+      PACK_OP(cv_mode, cv_mode_bits)
 
-    void OnDataReceive(uint32_t data) {
-        fill[0] = Unpack(data, PackLocation {0,5}) << 3;
-        fill[1] = Unpack(data, PackLocation {5,5}) << 3;
-        x = Unpack(data, PackLocation {10,5}) << 3;
-        y = Unpack(data, PackLocation {15,5}) << 3;
-        chaos = Unpack(data, PackLocation {20,5}) << 3;
-        mode[0] = Unpack(data, PackLocation {25,2});
-        mode[1] = Unpack(data, PackLocation {27,2});
-        cv_mode = Unpack(data, PackLocation {29,2});
-    }
+    ON_DATA_REQUEST(PACK_SPEC)
+    ON_DATA_RECEIVE(PACK_SPEC)
 
 protected:
     void SetHelp() {
@@ -224,6 +196,34 @@ private:
     int8_t cv_mode = 0; // 0 = Fill A/B, 1 = X/Y, 2 = Fill A/Chaos
     int cv1 = 0; // internal tracking of cv inputs
     int cv2 = 0;
+
+    static const int mode_bits = 2;
+    static const int fill_bits = 5;
+    static const int xy_bits = 6;
+    static const int chaos_bits = 4;
+    static const int cv_mode_bits = 2;
+
+    CHECK_PACK_SIZE(PACK_SPEC)
+    #undef PACK_SPEC
+
+    const int max_fill = (1 << fill_bits) - 1;
+    const int max_xy = (1 << xy_bits) - 1;
+    const int max_chaos = (1 << chaos_bits) - 1;
+
+    inline int fill_(int i) const {
+      int cv = 0;
+      if (i == 0 && (cv_mode == 0 || cv_mode == 2)) {
+        cv = cv1;
+      } else if (i == 1 && cv_mode == 0) {
+        cv = cv2;
+      }
+      int f = fill[i] * 255 / max_fill;
+      return constrain(f + cv, 0, 255);
+    }
+
+    inline int x_() const { return x * 255 / max_xy; }
+    inline int y_() const { return y * 255 / max_xy; }
+    inline int chaos_() const { return chaos * 255 / max_chaos; }
 
     uint8_t ReadDrumMap(uint8_t step, uint8_t part, uint8_t x, uint8_t y) {
       uint8_t i = x >> 6;
@@ -268,34 +268,23 @@ private:
 
         // fill
         gfxPrint(1,25,"F");
-        // add cv1 to fill_a value if cv1 mode is set to Fill A
-        int fa = fill[0];
-        if (cv_mode == 0 || cv_mode == 2) fa = constrain(fa+cv1, 0, 255);
-        DrawKnobAt(9,25,20,fa,cursor == 2);
+        DrawKnobAt(9,25,20,fill_(0),cursor == 2);
         // don't show fill for channel b if it is an accent mode
         if (mode[1] < 3) {
             gfxPrint(32,25,"F");
             // add cv1 to fill_a value if cv1 mode is set to Fill A
-            int fb = fill[1];
-            if (cv_mode == 0) fb = constrain(fb+cv2, 0, 255);
-            DrawKnobAt(40,25,20,fb,cursor == 3);
+            DrawKnobAt(40,25,20,fill_(1),cursor == 3);
         }
 
         // x & y
-        int _x = x;
-        if (cv_mode == 1) _x = constrain(_x+cv1, 0, 255);
         gfxPrint(1,35,"X");
-        DrawKnobAt(9,35,20,_x,cursor == 4);
-        int _y = y;
-        if (cv_mode == 1) _y = constrain(_y+cv2, 0, 255);
+        DrawKnobAt(9,35,20,x_(),cursor == 4);
         gfxPrint(32,35,"Y");
-        DrawKnobAt(40,35,20,_y,cursor == 5);
+        DrawKnobAt(40,35,20,y_(),cursor == 5);
 
         // chaos
-        int _chaos = chaos;
-        if (cv_mode == 2) _chaos = constrain(_chaos+cv2, 0, 255);
         gfxPrint(1,45,"CHAOS");
-        DrawKnobAt(32,45,28,_chaos,cursor == 6);
+        DrawKnobAt(32,45,28,chaos_(),cursor == 6);
 
         // cv input assignment
         gfxIcon(1,57,CV_ICON);
@@ -316,19 +305,19 @@ private:
           int val = 0;
           switch (cursor) {
             case 2:
-              val = fill[0];
+              val = fill_(0);
               break;
             case 3:
-              val = fill[1];
+              val = fill_(1);
               break;
             case 4:
-              val = x;
+              val = x_();
               break;
             case 5:
-              val = y;
+              val = y_();
               break;
             case 6:
-              val = chaos;
+              val = chaos_();
               break;
           }
           int xPos = 27;
