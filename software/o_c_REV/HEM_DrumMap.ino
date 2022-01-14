@@ -92,11 +92,6 @@ public:
           value_animation--;
         }
 
-        // decrease knob acceleration
-        if (knob_accel > 256) {
-          knob_accel--;
-        }
-
         // auto-reset after ~2 seconds of no clock
         if (OC::CORE::ticks - last_clock > HEM_DRUMMAP_AUTO_RESET_TICKS && step != 0) {
             Reset();
@@ -115,8 +110,6 @@ public:
     }
 
     void OnEncoderMove(int direction) {
-        //int accel = knob_accel >> 8;
-        int accel = 1;
         // modes
         if (cursor == 0) {
             mode[0] += direction;
@@ -129,27 +122,18 @@ public:
             if (mode[1] < 0) mode[1] = 3;
         }
         // fill
-        if (cursor == 2) fill[0] = constrain(fill[0] += (direction * accel), 0, max_fill);
-        if (cursor == 3) fill[1] = constrain(fill[1] += (direction * accel), 0, max_fill);
+        if (cursor == 2) fill[0] = constrain(fill[0] += direction, 0, max_fill);
+        if (cursor == 3) fill[1] = constrain(fill[1] += direction, 0, max_fill);
         // x/y
-        if (cursor == 4) x = constrain(x += (direction * accel), 0, max_xy);
-        if (cursor == 5) y = constrain(y += (direction * accel), 0, max_xy);
+        if (cursor == 4) x = constrain(x += direction, 0, max_xy);
+        if (cursor == 5) y = constrain(y += direction, 0, max_xy);
         // chaos
-        if (cursor == 6) chaos = constrain(chaos += (direction * accel), 0, max_chaos);
+        if (cursor == 6) chaos = constrain(chaos += direction, 0, max_chaos);
         // cv assign
         if (cursor == 7) {
           cv_mode += direction;
           if (cv_mode > 2) cv_mode = 0;
           if (cv_mode < 0) cv_mode = 2;
-        }
-
-        // knob acceleration and value display for slider params
-        if (cursor >= 2 && cursor <= 6 && knob_accel < 2049) {
-          if (knob_accel < 300) {
-            knob_accel = knob_accel << 1;
-          }
-          knob_accel = knob_accel << 2;
-          value_animation = HEM_DRUMMAP_VALUE_ANIMATION_TICKS;
         }
     }
 
@@ -184,7 +168,6 @@ private:
     uint8_t randomness[3] = {0, 0, 0};
     int pulse_animation[2] = {0, 0};
     int value_animation = 0;
-    int knob_accel = 256;
     uint32_t last_clock;
 
     // settings
