@@ -50,17 +50,17 @@ public:
             // generate randomness for each drum type on first step of the pattern
             if (step == 0) {
                 for (int i = 0; i < 3; i++) {
-                    randomness[i] = random(0, chaos_() >> 2);
+                    randomness[i] = random(0, chaos_final() >> 2);
                 }
             }
 
             ForEachChannel(ch) {
                 // accent on ch 1 will be for whatever part ch 0 is set to
                 uint8_t part = (ch == 1 && mode[ch] == 3) ? mode[0] : mode[ch];
-                int level = ReadDrumMap(step, part, x_(), y_());
+                int level = ReadDrumMap(step, part, x_final(), y_final());
                 level = constrain(level + randomness[part], 0, 255);
                 // use ch 0 fill if ch 1 is in accent mode
-                uint8_t threshold = (ch == 1 && mode[ch] == 3) ? ~fill_(0) : ~fill_(ch);
+                uint8_t threshold = (ch == 1 && mode[ch] == 3) ? ~fill_final(0) : ~fill_final(ch);
                 if (level > threshold) {
                     if (mode[ch] < 3) {
                         // normal part
@@ -135,6 +135,9 @@ public:
           if (cv_mode > 2) cv_mode = 0;
           if (cv_mode < 0) cv_mode = 2;
         }
+        if (cursor >= 2 && cursor <= 6) {
+          value_animation = HEM_DRUMMAP_VALUE_ANIMATION_TICKS;
+        }
     }
 
     #define PACK_SPEC(PACK_OP) \
@@ -193,20 +196,32 @@ private:
     const int max_xy = (1 << xy_bits) - 1;
     const int max_chaos = (1 << chaos_bits) - 1;
 
-    inline int fill_(int i) const {
+    inline int fill_scaled(int i) const { return fill[i] * 255 / max_fill; }
+    inline int fill_final(int i) const {
       int cv = 0;
       if (i == 0 && (cv_mode == 0 || cv_mode == 2)) {
         cv = cv1;
       } else if (i == 1 && cv_mode == 0) {
         cv = cv2;
       }
-      int f = fill[i] * 255 / max_fill;
-      return constrain(f + cv, 0, 255);
+      return constrain(fill_scaled(i) + cv, 0, 255);
     }
 
-    inline int x_() const { return x * 255 / max_xy; }
-    inline int y_() const { return y * 255 / max_xy; }
-    inline int chaos_() const { return chaos * 255 / max_chaos; }
+    int x_scaled() const { return x * 255 / max_xy; }
+    int x_final() const {
+      return constrain(x_scaled() + (cv_mode == 1 ? cv1 : 0), 0, 255);
+    }
+
+    int y_scaled() const { return y * 255 / max_xy; }
+    int y_final() const {
+      return constrain(y_scaled() + (cv_mode == 1 ? cv2 : 0), 0, 255);
+    }
+
+    int chaos_scaled() const { return chaos * 255 / max_chaos; }
+    int chaos_final() const {
+      return constrain(chaos_scaled() + (cv_mode == 2 ? cv2 : 0), 0, 255);
+    }
+
 
     uint8_t ReadDrumMap(uint8_t step, uint8_t part, uint8_t x, uint8_t y) {
       uint8_t i = x >> 6;
@@ -251,23 +266,23 @@ private:
 
         // fill
         gfxPrint(1,25,"F");
-        DrawKnobAt(9,25,20,fill_(0),cursor == 2);
+        DrawKnobAt(9,25,20,fill_final(0),cursor == 2);
         // don't show fill for channel b if it is an accent mode
         if (mode[1] < 3) {
             gfxPrint(32,25,"F");
             // add cv1 to fill_a value if cv1 mode is set to Fill A
-            DrawKnobAt(40,25,20,fill_(1),cursor == 3);
+            DrawKnobAt(40,25,20,fill_final(1),cursor == 3);
         }
 
         // x & y
         gfxPrint(1,35,"X");
-        DrawKnobAt(9,35,20,x_(),cursor == 4);
+        DrawKnobAt(9,35,20,x_final(),cursor == 4);
         gfxPrint(32,35,"Y");
-        DrawKnobAt(40,35,20,y_(),cursor == 5);
+        DrawKnobAt(40,35,20,y_final(),cursor == 5);
 
         // chaos
         gfxPrint(1,45,"CHAOS");
-        DrawKnobAt(32,45,28,chaos_(),cursor == 6);
+        DrawKnobAt(32,45,28,chaos_final(),cursor == 6);
 
         // cv input assignment
         gfxIcon(1,57,CV_ICON);
@@ -288,19 +303,19 @@ private:
           int val = 0;
           switch (cursor) {
             case 2:
-              val = fill_(0);
+              val = fill_scaled(0);
               break;
             case 3:
-              val = fill_(1);
+              val = fill_scaled(1);
               break;
             case 4:
-              val = x_();
+              val = x_scaled();
               break;
             case 5:
-              val = y_();
+              val = y_scaled();
               break;
             case 6:
-              val = chaos_();
+              val = chaos_scaled();
               break;
           }
           int xPos = 27;
