@@ -156,11 +156,11 @@ private:
                         }
                     }
 
-                    if (s + (ch * 8) == step) {
+                    if (s + (ch * 8) == active_step) {
                         gfxLine(x + 4, y, x + 10, y);
                     }
 
-                    if (s == offset) {
+                    if (s + (ch * 8) == offset) {
                         gfxFrame(x - 4, y - 4, 9, 9);
                     }
 
