@@ -11,8 +11,7 @@ public:
     phase += phase_increment;
     int slope_cv = In(1) * 32768 / HEMISPHERE_3V_CV;
     int s = constrain(slope * 65535 / 127 + slope_cv, 0, 65535);
-    ProcessSample(s, att_shape * 65535 / 127, dec_shape * 65535 / 127,
-                   fold * 32767 / 127, phase, sample);
+    ProcessSample(s, shape * 65535 / 127, fold * 32767 / 127, phase, sample);
     if (phase < phase_increment) {
       eoa_reached = false;
     } else {
@@ -31,9 +30,8 @@ public:
 
     int last = 50;
     for (int i = 1; i < 64; i++) {
-      ProcessSample(slope * 65535 / 127, att_shape * 65535 / 127,
-                     dec_shape * 65535 / 127, fold * 32767 / 127,
-                     0xffffffff / 64 * i, disp_sample);
+      ProcessSample(slope * 65535 / 127, shape * 65535 / 127,
+                    fold * 32767 / 127, 0xffffffff / 64 * i, disp_sample);
       int next = 50 - disp_sample.unipolar * 35 / 65535;
       gfxLine(i - 1, last, i, next);
       last = next;
@@ -54,21 +52,17 @@ public:
       break;
     case 2:
       gfxPrint(0, 55, "Att: ");
-      gfxPrint(att_shape);
+      gfxPrint(shape);
       break;
     case 3:
-      gfxPrint(0, 55, "Dec: ");
-      gfxPrint(dec_shape);
-      break;
-    case 4:
       gfxPrint(0, 55, "Fold: ");
       gfxPrint(fold);
       break;
-    case 5:
+    case 4:
       gfxPrint(0, 55, "OutA: ");
       gfxPrint(out_labels[out_a]);
       break;
-    case 6:
+    case 5:
       gfxPrint(0, 55, "OutB: ");
       gfxPrint(out_labels[out_b]);
       break;
@@ -79,7 +73,7 @@ public:
 
   void OnButtonPress() {
     cursor++;
-    cursor %= 7;
+    cursor %= 6;
   }
 
   void OnEncoderMove(int direction) {
@@ -98,22 +92,19 @@ public:
       break;
     }
     case 2: {
-      att_shape = constrain(att_shape + direction, 0, 127);
+      shape += direction;
+      shape %= 128;
       break;
     }
     case 3: {
-      dec_shape = constrain(dec_shape + direction, 0, 127);
-      break;
-    }
-    case 4: {
       fold = constrain(fold + direction, 0, 127);
       break;
     }
-    case 5: {
+    case 4: {
       out_a += direction;
       out_a %= 4;
     }
-    case 6: {
+    case 5: {
       out_b += direction;
       out_b %= 4;
     }
@@ -138,8 +129,7 @@ private:
   int cursor;
   int16_t pitch;
   int slope = 64;
-  int att_shape = 64;
-  int dec_shape = 64;
+  int shape = 32;
   int fold = 0;
   const char* out_labels[4] = {"Uni", "Bi", "High", "Low"};
   uint8_t out_a = UNIPOLAR;
@@ -205,14 +195,6 @@ private:
     } else {
       gfxPrint("Hz");
     }
-    // int oom = 1;
-    // int i = -3;
-    // while (oom * phase_inc < 1000 * (uint64_t) 0xffffffff) {
-    //   oom *= 10;
-    //   i++;
-    // }
-    // gfxCursor(x, y);
-    // gfxPrint(x, y, phase_inc * oom / 0xffffffff);
   }
 };
 ////////////////////////////////////////////////////////////////////////////////

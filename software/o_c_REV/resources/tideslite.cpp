@@ -14,7 +14,7 @@ int main(int argc, char **argv) {
   uint32_t phase = 0;
   printf("unipolar,bipolar,high,low\n");
   for (uint64_t i = 0; i < samples; i++) {
-    ProcessSample(slope, shape, shape, fold, phase, sample);
+    ProcessSample(slope, shape, fold, phase, sample);
     printf("%d,%d,%d,%d\n", sample.unipolar, sample.bipolar,
            (sample.flags & FLAG_EOA) ? 65535 : 0,
            (sample.flags & FLAG_EOR) ? 65535 : 0);

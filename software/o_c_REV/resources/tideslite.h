@@ -214,8 +214,32 @@ uint16_t ShapePhase(uint16_t phase, uint16_t attack_curve,
              : WarpPhase((0xffff - phase) << 17, decay_curve) >> 16;
 }
 
-void ProcessSample(uint16_t slope, uint16_t att_shape, uint16_t dec_shape,
-                    int16_t fold, uint32_t phase, TidesLiteSample &sample) {
+uint16_t ShapePhase(uint16_t phase, uint16_t shape) {
+  uint32_t att = 0;
+  uint32_t dec = 0;
+  if (shape < 1 * 65536 / 4) {
+    shape *= 4;
+    att = 0;
+    dec = 65535 - shape;
+  } else if (shape < 2 * 65536 / 4) {
+    // shape between -24576 and 81
+    shape = (shape - 65536 / 4) * 4;
+    att = shape;
+    dec = shape;
+  } else if (shape < 3 * 65536 / 4) {
+    shape = (shape - 2 * 65536 / 4) * 4;
+    att = 65535;
+    dec = 65535 - shape;
+  } else if (shape < 4 * 65536 / 4) {
+    shape = (shape - 3 * 65536 / 4) * 4;
+    att = 65535 - shape;
+    dec = shape;
+  }
+  return ShapePhase(phase, att, dec);
+}
+
+void ProcessSample(uint16_t slope, uint16_t shape, int16_t fold, uint32_t phase,
+                   TidesLiteSample &sample) {
   uint32_t eoa = slope << 16;
   // uint32_t skewed_phase = phase;
   slope = slope ? slope : 1;
@@ -230,8 +254,8 @@ void ProcessSample(uint16_t slope, uint16_t att_shape, uint16_t dec_shape,
     skewed_phase += 1L << 31;
   }
 
-  sample.unipolar = ShapePhase(skewed_phase >> 16, att_shape, dec_shape);
-  sample.bipolar = ShapePhase(skewed_phase >> 15, att_shape, dec_shape) >> 1;
+  sample.unipolar = ShapePhase(skewed_phase >> 16, shape);
+  sample.bipolar = ShapePhase(skewed_phase >> 15, shape) >> 1;
   if (skewed_phase >= (1UL << 31)) {
     sample.bipolar = -sample.bipolar;
   }
