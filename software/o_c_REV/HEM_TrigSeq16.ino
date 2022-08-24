@@ -156,7 +156,7 @@ private:
                         }
                     }
 
-                    if (s + (ch * 8) == step) {
+                    if (s + (ch * 8) == active_step) {
                         gfxLine(x + 4, y, x + 10, y);
                     }
 
