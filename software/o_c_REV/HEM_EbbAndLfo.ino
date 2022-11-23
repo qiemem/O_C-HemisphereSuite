@@ -18,8 +18,22 @@ public:
       eoa_reached = eoa_reached || (sample.flags & FLAG_EOA);
     }
 
-    output(0, (Output) out_a);
-    output(1, (Output) out_b);
+    ForEachChannel(ch) {
+      switch (output(ch)) {
+      case UNIPOLAR:
+        Out(ch, Proportion(sample.unipolar, 65535, HEMISPHERE_MAX_CV));
+        break;
+      case BIPOLAR:
+        Out(ch, Proportion(sample.bipolar, 32767, HEMISPHERE_MAX_CV / 2));
+        break;
+      case EOA:
+        GateOut(ch, eoa_reached);
+        break;
+      case EOR:
+        GateOut(ch, !eoa_reached);
+        break;
+      }
+    }
 
     if (knob_accel > (1 << 8))
       knob_accel--;
@@ -51,7 +65,7 @@ public:
       gfxPrint(slope);
       break;
     case 2:
-      gfxPrint(0, 55, "Att: ");
+      gfxPrint(0, 55, "Shape: ");
       gfxPrint(shape);
       break;
     case 3:
@@ -59,12 +73,10 @@ public:
       gfxPrint(fold);
       break;
     case 4:
-      gfxPrint(0, 55, "OutA: ");
-      gfxPrint(out_labels[out_a]);
-      break;
-    case 5:
-      gfxPrint(0, 55, "OutB: ");
-      gfxPrint(out_labels[out_b]);
+      gfxPrint(0, 55, hemisphere == 0 ? "A: " : "C: ");
+      gfxPrint(out_labels[output(0)]);
+      gfxPrint(hemisphere == 0 ? " B: " : " D: ");
+      gfxPrint(out_labels[output(1)]);
       break;
     }
   }
@@ -73,7 +85,7 @@ public:
 
   void OnButtonPress() {
     cursor++;
-    cursor %= 6;
+    cursor %= 5;
   }
 
   void OnEncoderMove(int direction) {
@@ -101,21 +113,33 @@ public:
       break;
     }
     case 4: {
-      out_a += direction;
-      out_a %= 4;
-    }
-    case 5: {
-      out_b += direction;
-      out_b %= 4;
+      out += direction;
+      out %= 0b10000;
     }
     }
     if (knob_accel < (1 << 13))
       knob_accel <<= 1;
   }
 
-  uint64_t OnDataRequest() { return 0; }
+  uint64_t OnDataRequest() {
+    uint64_t data = 0;
+    Pack(data, PackLocation { 0, 16 }, pitch + (1 << 15));
+    Pack(data, PackLocation { 16, 7 }, slope);
+    Pack(data, PackLocation { 23, 7 }, shape + 128);
+    Pack(data, PackLocation { 30, 7 }, fold);
+    Pack(data, PackLocation { 37, 4 }, out);
+    Pack(data, PackLocation { 41, 4 }, cv);
+    return data;
+  }
 
-  void OnDataReceive(uint64_t data) {}
+  void OnDataReceive(uint64_t data) {
+    pitch = Unpack(data, PackLocation { 0, 16 }) - (1 << 15);
+    slope = Unpack(data, PackLocation { 16, 7 });
+    shape = Unpack(data, PackLocation { 23, 7 }) - 128;
+    fold = Unpack(data, PackLocation { 30, 7 });
+    out = Unpack(data, PackLocation { 37, 4 });
+    cv = Unpack(data, PackLocation { 41, 4 });
+  }
 
 private:
 
@@ -125,15 +149,24 @@ private:
     EOA,
     EOR,
   };
+  const char* out_labels[4] = {"Un", "Bi", "Hi", "Lo"};
 
-  int cursor;
-  int16_t pitch;
+  enum CV {
+    FREQ,
+    SLOPE,
+    SHAPE,
+    FOLD,
+  };
+  const char* cv_labels[4] = {"Hz", "Sl", "Sh", "Fo"};
+
+  int cursor = 0;
+  int16_t pitch = -3 * 12 * 128;
   int slope = 64;
-  int shape = 32;
+  int shape = 48; // triangle
   int fold = 0;
-  const char* out_labels[4] = {"Uni", "Bi", "High", "Low"};
-  uint8_t out_a = UNIPOLAR;
-  uint8_t out_b = BIPOLAR;
+
+  uint8_t out = 0b0001; // Unipolar on A, bipolar on B
+  uint8_t cv = 0b0001; // Freq on 1, shape on 2
   TidesLiteSample disp_sample;
   TidesLiteSample sample;
   bool eoa_reached = false;
@@ -142,23 +175,13 @@ private:
 
   uint32_t phase;
 
-  void output(int ch, Output out) {
-    switch (out) {
-    case UNIPOLAR:
-      Out(ch, Proportion(sample.unipolar, 65535, HEMISPHERE_MAX_CV));
-      break;
-    case BIPOLAR:
-      Out(ch, Proportion(sample.bipolar, 32767, HEMISPHERE_MAX_CV / 2));
-      break;
-    case EOA:
-      GateOut(ch, eoa_reached);
-      break;
-    case EOR:
-      GateOut(ch, !eoa_reached);
-      break;
-    }
+  Output output(int ch) {
+    return (Output) ((out >> ((1 - ch) * 2)) & 0b11);
   }
 
+  CV cv_type(int ch) {
+    return (CV) ((out >> ((1 - ch) * 2)) & 0b11);
+  }
 
   void gfxPrintFreq(int16_t pitch) {
     uint32_t num = ComputePhaseIncrement(pitch);
