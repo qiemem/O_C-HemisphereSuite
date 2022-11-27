@@ -42,14 +42,32 @@ public:
   void View() {
     gfxHeader(applet_name());
 
-    int last = 50;
-    for (int i = 1; i < 64; i++) {
-      ProcessSample(slope * 65535 / 127, shape * 65535 / 127,
-                    fold * 32767 / 127, 0xffffffff / 64 * i, disp_sample);
-      int next = 50 - disp_sample.unipolar * 35 / 65535;
-      gfxLine(i - 1, last, i, next);
-      last = next;
-      // gfxPixel(i, 50 - disp_sample.unipolar * 35 / 65536);
+    ForEachChannel(ch) {
+      int h = 17;
+      int bottom = 32 + (h + 1) * ch;
+      int last = bottom;
+      for (int i = 0; i < 64; i++) {
+        ProcessSample(slope * 65535 / 127, shape * 65535 / 127,
+                      fold * 32767 / 127, 0xffffffff / 64 * i, disp_sample);
+        int next = 0;
+        switch (output(ch)) {
+        case UNIPOLAR:
+          next = bottom - disp_sample.unipolar * h / 65535;
+          break;
+        case BIPOLAR:
+          next = bottom - (disp_sample.bipolar + 32767) * h / 65535;
+          break;
+        case EOA:
+          next = bottom - ((disp_sample.flags & FLAG_EOA) ? h : 0);
+          break;
+        case EOR:
+          next = bottom - ((disp_sample.flags & FLAG_EOR) ? h : 0);
+          break;
+        }
+        if (i > 0) gfxLine(i - 1, last, i, next);
+        last = next;
+        // gfxPixel(i, 50 - disp_sample.unipolar * 35 / 65536);
+      }
     }
     uint32_t p = phase / (0xffffffff / 64);
     gfxLine(p, 15, p, 50);
