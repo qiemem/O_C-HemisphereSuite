@@ -188,26 +188,27 @@ int16_t ComputePitch(uint32_t phase_increment) {
 }
 
 
-const uint64_t max_phase = 0xffffffff;
-const uint64_t max_16 = 0xffff;
-uint32_t WarpPhase(uint32_t phase, uint16_t curve) {
-  int32_t c = curve - 32767;
+const uint32_t max_16 = 0xffff;
+const uint32_t max_8 = 0xff;
+
+uint32_t WarpPhase(uint16_t phase, uint16_t curve) {
+  int32_t c = (curve - 32767) >> 8;
   bool flip = c < 0;
   if (flip)
-    phase = max_phase - phase;
-  uint64_t a = (uint64_t)128 * c * c;
-  phase = (max_16 + a / max_16) * phase /
-          ((max_phase + a / max_16 * phase / max_16) / max_16);
+    phase = max_16 - phase;
+  uint32_t a = 128 * c * c;
+  phase = (max_8 + a / max_8) * phase /
+          ((max_16 + a / max_8 * phase / max_8) / max_8);
   if (flip)
-    phase = max_phase - phase;
+    phase = max_16 - phase;
   return phase;
 }
 
 uint16_t ShapePhase(uint16_t phase, uint16_t attack_curve,
                     uint16_t decay_curve) {
   return phase < (1UL << 15)
-             ? WarpPhase(phase << 17, attack_curve) >> 16
-             : WarpPhase((0xffff - phase) << 17, decay_curve) >> 16;
+             ? WarpPhase(phase << 1, attack_curve)
+             : WarpPhase((0xffff - phase) << 1, decay_curve);
 }
 
 uint16_t ShapePhase(uint16_t phase, uint16_t shape) {
@@ -226,7 +227,7 @@ uint16_t ShapePhase(uint16_t phase, uint16_t shape) {
     shape = (shape - 2 * 65536 / 4) * 4;
     att = 65535;
     dec = 65535 - shape;
-  } else if (shape < 4 * 65536 / 4) {
+  } else {
     shape = (shape - 3 * 65536 / 4) * 4;
     att = 65535 - shape;
     dec = shape;

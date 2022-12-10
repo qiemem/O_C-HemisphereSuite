@@ -130,7 +130,8 @@ public:
     }
     case 2: {
       shape += direction;
-      shape %= 128;
+      while (shape < 0) shape += 128;
+      while (shape > 127) shape -= 128;
       break;
     }
     case 3: {
@@ -150,7 +151,7 @@ public:
     uint64_t data = 0;
     Pack(data, PackLocation { 0, 16 }, pitch + (1 << 15));
     Pack(data, PackLocation { 16, 7 }, slope);
-    Pack(data, PackLocation { 23, 7 }, shape + 128);
+    Pack(data, PackLocation { 23, 7 }, shape);
     Pack(data, PackLocation { 30, 7 }, fold);
     Pack(data, PackLocation { 37, 4 }, out);
     Pack(data, PackLocation { 41, 4 }, cv);
@@ -160,7 +161,7 @@ public:
   void OnDataReceive(uint64_t data) {
     pitch = Unpack(data, PackLocation { 0, 16 }) - (1 << 15);
     slope = Unpack(data, PackLocation { 16, 7 });
-    shape = Unpack(data, PackLocation { 23, 7 }) - 128;
+    shape = Unpack(data, PackLocation { 23, 7 });
     fold = Unpack(data, PackLocation { 30, 7 });
     out = Unpack(data, PackLocation { 37, 4 });
     cv = Unpack(data, PackLocation { 41, 4 });
