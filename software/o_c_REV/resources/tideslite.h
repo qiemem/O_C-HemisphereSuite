@@ -122,45 +122,6 @@ const int16_t wav_unipolar_fold[] = {
     32451, 32476, 32501, 32526, 32551, 32576, 32601, 32625, 32649, 32673, 32697,
     32720, 32744, 32767, 32767};
 
-/*
-size_t lower_bound(uint32_t* first, uint32_t* last, const uint32_t target)) {
-  size_t len = last - first;
-
-  if (first == last) {
-    return &first;
-  }
-  uint32_t* mid = first + (last - first) / 2;
-  if (mid == &target) {
-    return mid;
-  }
-  if (target < mid)
-}
-
-int16_t ComputePitch(uint32_t phase_increment) {
-  uint32_t first = lut_increments[0];
-  uint32_t last = lut_increments[LUT_INCREMENTS_SIZE - 2];
-  int16_t pitch = 0;
-
-  if (phase_increment == 0) {
-    phase_increment = 1;
-  }
-
-  while (phase_increment > last) {
-    phase_increment >>= 1;
-    pitch += kOctave;
-  }
-  while (phase_increment < first) {
-    phase_increment <<= 1;
-    pitch -= kOctave;
-  }
-  pitch += (std::lower_bound(
-      lut_increments,
-      lut_increments + LUT_INCREMENTS_SIZE,
-      phase_increment) - lut_increments) << 4;
-  return pitch;
-}
-*/
-
 inline int16_t Interpolate1022(const int16_t *table, uint32_t phase) {
   int32_t a = table[phase >> 22];
   int32_t b = table[(phase >> 22) + 1];
@@ -191,6 +152,41 @@ uint32_t ComputePhaseIncrement(int16_t pitch) {
   return num_shifts >= 0 ? phase_increment << num_shifts
                          : phase_increment >> -num_shifts;
 }
+
+int16_t ComputePitch(uint32_t phase_increment) {
+  uint32_t first = lut_increments[0];
+  uint32_t last = lut_increments[LUT_INCREMENTS_SIZE - 2];
+  int16_t pitch = 0;
+
+  if (phase_increment == 0) {
+    phase_increment = 1;
+  }
+
+  while (phase_increment > last) {
+    phase_increment >>= 1;
+    pitch += kOctave;
+  }
+
+  while (phase_increment < first) {
+    phase_increment <<= 1;
+    pitch -= kOctave;
+  }
+
+  int i = 0;
+  int j = LUT_INCREMENTS_SIZE - 1;
+  while (j - i > 1) {
+    int k = i + (j - i) / 2;
+    uint32_t mid = lut_increments[k];
+    if (phase_increment < mid) {
+      j = k;
+    } else {
+      i = k;
+    }
+  }
+  pitch += (i << 4);
+  return pitch;
+}
+
 
 const uint64_t max_phase = 0xffffffff;
 const uint64_t max_16 = 0xffff;

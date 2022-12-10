@@ -9,6 +9,13 @@ public:
   void Controller() {
     uint32_t phase_increment = ComputePhaseIncrement(pitch + In(0));
     phase += phase_increment;
+    if (Clock(1)) phase = 0;
+    if (Clock(0)) {
+      //uint32_t next_tick = predictor.Predict(ClockCycleTicks(0));
+      int new_freq = 0xffffffff / ClockCycleTicks(0);
+      pitch = ComputePitch(new_freq);
+      phase = 0;
+    }
     int slope_cv = In(1) * 32768 / HEMISPHERE_3V_CV;
     int s = constrain(slope * 65535 / 127 + slope_cv, 0, 65535);
     ProcessSample(s, shape * 65535 / 127, fold * 32767 / 127, phase, sample);
