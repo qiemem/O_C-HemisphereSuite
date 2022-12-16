@@ -27,7 +27,7 @@
 // Random number generator.
 
 // #include "stmlib/utils/random.h"
-#include "utils/stmlib_utils_random.h"
+#include "stmlib_utils_random.h"
 
 namespace stmlib {
 
