@@ -36,6 +36,9 @@
 
 namespace braids {
 
+const int32_t NEIGHBOR_WEIGHT = 10; // out of 16
+constexpr int32_t CUR_WEIGHT = 16 - NEIGHBOR_WEIGHT;
+
 void SortScale(Scale &scale) {
   std::sort(scale.notes, scale.notes + scale.num_notes);
 }
@@ -64,6 +67,7 @@ int32_t Quantizer::Process(int32_t pitch, int32_t root, int32_t transpose) {
     // We're still in the voronoi cell for the active codeword.
     pitch = codeword_;
   } else {
+    requantize_ = false;
     int16_t octave = pitch / span_ - (pitch < 0 ? 1 : 0);
     int16_t rel_pitch = pitch - span_ * octave;
 
@@ -77,10 +81,10 @@ int32_t Quantizer::Process(int32_t pitch, int32_t root, int32_t transpose) {
       }
     }
 
-    if (abs(pitch - (octave + 1) * span_ + notes_[0]) < best_distance) {
+    if (abs(pitch - (octave + 1) * span_ - notes_[0]) < best_distance) {
       octave++;
       q = 0;
-    } else if (abs(pitch - (octave - 1) * span_ + notes_[num_notes_ - 1]) < best_distance) {
+    } else if (abs(pitch - (octave - 1) * span_ - notes_[num_notes_ - 1]) <= best_distance) {
       octave--;
       q = num_notes_ - 1;
     }
@@ -91,11 +95,13 @@ int32_t Quantizer::Process(int32_t pitch, int32_t root, int32_t transpose) {
       ? notes_[num_notes_ - 1] + (octave - 1) * span_
       : notes_[q - 1] + octave * span_;
 
-    previous_boundary_ = (9 * previous_boundary_ + 7 * codeword_) >> 4;
+    previous_boundary_ =
+        (NEIGHBOR_WEIGHT * previous_boundary_ + CUR_WEIGHT * codeword_) >> 4;
     next_boundary_ = q == num_notes_ - 1
       ? notes_[0] + (octave + 1) * span_
       : notes_[q + 1] + octave * span_;
-    next_boundary_ = (9 * next_boundary_ + 7 * codeword_) >> 4;
+    next_boundary_ =
+        (NEIGHBOR_WEIGHT * next_boundary_ + CUR_WEIGHT * codeword_) >> 4;
 
     pitch = codeword_;
   }
