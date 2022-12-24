@@ -66,11 +66,15 @@ public:
     gfxHeader(applet_name());
 
     gfxPrint(0, 15, OC::scale_names_short[scale]);
-    if (cursor == 0)
+    if (cursor == 0) {
       gfxCursor(0, 23, 30);
+      if (selected) gfxInvert(0, 14, 30, 9);
+    }
     gfxPrint(36, 15, OC::Strings::note_names_unpadded[root]);
-    if (cursor == 1)
+    if (cursor == 1) {
       gfxCursor(36, 23, 12);
+      if (selected) gfxInvert(36, 14, 12, 9);
+    }
 
     uint16_t mask = chord_mask;
     for (size_t i = 0; i < active_scale.num_notes; i++) {
@@ -92,7 +96,7 @@ public:
   }
 
   void OnButtonPress() {
-    if (cursor <= 2) {
+    if (cursor < 2) {
       selected = !selected;
     } else {
       chord_mask ^= 1 << (cursor - 2);
@@ -115,12 +119,8 @@ public:
       }
       update_chord_quantizer();
     } else {
-      cursor += direction;
-      if (cursor >= 2 + active_scale.num_notes) {
-        cursor = 0;
-      } else if (cursor < 0) {
-        cursor = 1 + active_scale.num_notes;
-      }
+      cursor = constrain(cursor + direction, 0, 1+active_scale.num_notes);
+      ResetCursor();
     }
   }
 
@@ -156,7 +156,7 @@ private:
   bool continuous[2];
   braids::Scale active_scale;
 
-  size_t cursor = 0;
+  int cursor = 0;
   bool selected = false;
 
   // Leftmost is root, second to left is 2, etc. Defaulting here to basic triad.
