@@ -41,7 +41,7 @@ public:
         {
             length[ch] = 16;
             beats[ch] = 4 + (ch * 4);
-            pattern[ch] = EuclideanPattern(length[ch] - 1, beats[ch], 0);;
+            pattern[ch] = EuclideanPattern(length[ch], beats[ch], 0);;
         }
         step = 0;
         SetDisplayPositions(0, 24);
@@ -60,7 +60,7 @@ public:
                 int rotation = Proportion(DetentedIn(ch), HEMISPHERE_MAX_CV, length[ch]);
 
                 // Store the pattern for display
-                pattern[ch] = EuclideanPattern(length[ch] - 1, beats[ch], rotation);
+                pattern[ch] = EuclideanPattern(length[ch], beats[ch], rotation);
                 int sb = step % length[ch];
                 if ((pattern[ch] >> sb) & 0x01) {
                     ClockOut(ch);

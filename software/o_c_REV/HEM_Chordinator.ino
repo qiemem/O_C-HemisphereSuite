@@ -115,9 +115,11 @@ public:
       }
       update_chord_quantizer();
     } else {
-      cursor++;
+      cursor += direction;
       if (cursor >= 2 + active_scale.num_notes) {
         cursor = 0;
+      } else if (cursor < 0) {
+        cursor = 1 + active_scale.num_notes;
       }
     }
   }
