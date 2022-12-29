@@ -16,8 +16,9 @@ public:
       pitch = ComputePitch(new_freq);
       phase = 0;
     }
-    int slope_cv = In(1) * 32768 / HEMISPHERE_3V_CV;
-    int s = constrain(slope * 65535 / 127 + slope_cv, 0, 65535);
+    slope_mod = slope + Proportion(DetentedIn(1), HEMISPHERE_MAX_CV, 127);
+    slope_mod = constrain(slope_mod, 0, 127);
+    int s = constrain(slope_mod * 65535 / 127, 0, 65535);
     ProcessSample(s, shape * 65535 / 127, fold * 32767 / 127, phase, sample);
     if (phase < phase_increment) {
       eoa_reached = false;
@@ -54,7 +55,7 @@ public:
       int bottom = 32 + (h + 1) * ch;
       int last = bottom;
       for (int i = 0; i < 64; i++) {
-        ProcessSample(slope * 65535 / 127, shape * 65535 / 127,
+        ProcessSample(slope_mod * 65535 / 127, shape * 65535 / 127,
                       fold * 32767 / 127, 0xffffffff / 64 * i, disp_sample);
         int next = 0;
         switch (output(ch)) {
@@ -82,69 +83,70 @@ public:
     switch (cursor) {
     case 0:
       // gfxPrint(0, 55, "Frq:");
-      gfxPos(0, 55);
+      gfxPos(0, 56);
       gfxPrintFreq(pitch);
       break;
     case 1:
-      gfxPrint(0, 55, "Slope: ");
+      gfxPrint(0, 56, "Slope: ");
       gfxPrint(slope);
       break;
     case 2:
-      gfxPrint(0, 55, "Shape: ");
+      gfxPrint(0, 56, "Shape: ");
       gfxPrint(shape);
       break;
     case 3:
-      gfxPrint(0, 55, "Fold: ");
+      gfxPrint(0, 56, "Fold: ");
       gfxPrint(fold);
       break;
     case 4:
-      gfxPrint(0, 55, hemisphere == 0 ? "A: " : "C: ");
+      gfxPrint(0, 56, hemisphere == 0 ? "A:" : "C:");
       gfxPrint(out_labels[output(0)]);
-      gfxPrint(hemisphere == 0 ? " B: " : " D: ");
+      gfxPrint(hemisphere == 0 ? " B:" : " D:");
       gfxPrint(out_labels[output(1)]);
       break;
     }
+    if (isEditing) gfxInvert(0, 55, 64, 9);
   }
 
-  void SetHelp() {}
-
   void OnButtonPress() {
-    cursor++;
-    cursor %= 5;
+    isEditing = !isEditing;
   }
 
   void OnEncoderMove(int direction) {
-    switch (cursor) {
-    case 0: {
-      uint32_t old_pi = ComputePhaseIncrement(pitch);
-      pitch += (knob_accel >> 8) * direction;
-      while (ComputePhaseIncrement(pitch) == old_pi) {
-        pitch += direction;
-      }
-      break;
+    if (!isEditing) cursor = constrain(cursor + direction, 0, 4);
+    else {
+        switch (cursor) {
+        case 0: {
+          uint32_t old_pi = ComputePhaseIncrement(pitch);
+          pitch += (knob_accel >> 8) * direction;
+          while (ComputePhaseIncrement(pitch) == old_pi) {
+            pitch += direction;
+          }
+          break;
+        }
+        case 1: {
+          // slope += (knob_accel >> 4) * direction;
+          slope = constrain(slope + direction, 0, 127);
+          break;
+        }
+        case 2: {
+          shape += direction;
+          while (shape < 0) shape += 128;
+          while (shape > 127) shape -= 128;
+          break;
+        }
+        case 3: {
+          fold = constrain(fold + direction, 0, 127);
+          break;
+        }
+        case 4: {
+          out += direction;
+          out %= 0b10000;
+        }
+        }
+        if (knob_accel < (1 << 13))
+          knob_accel <<= 1;
     }
-    case 1: {
-      // slope += (knob_accel >> 4) * direction;
-      slope = constrain(slope + direction, 0, 127);
-      break;
-    }
-    case 2: {
-      shape += direction;
-      while (shape < 0) shape += 128;
-      while (shape > 127) shape -= 128;
-      break;
-    }
-    case 3: {
-      fold = constrain(fold + direction, 0, 127);
-      break;
-    }
-    case 4: {
-      out += direction;
-      out %= 0b10000;
-    }
-    }
-    if (knob_accel < (1 << 13))
-      knob_accel <<= 1;
   }
 
   uint64_t OnDataRequest() {
@@ -167,6 +169,16 @@ public:
     cv = Unpack(data, PackLocation { 41, 4 });
   }
 
+protected:
+    void SetHelp() {
+        //                               "------------------" <-- Size Guide
+        help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Reset";
+        help[HEMISPHERE_HELP_CVS]      = "1=V/Oct 2=Slope";
+        help[HEMISPHERE_HELP_OUTS]     = "A=OutA  B=OutB";
+        help[HEMISPHERE_HELP_ENCODER]  = "Select/Edit params";
+        //                               "------------------" <-- Size Guide
+    }
+
 private:
 
   enum Output {
@@ -186,8 +198,10 @@ private:
   const char* cv_labels[4] = {"Hz", "Sl", "Sh", "Fo"};
 
   int cursor = 0;
+  bool isEditing = false;
   int16_t pitch = -3 * 12 * 128;
   int slope = 64;
+  int slope_mod = 64; // actual value after CV mod
   int shape = 48; // triangle
   int fold = 0;
 
