@@ -1346,12 +1346,15 @@ bool EuclideanFilter(uint8_t num_steps, uint8_t num_beats, uint8_t rotation, uin
 }
 
 uint32_t EuclideanPattern(uint8_t num_steps, uint8_t num_beats, uint8_t rotation) {
-  if (num_beats > (num_steps + 1)) {
-    num_beats = num_steps + 1;
+  if (num_steps < 2) {
+    num_steps = 2; //
   }
-  uint32_t pattern = bjorklund_patterns[((num_steps - 1) * 33) + num_beats]; 
+  if (num_beats > (num_steps)) {
+    num_beats = num_steps;
+  }
+  uint32_t pattern = bjorklund_patterns[((num_steps - 2) * 33) + num_beats]; 
   if (rotation) {
-    rotation = rotation % (num_steps + 1);
+    rotation = rotation % num_steps;
     pattern = rotl32(pattern, num_steps, rotation) ;
   }
   return pattern;
