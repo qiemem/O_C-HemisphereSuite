@@ -92,9 +92,9 @@ public:
     }
 
     void OnEncoderMove(int direction) {
-        if (cursor == 0) compose = constrain(compose += direction, 0, HEM_PALIMPSEST_MAX_VALUE);
-        if (cursor == 1) decompose = constrain(decompose -= direction, 0, HEM_PALIMPSEST_MAX_VALUE);
-        if (cursor == 2) length = constrain(length += direction, 2, 16);
+        if (cursor == 0) compose = constrain(compose + direction, 0, HEM_PALIMPSEST_MAX_VALUE);
+        if (cursor == 1) decompose = constrain(decompose - direction, 0, HEM_PALIMPSEST_MAX_VALUE);
+        if (cursor == 2) length = constrain(length + direction, 2, 16);
         ResetCursor();
     }
         

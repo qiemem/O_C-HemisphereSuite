@@ -78,21 +78,23 @@ public:
 
     uint16_t mask = chord_mask;
     for (int i = 0; i < int(active_scale.num_notes); i++) {
+      int y = 7*(i / 12); // longer scales spill over
+      int x = 5*(i % 12);
       if (mask & 1) {
-        gfxRect(5 * i, 25, 4, 4);
+        gfxRect(x, 25 + y, 4, 4);
       } else {
-        gfxFrame(5 * i, 25, 4, 4);
+        gfxFrame(x, 25 + y, 4, 4);
       }
       if (cursor - 2 == i) {
-        gfxCursor(5 * i, 31, 4);
+        gfxCursor(x, 30 + y, 4);
       }
 
       mask >>= 1;
     }
 
     size_t root_ix = note_ix(chord_root_pitch);
-    gfxBitmap(5 * root_ix, 35, 8, NOTE4_ICON);
-    gfxBitmap(5 * note_ix(harm_pitch), 45, 8, NOTE4_ICON);
+    gfxBitmap(5 * root_ix, 40, 8, NOTE4_ICON);
+    gfxBitmap(5 * note_ix(harm_pitch), 50, 8, NOTE4_ICON);
   }
 
   void OnButtonPress() {
@@ -152,7 +154,7 @@ private:
   braids::Quantizer root_quantizer;
   braids::Quantizer chord_quantizer;
 
-  size_t scale; // SEMI
+  int scale; // SEMI
   int16_t root;
   bool continuous[2];
   braids::Scale active_scale;
@@ -191,8 +193,10 @@ private:
     return p;
   }
 
-  void set_scale(size_t value) {
-    scale = value;
+  void set_scale(int value) {
+    if (value < 0) scale = OC::Scales::NUM_SCALES - 1;
+    else if (value >= OC::Scales::NUM_SCALES) scale = 0;
+    else scale = value;
     active_scale = OC::Scales::GetScale(scale);
     root_quantizer.Configure(active_scale);
   }

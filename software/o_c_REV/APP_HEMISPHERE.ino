@@ -38,6 +38,8 @@ namespace menu = OC::menu;
 }
 
 #define HEMISPHERE_DOUBLE_CLICK_TIME 8000
+#define HEMISPHERE_PULSE_ANIMATION_TIME 500
+#define HEMISPHERE_PULSE_ANIMATION_TIME_LONG 1200
 
 typedef struct Applet {
   int id;
@@ -94,7 +96,11 @@ public:
         {
             int index = get_applet_index_by_id(values_[h]);
             SetApplet(h, index);
-            uint64_t data = (uint64_t(values_[8 + h]) << 48) + (uint64_t(values_[6 + h]) << 32) + (values_[4 + h] << 16) + values_[2 + h];
+            uint64_t data =
+                (uint64_t(values_[8 + h]) << 48) |
+                (uint64_t(values_[6 + h]) << 32) |
+                (uint64_t(values_[4 + h]) << 16) |
+                (uint64_t(values_[2 + h]));
             available_applets[index].OnDataReceive(h, data);
         }
         ClockSetup.OnDataReceive(0, uint64_t(values_[HEMISPHERE_CLOCK_DATA]));
@@ -130,7 +136,12 @@ public:
             }
         }
 
-        if (clock_setup) ClockSetup.Controller(LEFT_HEMISPHERE, clock_m->IsForwarded());
+        // Advance internal clock, sync to external pulse
+        if (clock_m->IsRunning())
+            clock_m->SyncTrig( OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_1>() );
+
+        // NJM: always execute ClockSetup controller - it handles MIDI clock out
+        ClockSetup.Controller(LEFT_HEMISPHERE, clock_m->IsForwarded());
 
         for (int h = 0; h < 2; h++)
         {
@@ -181,10 +192,13 @@ public:
     }
 
     void DelegateSelectButtonPush(int hemisphere) {
-        if (OC::CORE::ticks - click_tick < HEMISPHERE_DOUBLE_CLICK_TIME && hemisphere == first_click) {
+        if (OC::CORE::ticks - click_tick < HEMISPHERE_DOUBLE_CLICK_TIME) {
             // This is a double-click, so activate corresponding help screen, leave
             // Select Mode, and reset the double-click timer
-            SetHelpScreen(hemisphere);
+            if (hemisphere == first_click)
+                SetHelpScreen(hemisphere);
+            else // up + down simultaneous
+                clock_setup = 1;
             select_mode = -1;
             click_tick = 0;
         } else {
@@ -197,12 +211,13 @@ public:
                 // If we're in the clock setup screen, we want to exit the setup without turning on Select Mode
                 if (hemisphere == select_mode) select_mode = -1; // Leave Select Mode is same button is pressed
                 else select_mode = hemisphere; // Otherwise, set Select Mode
-                click_tick = OC::CORE::ticks;
             }
+            click_tick = OC::CORE::ticks;
             first_click = hemisphere;
         }
 
-        clock_setup = 0; // Turn off clock setup with any button press
+        if (click_tick)
+            clock_setup = 0; // Turn off clock setup with any single button press
     }
 
     void DelegateEncoderMovement(const UI::Event &event) {

@@ -53,7 +53,7 @@ public:
             if (phase == 1) target = int2simfloat(HEMISPHERE_MAX_CV); // Rise to max for attack
             if (phase == 2) target = 0; // Fall to zero for decay
 
-            if (signal != target) {
+            //if (signal != target) { // Logarhythm fix 8/2020
                 int segment = phase == 1
                     ? effective_attack + Proportion(DetentedIn(0), HEMISPHERE_MAX_CV, HEM_ADEG_MAX_VALUE)
                     : effective_decay + Proportion(DetentedIn(1), HEMISPHERE_MAX_CV, HEM_ADEG_MAX_VALUE);
@@ -82,7 +82,7 @@ public:
                     ClockOut(1);
                     phase = 0;
                 }
-            }
+            //}
             Out(0, simfloat2int(signal));
         }
     }
@@ -98,11 +98,11 @@ public:
 
     void OnEncoderMove(int direction) {
         if (cursor == 0) {
-            attack = constrain(attack += direction, 0, HEM_ADEG_MAX_VALUE);
+            attack = constrain(attack + direction, 0, HEM_ADEG_MAX_VALUE);
             last_ms_value = Proportion(attack, HEM_ADEG_MAX_VALUE, HEM_ADEG_MAX_TICKS) / 17;
         }
         else {
-            decay = constrain(decay += direction, 0, HEM_ADEG_MAX_VALUE);
+            decay = constrain(decay + direction, 0, HEM_ADEG_MAX_VALUE);
             last_ms_value = Proportion(decay, HEM_ADEG_MAX_VALUE, HEM_ADEG_MAX_TICKS) / 17;
         }
         last_change_ticks = OC::CORE::ticks;

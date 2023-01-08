@@ -26,6 +26,7 @@
 #include <EEPROM.h>
 
 #include "OC_apps.h"
+#include "OC_strings.h"
 #include "OC_core.h"
 #include "OC_DAC.h"
 #include "OC_debug.h"

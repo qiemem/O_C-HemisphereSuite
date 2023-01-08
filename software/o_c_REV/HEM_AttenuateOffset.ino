@@ -32,9 +32,19 @@ public:
     }
 
     void Controller() {
+        mix_final = mix || Gate(0);
+        int prevSignal = 0;
+        
         ForEachChannel(ch)
         {
             int signal = Proportion(level[ch], 63, In(ch)) + (offset[ch] * ATTENOFF_INCREMENTS);
+            if (ch == 1 && mix_final) {
+                signal = signal + prevSignal;
+            }
+
+            // use the unconstrained signal for mixing
+            prevSignal = signal;
+
             signal = constrain(signal, -HEMISPHERE_3V_CV, HEMISPHERE_MAX_CV);
             Out(ch, signal);
         }
@@ -46,44 +56,52 @@ public:
     }
 
     void OnButtonPress() {
-        if (++cursor > 3) cursor = 0;
-        ResetCursor();
+        if (cursor == 4)
+            mix = !mix;
+        else
+            isEditing = !isEditing;
     }
 
     void OnEncoderMove(int direction) {
-        uint8_t ch = cursor / 2;
-        if (cursor == 0 || cursor == 2) {
-            // Change offset voltage
-            int min = -HEMISPHERE_MAX_CV / ATTENOFF_INCREMENTS;
-            int max = HEMISPHERE_MAX_CV / ATTENOFF_INCREMENTS;
-            offset[ch] = constrain(offset[ch] + direction, min, max);
+        if (!isEditing) {
+            cursor = constrain(cursor + direction, 0, 4);
+            ResetCursor();
         } else {
-            // Change level percentage
-            level[ch] = constrain(level[ch] + direction, 0, 63);
+            uint8_t ch = cursor / 2;
+            if (cursor == 0 || cursor == 2) {
+                // Change offset voltage
+                int min = -HEMISPHERE_MAX_CV / ATTENOFF_INCREMENTS;
+                int max = HEMISPHERE_MAX_CV / ATTENOFF_INCREMENTS;
+                offset[ch] = constrain(offset[ch] + direction, min, max);
+            } else {
+                // Change level percentage
+                level[ch] = constrain(level[ch] + direction, -63, 63);
+            }
         }
-
     }
         
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         Pack(data, PackLocation {0,9}, offset[0] + 256);
         Pack(data, PackLocation {10,9}, offset[1] + 256);
-        Pack(data, PackLocation {19,6}, level[0]);
-        Pack(data, PackLocation {25,6}, level[1]);
+        Pack(data, PackLocation {19,7}, level[0] + 64);
+        Pack(data, PackLocation {26,7}, level[1] + 64);
+        Pack(data, PackLocation {34,1}, mix);
         return data;
     }
 
     void OnDataReceive(uint64_t data) {
         offset[0] = Unpack(data, PackLocation {0,9}) - 256;
         offset[1] = Unpack(data, PackLocation {10,9}) - 256;
-        level[0] = Unpack(data, PackLocation {19,6});
-        level[1] = Unpack(data, PackLocation {25,6});
+        level[0] = Unpack(data, PackLocation {19,7}) - 64;
+        level[1] = Unpack(data, PackLocation {26,7}) - 64;
+        mix = Unpack(data, PackLocation {34,1});
     }
 
 protected:
     void SetHelp() {
         //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "";
+        help[HEMISPHERE_HELP_DIGITALS] = "1=Mix A&B";
         help[HEMISPHERE_HELP_CVS]      = "CV Inputs 1,2";
         help[HEMISPHERE_HELP_OUTS]     = "Outputs A,B";
         help[HEMISPHERE_HELP_ENCODER]  = "Offset V / Level %";
@@ -92,8 +110,11 @@ protected:
     
 private:
     int cursor;
+    bool isEditing = false;
     int level[2];
     int offset[2];
+    bool mix = false;
+    bool mix_final = false;
     
     void DrawInterface() {
         ForEachChannel(ch)
@@ -105,9 +126,19 @@ private:
             gfxPrint("%");
         }
 
-        int ch = cursor / 2;
-        if (cursor == 0 or cursor == 2) gfxCursor(13, 23 + (ch * 20), 36);
-        else gfxCursor(13, 33 + (ch * 20), 36);
+        if (mix_final) {
+            gfxLine(3, 24, 3, 31); 
+            gfxIcon(0, 25, DOWN_BTN_ICON);  
+        }
+
+        if (cursor == 4) {
+            if (CursorBlink()) {
+                gfxFrame(0, 24, 9, 10);
+            }
+        } else {
+            isEditing ? gfxInvert(12, 14 + cursor * 10, 37, 9)
+                      : gfxCursor(12, 23 + cursor * 10, 37);
+        }    
     }
 
 };

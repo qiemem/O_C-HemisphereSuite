@@ -132,10 +132,10 @@ public:
           if (freq[i] > 250) exponent++;
           if (freq[i] > 1000) exponent++;
           if (freq[i] > 10000) exponent++;
-          Pack(data, PackLocation {12 + i * 10, 2}, exponent);
+          Pack(data, PackLocation {uint8_t(12 + i * 10), 2}, exponent);
 
           int mantissa = freq[i] / pow10_lut[exponent];
-          Pack(data, PackLocation {12 + i * 10 + 2, 8}, mantissa);
+          Pack(data, PackLocation {uint8_t(12 + i * 10 + 2), 8}, mantissa);
         }
         
         return data;
@@ -143,8 +143,8 @@ public:
     
     void OnDataReceive(uint64_t data) {
         for (int i = 0; i < 2; ++i) {
-          int exponent = Unpack(data, PackLocation {12 + i * 10, 2});
-          int mantissa = Unpack(data, PackLocation {12 + i * 10 + 2, 8});
+          int exponent = Unpack(data, PackLocation {uint8_t(12 + i * 10), 2});
+          int mantissa = Unpack(data, PackLocation {uint8_t(12 + i * 10 + 2), 8});
           
           freq[i] = mantissa * pow10_lut[exponent];
         }

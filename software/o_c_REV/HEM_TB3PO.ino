@@ -262,115 +262,113 @@ class TB_3PO : public HemisphereApplet
       DrawGraphics();
     }
 
-    void OnButtonPress() 
-    {
-      if(cursor == 0)
-      {
-        cursor = lock_seed ? 1 : 5;
-      }
-      else if (++cursor > 8) 
-      {
-        cursor = 0;
-      }
-      
-      ResetCursor();  // Reset blink so it's immediately visible when moved
+    void OnButtonPress() {
+      isEditing = !isEditing;
     }
 
     void OnEncoderMove(int direction) 
     {
-      if(cursor == 0)
-      {
-        // Toggle the seed between auto (randomized every reset input pulse) 
-        // or Manual (seed becomes locked, cursor can be moved to edit each digit)
-        lock_seed += direction;
+      if (!isEditing) { // move cursor
+        cursor += direction;
+        if (cursor < 0) cursor = 8;
+        if (cursor > 8) cursor = 0;
+        if (!lock_seed && cursor == 1) cursor = 5; // skip from 1 to 5 if not locked
+        if (!lock_seed && cursor == 4) cursor = 0; // skip from 4 to 0 if not locked
 
-        // See if the turn would move beyond the random die to the left or the lock to the right
-        // If so, take this as a manual input just like receiving a reset pulse (handled in Controller())
-        // regenerate_all() will honor the random or locked icon shown (seed will be randomized or not)
-        manual_reset_flag = (lock_seed > 1 || lock_seed < 0) ? 1 : 0;
-        
-        // constrain to legal values before regeneration
-        lock_seed = constrain(lock_seed, 0, 1);
-      }
-      else if (cursor <= 4)
-      {
-        // Editing one of the 4 hex digits of the seed
-        
-        // cursor==1 is at the most significant byte, 
-        // cursor==4 is at least significant byte
-        int byte_offs = 4-cursor;  
-        int shift_amt = byte_offs*4;
+        ResetCursor();  // Reset blink so it's immediately visible when moved
+      } else { // edit param
+        switch(cursor) {
+        case 0:
+          // Toggle the seed between auto (randomized every reset input pulse) 
+          // or Manual (seed becomes locked, cursor can be moved to edit each digit)
+          lock_seed += direction;
 
-        uint32_t nib = (seed >> shift_amt)& 0xf; // Abduct the nibble
-        uint8_t c = nib;
-        c = constrain(c+direction, 0, 0xF);  // Edit the nibble
-        nib = c;
-        uint32_t mask = 0xf;
-        seed &= ~(mask << shift_amt);  // Clear bits where this nibble lives
-        seed |= (nib << shift_amt);    // Move the nibble to its home
-      }
-      else if (cursor == 5)
-      {
-        density_encoder = constrain(density_encoder + direction, 0, 14);  // Treated as a bipolar -7 to 7 in practice
-        density_encoder_display = 400; // How long to show the encoder version of density in the number display for
-        
-        //density = constrain(density + direction, 0, 14);  // Treated as a bipolar -7 to 7 in practice
-        
-        // Disabled: Let this occur when detected on the next step
-        //regenerate_density_if_changed();
-      } 
-      else if(cursor == 6)
-      {
-        // Scale selection
-        scale += direction;
-        if (scale >= OC::Scales::NUM_SCALES) scale = 0;
-        if (scale < 0) scale = OC::Scales::NUM_SCALES - 1;
-        // Apply to the quantizer
-        set_quantizer_scale(scale);
+          // See if the turn would move beyond the random die to the left or the lock to the right
+          // If so, take this as a manual input just like receiving a reset pulse (handled in Controller())
+          // regenerate_all() will honor the random or locked icon shown (seed will be randomized or not)
+          manual_reset_flag = (lock_seed > 1 || lock_seed < 0) ? 1 : 0;
+          
+          // constrain to legal values before regeneration
+          lock_seed = constrain(lock_seed, 0, 1);
+          break;
+        case 1:
+        case 2:
+        case 3:
+        case 4: { // Editing one of the 4 hex digits of the seed
+          // cursor==1 is at the most significant byte, 
+          // cursor==4 is at least significant byte
+          int byte_offs = 4-cursor;  
+          int shift_amt = byte_offs*4;
 
-// New: Constrain root to scale size (leave oct offset where it is)
-        int max_root = scale_size > 12 ? 12 : scale_size;
-        if(max_root > 0)
-        {
-          root = constrain(root, 0, max_root-1);
+          uint32_t nib = (seed >> shift_amt)& 0xf; // Abduct the nibble
+          uint8_t c = nib;
+          c = constrain(c+direction, 0, 0xF);  // Edit the nibble
+          nib = c;
+          uint32_t mask = 0xf;
+          seed &= ~(mask << shift_amt);  // Clear bits where this nibble lives
+          seed |= (nib << shift_amt);    // Move the nibble to its home
+          break;
         }
-      }
-      else if(cursor == 7)
-      {
-        // Root note selection
+        case 5: // density
+          density_encoder = constrain(density_encoder + direction, 0, 14);  // Treated as a bipolar -7 to 7 in practice
+          density_encoder_display = 400; // How long to show the encoder version of density in the number display for
+          
+          //density = constrain(density + direction, 0, 14);  // Treated as a bipolar -7 to 7 in practice
+          
+          // Disabled: Let this occur when detected on the next step
+          //regenerate_density_if_changed();
+          break;
+        case 6: { // Scale selection
+          scale += direction;
+          if (scale >= OC::Scales::NUM_SCALES) scale = 0;
+          if (scale < 0) scale = OC::Scales::NUM_SCALES - 1;
+          // Apply to the quantizer
+          set_quantizer_scale(scale);
 
-        // No oct version
-        //root = constrain(root + direction, 0, 11);
-
-        // Add in handling for octave settings without affecting root's range
-        int r = root + direction;
-
-        int max_root = scale_size > 12 ? 12 : scale_size;
+          // New: Constrain root to scale size (leave oct offset where it is)
+          int max_root = scale_size > 12 ? 12 : scale_size;
+          if(max_root > 0)
+          {
+            root = constrain(root, 0, max_root-1);
+          }
+          break;
+        }
+        case 7: { // Root note selection
         
-        //if(direction > 0 && r > 11 && octave_offset < 3)
-        if(direction > 0 && r >= max_root  && octave_offset < 3)
-        {
-          ++octave_offset;  // Go up to next octave
-          r = 0; // Roll around root note
+          // No oct version
+          //root = constrain(root + direction, 0, 11);
+
+          // Add in handling for octave settings without affecting root's range
+          int r = root + direction;
+
+          int max_root = scale_size > 12 ? 12 : scale_size;
+          
+          //if(direction > 0 && r > 11 && octave_offset < 3)
+          if(direction > 0 && r >= max_root  && octave_offset < 3)
+          {
+            ++octave_offset;  // Go up to next octave
+            r = 0; // Roll around root note
+          }
+          else if(direction < 0 && r < 0 && octave_offset > -3)
+          {
+            --octave_offset;
+
+            r = max_root-1;
+            //r = 11; // Roll around root note
+          }
+
+          // Limit root value
+          //root = constrain(r, 0, 11);
+          root = constrain(r, 0, max_root-1);
+
+          break;
         }
-        else if(direction < 0 && r < 0 && octave_offset > -3)
-        {
-          --octave_offset;
-
-          r = max_root-1;
-          //r = 11; // Roll around root note
-        }
-
-        // Limit root value
-        //root = constrain(r, 0, 11);
-        root = constrain(r, 0, max_root-1);
-
+        case 8: // pattern length
+          num_steps = constrain(num_steps + direction, 1, 32);
+          break;
+        } //switch
       }
-      else
-      {
-        num_steps = constrain(num_steps + direction, 1, 32);
-      }
-    }
+    } //OnEncoderMove
 
     uint64_t OnDataRequest() {
         uint64_t data = 0;
@@ -379,6 +377,7 @@ class TB_3PO : public HemisphereApplet
         Pack(data, PackLocation {8,4}, root);
         Pack(data, PackLocation {12,4}, density_encoder);
         Pack(data, PackLocation {16,16}, seed);
+        Pack(data, PackLocation {32,8}, octave_offset);
         return data;
     }
 
@@ -388,6 +387,7 @@ class TB_3PO : public HemisphereApplet
       root = Unpack(data, PackLocation {8,4});
       density_encoder = Unpack(data, PackLocation {12,4});
       seed = Unpack(data, PackLocation {16,16});
+      octave_offset = Unpack(data, PackLocation {32,8});
 
       //const braids::Scale & quant_scale = OC::Scales::GetScale(scale);
       set_quantizer_scale(scale);
@@ -396,6 +396,7 @@ class TB_3PO : public HemisphereApplet
       root = constrain(root, 0, 11);
       density_encoder = constrain(density_encoder, 0, 14); // Internally just positive
       density = density_encoder;
+      octave_offset = constrain(octave_offset,-3,3);
       
       // Restore all seed-derived settings!
       regenerate_all();
@@ -416,6 +417,7 @@ class TB_3PO : public HemisphereApplet
     
   private:
     int cursor = 0;
+    bool isEditing = false;
 
     braids::Quantizer quantizer;  // Helper for note index --> pitch cv
     braids::Quantizer display_semi_quantizer;  // Quantizer to interpret the current note for display on a keyboard
@@ -954,30 +956,35 @@ class TB_3PO : public HemisphereApplet
       }
             
       // Draw edit cursor
-      if (cursor == 0)
-      {
-        // Set length to indicate length
-        gfxCursor(14, 23, lock_seed ? 12 : 35); // Seed = auto-randomize / locked-manual
-      }
-      else if (cursor <= 4) // seed, 4 positions (1-4)
-      {
-        gfxCursor(24 + 6*(cursor-1), 23, 8);
-      }
-      else if(cursor == 5)
-      {
-        gfxCursor(9, 34, 14);  // density
-      }
-      else if(cursor == 6)
-      {
-        gfxCursor(38, 34, 26);  // scale
-      }
-      else if(cursor == 7)
-      {
-       gfxCursor(42, 43, 16);  // root note
-      }
-      else if(cursor == 8)
-      {
-        gfxCursor(20, 54, 12);  // step
+      switch (cursor) {
+        case 0:
+          // Set length to indicate length
+          gfxCursor(14, 23, lock_seed ? 11 : 36); // Seed = auto-randomize / locked-manual
+          if (isEditing) gfxInvert(14, 14, lock_seed ? 11 : 36, 9);
+          break;
+        case 1:
+        case 2:
+        case 3:
+        case 4: // seed, 4 positions (1-4)
+          gfxCursor(25 + 6*(cursor-1), 23, 7);
+          if (isEditing) gfxInvert(25 + 6*(cursor-1), 14, 7, 9);
+          break;
+        case 5:
+          gfxCursor(9, 45, 14);  // density
+          if (isEditing) gfxInvert(9, 36, 14, 9);
+          break;
+        case 6:
+          gfxCursor(39, 34, 25);  // scale
+          if (isEditing) gfxInvert(39, 26, 25, 8);
+          break;
+        case 7:
+          gfxCursor(39, 44, 24);  // root note
+          if (isEditing) gfxInvert(39, 35, 24, 9);
+          break;
+        case 8:
+          gfxCursor(20, 54, 12);  // step
+          if (isEditing) gfxInvert(20, 46, 12, 8);
+          break;
       }
     }
 

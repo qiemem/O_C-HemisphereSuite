@@ -128,17 +128,17 @@ public:
     }
 
     void OnEncoderMove(int direction) {
-        if (cursor == 0) number = constrain(number += direction, 1, HEM_BURST_NUMBER_MAX);
+        if (cursor == 0) number = constrain(number + direction, 1, HEM_BURST_NUMBER_MAX);
         if (cursor == 1) {
-            spacing = constrain(spacing += direction, HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
+            spacing = constrain(spacing + direction, HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
             clocked = 0;
         }
         if (cursor == 2) {
-            accel = constrain(accel += direction, -HEM_BURST_ACCEL_MAX, HEM_BURST_ACCEL_MAX);
+            accel = constrain(accel + direction, -HEM_BURST_ACCEL_MAX, HEM_BURST_ACCEL_MAX);
         }
 
         if (cursor == 3) {
-            jitter = constrain(jitter += direction, 0, HEM_BURST_JITTER_MAX);
+            jitter = constrain(jitter + direction, 0, HEM_BURST_JITTER_MAX);
         }
 
         if (cursor == 4) {
@@ -173,7 +173,7 @@ protected:
         //                               "------------------" <-- Size Guide
         help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Burst";
         help[HEMISPHERE_HELP_CVS]      = "1=Number 2=Spacing";
-        help[HEMISPHERE_HELP_OUTS]     = "1=Burst 2=Gate";
+        help[HEMISPHERE_HELP_OUTS]     = "A=Burst B=Gate";
         help[HEMISPHERE_HELP_ENCODER]  = "Number/Spacing/Div";
         //                               "------------------" <-- Size Guide
     }

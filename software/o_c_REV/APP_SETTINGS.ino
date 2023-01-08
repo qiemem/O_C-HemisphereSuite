@@ -71,9 +71,9 @@ public:
 
     void View() {
         gfxHeader("Setup / About");
-        gfxPrint(0, 15, "Benisphere Suite");
+        gfxPrint(0, 15, OC_VERSION_TITLE);
         gfxPrint(0, 25, OC_VERSION);
-        gfxPrint(0, 35, "github.com/benirose");
+        gfxPrint(0, 35, OC_VERSION_URL);
         gfxPrint(0, 55, "[CALIBRATE]   [RESET]");
 
 #ifdef BUCHLA_4U

@@ -58,7 +58,7 @@ public:
 
     /* Change the pability */
     void OnEncoderMove(int direction) {
-        p = constrain(p += direction, 0, 100);
+        p = constrain(p + direction, 0, 100);
     }
 
     uint64_t OnDataRequest() {

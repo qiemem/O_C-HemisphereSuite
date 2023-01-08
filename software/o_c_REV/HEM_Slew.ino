@@ -75,11 +75,11 @@ public:
 
     void OnEncoderMove(int direction) {
         if (cursor == 0) {
-            rise = constrain(rise += direction, 0, HEM_SLEW_MAX_VALUE);
+            rise = constrain(rise + direction, 0, HEM_SLEW_MAX_VALUE);
             last_ms_value = Proportion(rise, HEM_SLEW_MAX_VALUE, HEM_SLEW_MAX_TICKS) / 17;
         }
         else {
-            fall = constrain(fall += direction, 0, HEM_SLEW_MAX_VALUE);
+            fall = constrain(fall + direction, 0, HEM_SLEW_MAX_VALUE);
             last_ms_value = Proportion(fall, HEM_SLEW_MAX_VALUE, HEM_SLEW_MAX_TICKS) / 17;
         }
         last_change_ticks = OC::CORE::ticks;

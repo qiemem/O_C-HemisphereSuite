@@ -104,7 +104,7 @@ public:
 
     void OnEncoderMove(int direction) {
         int adsr[4] = {attack, decay, sustain, release};
-        adsr[edit_stage] = constrain(adsr[edit_stage] += direction, 1, HEM_EG_MAX_VALUE);
+        adsr[edit_stage] = constrain(adsr[edit_stage] + direction, 1, HEM_EG_MAX_VALUE);
         attack = adsr[HEM_EG_ATTACK];
         decay = adsr[HEM_EG_DECAY];
         sustain = adsr[HEM_EG_SUSTAIN];

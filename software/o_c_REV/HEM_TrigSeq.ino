@@ -33,20 +33,23 @@ public:
             step[ch] = 0;
         }
         cursor = 0;
+        reset = true;
     }
 
     void Controller() {
-        if (Clock(0) || Clock(1)) {
-            bool swap = In(0) >= HEMISPHERE_3V_CV;
+        if (Clock(1)) { // reset
+            ForEachChannel(ch) step[ch] = -1;
+        }
 
+        if (Clock(0)) { // clock advance
+            bool swap = In(0) >= HEMISPHERE_3V_CV;
             ForEachChannel(ch)
             {
-                if (Clock(1) || step[ch] >= end_step[ch]) step[ch] = -1;
+                if (step[ch] >= end_step[ch]) step[ch] = -1;
                 step[ch]++;
                 active_step[ch] = Step(ch);
                 if ((pattern[ch] >> active_step[ch]) & 0x01) ClockOut(swap ? (1 - ch) : ch);
             }
-
         }
     }
 
@@ -67,7 +70,7 @@ public:
 
         // Update end_step
         if (this_cursor == 2) {
-            end_step[ch] = constrain(end_step[ch] += direction, 0, 7);
+            end_step[ch] = constrain(end_step[ch] + direction, 0, 7);
         } else {
             // Get the current pattern
             int curr_patt = pattern[ch];
@@ -115,6 +118,7 @@ private:
     uint8_t pattern[2];
     int end_step[2];
     int cursor; // 0=ch1 low, 1=ch1 hi, 2=c1 end_step,  3=ch2 low, 4=ch3 hi, 5=ch2 end_step
+    bool reset;
 
     inline int Length(int ch) const {
         return end_step[ch] + 1;
@@ -132,7 +136,7 @@ private:
         offset %= Length(ch);
         return offset;
     }
-
+    
     void DrawDisplay() {
         ForEachChannel(ch)
         {

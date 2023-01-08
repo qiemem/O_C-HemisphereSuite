@@ -36,11 +36,13 @@ public:
     }
 
     void Controller() {
-        if (Clock(0) || Clock(1)) {
-            if (Clock(1) || step >= end_step) step = -1;
-            step++;
-            active_step = Step();
+        if (Clock(1)) step = -1; // reset regardless of clock
+
+        if (Clock(0)) {
             bool swap = In(0) >= HEMISPHERE_3V_CV;
+            if (step >= end_step) step = -1;
+            step++;
+            active_step = Step(); // actual step after Offset modulation
             if (active_step < 8) {
                 if ((pattern[0] >> active_step) & 0x01) ClockOut(swap ? 1 : 0);
                 else ClockOut(swap ? 0 : 1);
@@ -65,7 +67,7 @@ public:
     void OnEncoderMove(int direction) {
         // Update end_step
         if (cursor == 4) {
-            end_step = constrain(end_step += direction, 0, 15);
+            end_step = constrain(end_step + direction, 0, 15);
         } else {
             int ch = cursor > 1 ? 1 : 0;
             int this_cursor = cursor - (ch * 2);

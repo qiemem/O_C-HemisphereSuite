@@ -27,10 +27,10 @@
 /* Flags for the full-width apps, these enable/disable them in OC_apps.ino but also zero out the app   */
 /* files to prevent them from taking up space. Only Enigma is enabled by default.                      */
 #define ENABLE_APP_ENIGMA
-//#define ENABLE_APP_MIDI
+#define ENABLE_APP_MIDI
 //#define ENABLE_APP_NEURAL_NETWORK
-//#define ENABLE_APP_PONG
-//#define ENABLE_APP_DARKEST_TIMELINE
+#define ENABLE_APP_PONG
+#define ENABLE_APP_DARKEST_TIMELINE
 
 
 #endif

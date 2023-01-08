@@ -68,9 +68,9 @@ public:
 
     void OnEncoderMove(int direction) {
         if (cursor == 0) {
-            rate = constrain(rate += direction, 0, HEM_LFO_MAX_VALUE);
+            rate = constrain(rate + direction, 0, HEM_LFO_MAX_VALUE);
         } else {
-            skew = constrain(skew += direction, 0, HEM_LFO_MAX_VALUE);
+            skew = constrain(skew + direction, 0, HEM_LFO_MAX_VALUE);
         }
     }
 

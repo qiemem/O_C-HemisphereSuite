@@ -72,8 +72,8 @@ public:
     }
 
     void OnEncoderMove(int direction) {
-        if (cursor == 0) freq = constrain(freq += direction, 0, 255);
-        if (cursor == 1) rho = constrain(rho += direction, 4, 127);
+        if (cursor == 0) freq = constrain(freq + direction, 0, 255);
+        if (cursor == 1) rho = constrain(rho + direction, 4, 127);
     }
 
     uint64_t OnDataRequest() {

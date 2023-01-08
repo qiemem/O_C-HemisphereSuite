@@ -37,16 +37,28 @@ public:
     }
 
     void Controller() {
-        bool reset = Clock(1);
+        if (Clock(1)) reset = true;
+        if (reset) {
+            step = start;
+            if (punch_out) punch_out = end - start;
+        }
 
-        if (Clock(0) || reset) {
-            step++;
-            if (step > end || step < start) step = start;
-            if (reset) {
-                step = start;
-                if (punch_out) punch_out = end - start;
+        // check for deferred recording
+        if (EndOfADCLag() && punch_out && mode) {
+            ForEachChannel(ch)
+            {
+                if (mode & (0x01 << ch)) { // Record this channel
+                    cv[ch][step] = In(ch);
+                }
             }
-            bool rec = 0;
+            if (!reset) {
+                if (--punch_out == 0) mode = 0;
+            }
+        }
+
+        if (Clock(0) ) { // sequence advance
+            if (!reset) step++;
+            if (step > end || step < start) step = start;
             ForEachChannel(ch)
             {
                 signal[ch] = int2simfloat(cv[ch][step]);
@@ -54,17 +66,11 @@ public:
                 if (next_step > end) next_step = start;
                 if (smooth) rise[ch] = (int2simfloat(cv[ch][next_step]) - int2simfloat(cv[ch][step])) / ClockCycleTicks(0);
                 else rise[ch] = 0;
+            }
 
-                if (mode & (0x01 << ch)) { // Record this channel
-                    if (punch_out > 0) {
-                        rec = 1;
-                        cv[ch][step] = In(ch);
-                    }
-                }
-            }
-            if (rec) {
-                if (--punch_out == 0) mode = 0;
-            }
+            // defer recording
+            StartADCLag();
+            reset = false;
         }
 
         ForEachChannel(ch)
@@ -84,28 +90,38 @@ public:
     }
 
     void OnButtonPress() {
-        if (cursor == 3) {
-            // Check recording status
-            if (mode > 0) punch_out = end - start;
-            else punch_out = 0;
+        if (cursor == 2) { // special case to toggle smoothing
+            smooth = 1 - smooth;
+            ResetCursor();
+            return;
         }
-        if (++cursor > 3) cursor = 0;
-        ResetCursor();
+
+        isEditing = 1 - isEditing; // toggle editing
+        if (cursor == 3 && !isEditing) { // activate recording if selected
+            punch_out = (mode > 0) ? end - start : 0;
+        }
     }
 
     void OnEncoderMove(int direction) {
-        if (cursor == 0) {
-            int16_t fs = start; // Former start value
-            start = constrain(start + direction, 0, end - 1);
-            if (fs != start && punch_out) punch_out -= direction;
+        if (isEditing) {
+            if (cursor == 0) {
+                int16_t fs = start; // Former start value
+                start = constrain(start + direction, 0, end - 1);
+                if (fs != start && punch_out) punch_out -= direction;
+            }
+            if (cursor == 1) {
+                int16_t fe = end; // Former end value
+                end = constrain(end + direction, start + 1, CVREC_MAX_STEP - 1);
+                if (fe != end && punch_out) punch_out += direction;
+            }
+            //if (cursor == 2) smooth = direction > 0 ? 1 : 0;
+            if (cursor == 3) mode = constrain(mode + direction, 0, 3);
+
+            return;
         }
-        if (cursor == 1) {
-            int16_t fe = end; // Former end value
-            end = constrain(end + direction, start + 1, CVREC_MAX_STEP - 1);
-            if (fe != end && punch_out) punch_out += direction;
-        }
-        if (cursor == 2) smooth = direction > 0 ? 1 : 0;
-        if (cursor == 3) mode = constrain(mode + direction, 0, 3);
+        
+        //not editing, move cursor
+        cursor = constrain(cursor + direction, 0, 3);
         ResetCursor();
     }
         
@@ -141,6 +157,8 @@ private:
     simfloat rise[2];
     simfloat signal[2];
     bool smooth;
+    bool isEditing = 0;
+    bool reset = true;
 
     // Transport
     int mode = 0; // 0=Playback, 1=Rec Track 1, 2=Rec Track 2, 3= Rec Tracks 1 & 2
@@ -164,9 +182,11 @@ private:
         gfxPrint(1, 35, CVRecV2_MODES[mode]);
 
         // Cursor
-        if (cursor == 0) gfxCursor(19, 23, 18);
-        if (cursor == 1) gfxCursor(43, 23, 18);
-        if (cursor == 3) gfxCursor(1, 43, 63);
+        switch(cursor){
+            case 0: gfxCursor(19, 23, 18); break;
+            case 1: gfxCursor(43, 23, 18); break;
+            case 3: gfxCursor(1, 43, 63); break;
+        }
 
         // Status icon
         if (mode > 0 && punch_out > 0) {
@@ -176,6 +196,14 @@ private:
 
         // Record time indicator
         if (punch_out > 0) gfxInvert(0, 34, punch_out / 6, 9);
+
+        if (isEditing) {
+            switch(cursor){
+                case 0: gfxInvert(19, 14, 18, 9); break;
+                case 1: gfxInvert(43, 14, 18, 9); break;
+                case 3: gfxInvert(1, 34, 63, 9); break;
+            }
+        }
 
         // Step indicator
         segment.PrintWhole(hemisphere * 64, 50, step + 1, 100);

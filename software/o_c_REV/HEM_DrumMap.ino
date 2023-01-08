@@ -128,46 +128,64 @@ public:
     }
 
     void OnButtonPress() {
-        if (++cursor > 7) cursor = 0;
-        if (mode[1] > 2 && cursor == 3) cursor = 4;
+        isEditing = !isEditing;
     }
 
     void OnEncoderMove(int direction) {
-        int accel = knob_accel >> 8;
-        // modes
-        if (cursor == 0) {
-            mode[0] += direction;
-            if (mode[0] > 2) mode[0] = 0;
-            if (mode[0] < 0) mode[0] = 2;
-        }
-        if (cursor == 1) {
-            mode[1] += direction;
-            if (mode[1] > 3) mode[1] = 0;
-            if (mode[1] < 0) mode[1] = 3;
-        }
-        // fill
-        if (cursor == 2) fill[0] = constrain(fill[0] += (direction * accel), 0, 255);
-        if (cursor == 3) fill[1] = constrain(fill[1] += (direction * accel), 0, 255);
-        // x/y
-        if (cursor == 4) x = constrain(x += (direction * accel), 0, 255);
-        if (cursor == 5) y = constrain(y += (direction * accel), 0, 255);
-        // chaos
-        if (cursor == 6) chaos = constrain(chaos += (direction * accel), 0, 255);
-        // cv assign
-        if (cursor == 7) {
-          cv_mode += direction;
-          if (cv_mode > 2) cv_mode = 0;
-          if (cv_mode < 0) cv_mode = 2;
-        }
+        if (!isEditing) {
+            cursor += direction;
+            if (mode[1] > 2 && cursor == 3) cursor += direction;
+            cursor = constrain(cursor, 0, 7);
+            ResetCursor();
+        } else {
+            int accel = knob_accel >> 8;
+            // modes
+            switch (cursor) {
+            case 0:
+                mode[0] += direction;
+                if (mode[0] > 2) mode[0] = 0;
+                if (mode[0] < 0) mode[0] = 2;
+                break;
+            case 1:
+                mode[1] += direction;
+                if (mode[1] > 3) mode[1] = 0;
+                if (mode[1] < 0) mode[1] = 3;
+                break;
+            // fill
+            case 2:
+                fill[0] = constrain(fill[0] + (direction * accel), 0, 255);
+                break;
+            case 3:
+                fill[1] = constrain(fill[1] + (direction * accel), 0, 255);
+                break;
+            // x/y
+            case 4:
+                x = constrain(x + (direction * accel), 0, 255);
+                break;
+            case 5:
+                y = constrain(y + (direction * accel), 0, 255);
+                break;
+            // chaos
+            case 6:
+                chaos = constrain(chaos + (direction * accel), 0, 255);
+                break;
+            // cv assign
+            case 7:
+                cv_mode += direction;
+                if (cv_mode > 2) cv_mode = 0;
+                if (cv_mode < 0) cv_mode = 2;
+                break;
+            }
 
-        // knob acceleration and value display for slider params
-        if (cursor >= 2 && cursor <= 6 && knob_accel < 2049) {
-          if (knob_accel < 300) {
-            knob_accel = knob_accel << 1;
-          }
-          knob_accel = knob_accel << 2;
-          value_animation = HEM_DRUMMAP_VALUE_ANIMATION_TICKS;
-        }
+            // knob acceleration and value display for slider params
+            if (cursor >= 2 && cursor <= 6 && knob_accel < 2049) {
+              if (knob_accel < 300) {
+                knob_accel = knob_accel << 1;
+              }
+              knob_accel = knob_accel << 2;
+              value_animation = HEM_DRUMMAP_VALUE_ANIMATION_TICKS;
+            }
+        } // isEditing
     }
         
     uint64_t OnDataRequest() {
@@ -208,7 +226,8 @@ private:
     const uint8_t *MODE_ICONS[3] = {BD_ICON,SN_ICON,HH_ICON};
     const char *CV_MODE_NAMES[3] = {"FILL A/B", "X/Y", "FA/CHAOS"};
     const int *VALUE_MAP[5] = {&fill[0], &fill[1], &x, &y, &chaos};
-    uint8_t cursor = 0;
+    int cursor = 0;
+    bool isEditing = false;
     uint8_t step;
     uint8_t randomness[3] = {0, 0, 0};
     int pulse_animation[2] = {0, 0};
@@ -250,15 +269,15 @@ private:
     void DrawInterface() {
         // output selection
         gfxPrint(1,15,"A:");
-        gfxIcon(14,14,MODE_ICONS[mode[0]]);
+        gfxIcon(15,15,MODE_ICONS[mode[0]]);
         gfxPrint(32,15,"B:");
         if (mode[1] == 3) {
             // accent
-            gfxIcon(45,14,MODE_ICONS[mode[0]]);
+            gfxIcon(46,15,MODE_ICONS[mode[0]]);
             gfxPrint(53,15,">");
         } else {
             // standard
-            gfxIcon(45,14,MODE_ICONS[mode[1]]);
+            gfxIcon(46,15,MODE_ICONS[mode[1]]);
         }
         // pulse animation per channel
          ForEachChannel(ch){
@@ -298,22 +317,15 @@ private:
         gfxPrint(1,45,"CHAOS");
         DrawKnobAt(32,45,28,_chaos,cursor == 6);
         
-        // cv input assignment
-        gfxIcon(1,57,CV_ICON);
-        gfxPrint(10,55,CV_MODE_NAMES[cv_mode]);
-
         // step count in header
         gfxPrint((step < 9 ? 49 : 43),2,step+1);
 
         // cursor for non-knobs
-        if (cursor == 0) gfxCursor(14,23,16); // Part A
-        if (cursor == 1) gfxCursor(45,23,16); // Part B
-        if (cursor == 7) gfxCursor(10,63,50); // CV Assign
+        if (cursor <= 1) isEditing ? gfxInvert(14+cursor*31,14,16,9)
+                                   : gfxCursor(14+cursor*31,23,16); // Part A / B
         
         // display value for knobs
         if (value_animation > 0 && cursor >= 2 && cursor <= 6) {
-          gfxRect(1, 54, 60, 10);
-          gfxInvert(1, 54, 60, 10);
           int val = *VALUE_MAP[cursor-2];
           int xPos = 27;
           if (val > 99) {
@@ -322,15 +334,23 @@ private:
             xPos = 24;
           }
           gfxPrint(xPos, 55, val);
-          gfxInvert(1, 54, 60, 10);
+          gfxInvert(1, 54, 63, 10);
+        } else {
+          // cv input assignment
+          gfxIcon(1,57,CV_ICON);
+          gfxPrint(10,55,CV_MODE_NAMES[cv_mode]);
+          if (cursor == 7) isEditing ? gfxInvert(10,54,50,9)
+                                     : gfxCursor(10,63,50); // CV Assign
         }
+
     }
 
     void DrawKnobAt(byte x, byte y, byte len, byte value, bool is_cursor) {
-        byte w = Proportion(value, 255, len);
+        byte w = Proportion(value, 255, len-1); // minus 1 because width is 2
         byte p = is_cursor ? 1 : 3;
         gfxDottedLine(x, y + 4, x + len, y + 4, p);
-        gfxRect(x + w, y, 2, 7);
+        gfxRect(x + w, y, 2, 8);
+        if (is_cursor && isEditing) gfxInvert(x, y, len+1, 8);
     }
 
     void Reset() {

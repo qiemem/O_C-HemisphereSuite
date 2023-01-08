@@ -23,6 +23,7 @@
 #include "OC_apps.h"
 #include "OC_digital_inputs.h"
 #include "OC_autotune.h"
+#include "enigma/TuringMachine.h"
 
 #define DECLARE_APP(a, b, name, prefix) \
 { TWOCC<a,b>::value, name, \

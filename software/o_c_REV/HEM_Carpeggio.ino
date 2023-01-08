@@ -35,12 +35,17 @@ public:
         step = 0;
         replay = 0;
         transpose = 0;
+        reset = true;
         ImprintChord(2);
         pitch_out_for_step();
     }
 
     void Controller() {
-        if (Clock(1)) step = 0; // Reset
+        if (Clock(1)) { // Reset
+            step = 0; 
+            reset = true;
+            pitch_out_for_step();
+        }
 
         if (Clock(0)) {
             // Are the X or Y position being set? If so, get step coordinates. Otherwise,
@@ -54,7 +59,11 @@ public:
                 step = (y * 4) + x;
                 pitch_out_for_step();
             } else {
-                if (++step > 15) step = 0;
+                if (!reset) {
+                    ++step;
+                }
+                reset = false;
+                if (step > 15) step = 0;
                 pitch_out_for_step();
             }
             replay = 0;
@@ -91,9 +100,9 @@ public:
     }
 
     void OnEncoderMove(int direction) {
-        if (cursor == 0) sequence[step] = constrain(sequence[step] += direction, -24, 60);
-        if (cursor == 1) chord = constrain(chord += direction, 0, Nr_of_arp_chords - 1);
-        if (cursor == 2) transpose = constrain(transpose += direction, -24, 24);
+        if (cursor == 0) sequence[step] = constrain(sequence[step] + direction, -24, 60);
+        if (cursor == 1) chord = constrain(chord + direction, 0, Nr_of_arp_chords - 1);
+        if (cursor == 2) transpose = constrain(transpose + direction, -24, 24);
         if (cursor == 3) {
             if (shuffle && direction < 0) {
                 ImprintChord(sel_chord);
@@ -134,6 +143,7 @@ private:
     uint8_t step; // Current step number
     int16_t sequence[16];
     bool replay; // When the encoder is moved, re-quantize the output
+    bool reset;
 
     // Settings
     int chord; // Selected chord

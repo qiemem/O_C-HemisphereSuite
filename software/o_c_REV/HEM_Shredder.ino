@@ -37,6 +37,7 @@ public:
     void Start() {
         step = 0;
         replay = 0;
+        reset = true;
         quant_channels = 0;
         quantizer.Init();
         scale = OC::Scales::SCALE_NONE;
@@ -48,7 +49,11 @@ public:
     }
 
     void Controller() {
-        if (Clock(1)) step = 0; // Reset
+        if (Clock(1)) {
+            step = 0; // Reset
+            reset = true;
+            VolageOut();
+        }
 
         if (Clock(0)) {
             // Are the X or Y position being set? If so, get step coordinates. Otherwise,
@@ -62,7 +67,11 @@ public:
                 step = (y * 4) + x;
                 VolageOut();
             } else {
-                if (++step > 15) step = 0;
+                if (!reset) {
+                    ++step;
+                }
+                reset = false;
+                if (step > 15) step = 0;
                 VolageOut();
             }
             replay = 0;
@@ -131,7 +140,7 @@ public:
                 }
             }
         }
-        if (cursor == 2) quant_channels = constrain(quant_channels += direction, 0, 2);
+        if (cursor == 2) quant_channels = constrain(quant_channels + direction, 0, 2);
         if (cursor == 3) {
           scale += direction;
           if (scale >= OC::Scales::NUM_SCALES) scale = 0;
@@ -184,6 +193,7 @@ private:
     int sequence[2][16];
     int current[2];
     bool replay; // When the encoder is moved, re-quantize the output
+    bool reset;
 
     // settings
     int range[2] = {1,0};

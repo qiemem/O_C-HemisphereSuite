@@ -68,7 +68,7 @@ public:
         if (time[cursor] > 100) direction *= 2;
         if (time[cursor] > 500) direction *= 2;
         if (time[cursor] > 1000) direction *= 2;
-        time[cursor] = constrain(time[cursor] += direction, 0, 2000);
+        time[cursor] = constrain(time[cursor] + direction, 0, 2000);
     }
         
     uint64_t OnDataRequest() {

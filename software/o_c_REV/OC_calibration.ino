@@ -521,6 +521,14 @@ void calibration_draw(const CalibrationState &state) {
   graphics.setPrintPos(menu::kIndentDx, y + 2);
   if (step->help)
     graphics.print(step->help);
+ 
+  // NJM: display encoder direction config on first and last screens
+  if (step->step == HELLO || step->step == CALIBRATION_EXIT) {
+      y += menu::kMenuLineH;
+      graphics.setPrintPos(menu::kIndentDx, y + 2);
+      graphics.print("Encoders: ");
+      graphics.print(OC::Strings::encoder_config_strings[ OC::calibration_data.encoder_config() ]);
+  }
 
   weegfx::coord_t x = menu::kDisplayWidth - 22;
   y = 2;

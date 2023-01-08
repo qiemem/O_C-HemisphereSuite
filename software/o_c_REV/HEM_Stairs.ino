@@ -208,11 +208,11 @@ public:
     void OnEncoderMove(int direction) {
         if (cursor == 0) 
         {
-            steps = constrain( steps += direction, 0, HEM_STAIRS_MAX_STEPS-1);  // constrain includes max
+            steps = constrain( steps + direction, 0, HEM_STAIRS_MAX_STEPS-1);  // constrain includes max
         }
         else if (cursor == 1) 
         {
-            dir = constrain( dir += direction, 0, 2);
+            dir = constrain( dir + direction, 0, 2);
 
             // Don't change current direction if up/down mode
             if(dir != 1)

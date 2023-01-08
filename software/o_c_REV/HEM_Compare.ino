@@ -57,7 +57,7 @@ public:
     }
 
     void OnEncoderMove(int direction) {
-        level = constrain(level += direction, 0, HEM_COMPARE_MAX_VALUE);
+        level = constrain(level + direction, 0, HEM_COMPARE_MAX_VALUE);
     }
         
     uint64_t OnDataRequest() {

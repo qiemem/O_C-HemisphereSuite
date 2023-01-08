@@ -64,12 +64,12 @@ typedef int32_t simfloat;
 
 // Hemisphere-specific macros
 #define BottomAlign(h) (62 - h)
-#define ForEachChannel(ch) for(int ch = 0; ch < 2; ch++)
+#define ForEachChannel(ch) for(int_fast8_t ch = 0; ch < 2; ch++)
 
 // Specifies where data goes in flash storage for each selcted applet, and how big it is
 typedef struct PackLocation {
-    int location;
-    int size;
+    size_t location;
+    size_t size;
 } PackLocation;
 
 class HemisphereApplet {
@@ -297,7 +297,7 @@ public:
     void gfxHeader(const char *str) {
         gfxPrint(1, 2, str);
         gfxLine(0, 10, 62, 10);
-        gfxLine(0, 12, 62, 12);
+        gfxLine(0, 11, 62, 11);
     }
 
     //////////////// Offset I/O methods
@@ -325,23 +325,31 @@ public:
      */
     bool Clock(int ch, bool physical = 0) {
         bool clocked = 0;
-        if (hemisphere == 0) {
-            if (ch == 0) clocked = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_1>();
-            if (ch == 1) clocked = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_2>();
-        } else if (hemisphere == 1) {
-            if (ch == 0) clocked = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_3>();
-            if (ch == 1) clocked = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_4>();
+        ClockManager *clock_m = clock_m->get();
+
+        if (ch == 0) { // clock triggers
+            if (hemisphere == LEFT_HEMISPHERE) {
+                if (!physical && clock_m->IsRunning()) clocked = clock_m->Tock(hemisphere);
+                else clocked = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_1>();
+            } else { // right side is special
+                if (master_clock_bus) { // forwarding from left
+                    if (!physical && clock_m->IsRunning()) clocked = clock_m->Tock(hemisphere);
+                    else clocked = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_1>();
+                } 
+                else clocked = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_3>();
+            }
+        } else if (ch == 1) { // simple physical trig check
+            if (hemisphere == LEFT_HEMISPHERE)
+                clocked = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_2>();
+            else
+                clocked = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_4>();
         }
 
-        if (ch == 0 && !physical) {
-            ClockManager *clock_m = clock_m->get();
-            if (clock_m->IsRunning()) clocked = clock_m->Tock();
-            else if (master_clock_bus) clocked = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_1>();
-        }
+        clocked = clocked || clock_m->Beep(hemisphere*2 + ch);
 
         if (clocked) {
-        		cycle_ticks[ch] = OC::CORE::ticks - last_clock[ch];
-        		last_clock[ch] = OC::CORE::ticks;
+            cycle_ticks[ch] = OC::CORE::ticks - last_clock[ch];
+            last_clock[ch] = OC::CORE::ticks;
         }
         return clocked;
     }
@@ -427,7 +435,7 @@ protected:
     /* Retrieve value from a 64-bit storage unit at the specified location and of the specified bit size */
     int Unpack(uint64_t data, PackLocation p) {
         uint64_t mask = 1;
-        for (int i = 1; i < p.size; i++) mask |= (0x01 << i);
+        for (size_t i = 1; i < p.size; i++) mask |= (0x01 << i);
         return (data >> p.location) & mask;
     }
 
@@ -442,11 +450,12 @@ protected:
      *     // etc...
      * }
      */
-    void StartADCLag(int ch = 0) {
+    void StartADCLag(bool ch = 0) {
         adc_lag_countdown[ch] = HEMISPHERE_ADC_LAG;
     }
 
-    bool EndOfADCLag(int ch = 0) {
+    bool EndOfADCLag(bool ch = 0) {
+        if (adc_lag_countdown[ch] < 0) return false;
         return (--adc_lag_countdown[ch] == 0);
     }
 
@@ -466,7 +475,7 @@ private:
     bool master_clock_bus; // Clock forwarding was on during the last ISR cycle
     bool applet_started; // Allow the app to maintain state during switching
     int last_view_tick; // Tick number of the most recent view
-    int help_active;
+    bool help_active;
     bool changed_cv[2]; // Has the input changed by more than 1/8 semitone since the last read?
     int last_cv[2]; // For change detection
 };

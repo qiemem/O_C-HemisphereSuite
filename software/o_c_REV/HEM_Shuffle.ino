@@ -18,6 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+// Logarhythm: Added triplets output (3 triggers per 4 input clocks) to the unused 2nd output
+
 class Shuffle : public HemisphereApplet {
 public:
 
@@ -31,6 +33,10 @@ public:
         which = 0;
         cursor = 1;
         last_tick = 0;
+        
+        triplet_which = 0;  // Triplets
+        next_trip_trigger = 0;
+        triplet_time = 0;
     }
 
     void Controller() {
@@ -38,9 +44,24 @@ public:
         if (Clock(1)) {
             which = 0; // Reset (next trigger will be even clock)
             last_tick = tick;
+            triplet_which = 0;  // Triplets reset to down beat
         }
 
         if (Clock(0)) {
+        
+            // Triplets: Track what triplet timing should be to span 4 normal clocks
+            triplet_time = (ClockCycleTicks(0) * 4) / 3;
+            if(triplet_which == 0)
+            {
+              next_trip_trigger = tick;  // Trigger right now (downbeat)
+            }
+            
+            if(++triplet_which > 3)
+            {
+              triplet_which = 0;        
+            }
+            
+            // Swing
             which = 1 - which;
             if (last_tick) {
                 tempo = tick - last_tick;
@@ -52,7 +73,17 @@ public:
             last_tick = tick;
         }
 
+        // Shuffle output
         if (tick == next_trigger) ClockOut(0);
+
+        // Logarhythm: Triplets output
+        if(tick == next_trip_trigger)
+        {
+          next_trip_trigger = tick + triplet_time;  // Schedule the next triplet output
+          triplet_time = 0; // Ensure that triplets will stop being scheduled if clocks aren't received
+          ClockOut(1);
+        }
+
     }
 
     void View() {
@@ -87,7 +118,7 @@ protected:
         //                               "------------------" <-- Size Guide
         help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Reset";
         help[HEMISPHERE_HELP_CVS]      = "1=Odd Mod 2=Even";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Clock";
+        help[HEMISPHERE_HELP_OUTS]     = "A=Clock B=Triplets";
         help[HEMISPHERE_HELP_ENCODER]  = "Odd/Even Delay";
         //                               "------------------" <-- Size Guide
     }
@@ -99,6 +130,11 @@ private:
     uint32_t next_trigger; // The tick of the next scheduled trigger
     uint32_t tempo; // Calculated time between ticks
 
+    // Logarhythm: Triplets (output on out B)
+    uint32_t triplet_which; // The current 4 count of clocks used to determine triplet reset
+    uint32_t next_trip_trigger; // The tick of the next scheduled triplet trigger
+    uint32_t triplet_time;  // Number of ticks between triplet output pulses
+    
     // Settings
     int16_t delay[2]; // Percentage delay for even (0) and odd (1) clock
 

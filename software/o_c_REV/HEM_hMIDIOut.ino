@@ -142,9 +142,9 @@ public:
     }
 
     void OnEncoderMove(int direction) {
-        if (cursor == 0) channel = constrain(channel += direction, 0, 15);
-        if (cursor == 1) transpose = constrain(transpose += direction, -24, 24);
-        if (cursor == 2) function = constrain(function += direction, 0, 3);
+        if (cursor == 0) channel = constrain(channel + direction, 0, 15);
+        if (cursor == 1) transpose = constrain(transpose + direction, -24, 24);
+        if (cursor == 2) function = constrain(function + direction, 0, 3);
         if (cursor == 3) legato = direction > 0 ? 1 : 0;
         ResetCursor();
     }

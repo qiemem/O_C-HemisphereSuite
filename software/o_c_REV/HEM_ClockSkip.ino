@@ -59,7 +59,7 @@ public:
     }
 
     void OnEncoderMove(int direction) {
-        p[cursor] = constrain(p[cursor] += direction, 0, 100);
+        p[cursor] = constrain(p[cursor] + direction, 0, 100);
     }
         
     uint64_t OnDataRequest() {
