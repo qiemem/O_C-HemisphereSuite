@@ -49,6 +49,6 @@ inline uint32_t rotl32(uint32_t input, unsigned int length, unsigned int count) 
 }
 
 bool EuclideanFilter(uint8_t num_steps, uint8_t num_beats, uint8_t rotation, uint32_t clock);
-uint32_t EuclideanPattern(uint8_t num_steps, uint8_t num_beats, uint8_t rotation);
+uint32_t EuclideanPattern(uint8_t num_steps, uint8_t num_beats, uint8_t rotation, uint8_t padding = 0);
 
 #endif // BJORKLUND_H_

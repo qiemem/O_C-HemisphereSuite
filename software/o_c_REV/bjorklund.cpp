@@ -1334,17 +1334,14 @@ bool EuclideanFilter(uint8_t num_steps, uint8_t num_beats, uint8_t rotation, uin
   return static_cast<bool>(pattern & (0x01 << clock)) ;
 }
 
-uint32_t EuclideanPattern(uint8_t num_steps, uint8_t num_beats, uint8_t rotation) {
-  if (num_steps < 2) {
-    num_steps = 2; //
-  }
-  if (num_beats > (num_steps)) {
-    num_beats = num_steps;
-  }
+uint32_t EuclideanPattern(uint8_t num_steps, uint8_t num_beats, uint8_t rotation, uint8_t padding) {
+  if (num_steps < 2) num_steps = 2;
+  if (num_beats > num_steps) num_beats = num_steps;
+
   uint32_t pattern = bjorklund_patterns[((num_steps - 2) * 33) + num_beats]; 
   if (rotation) {
-    rotation = rotation % num_steps;
-    pattern = rotl32(pattern, num_steps, rotation) ;
+    rotation = rotation % (num_steps + padding);
+    pattern = rotl32(pattern, num_steps + padding, rotation) ;
   }
   return pattern;
 }

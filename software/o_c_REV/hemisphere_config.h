@@ -11,7 +11,7 @@
 // * Category filtering is deprecated at 1.8, but I'm leaving the per-applet categorization
 // alone to avoid breaking forked codebases by other developers.
 
-#define HEMISPHERE_AVAILABLE_APPLETS 59
+#define HEMISPHERE_AVAILABLE_APPLETS 60
 
 //////////////////  id  cat   class name
 #define HEMISPHERE_APPLETS { \
@@ -21,6 +21,7 @@
     DECLARE_APPLET( 56, 0x10, AttenuateOffset), \
     DECLARE_APPLET( 41, 0x41, Binary), \
     DECLARE_APPLET( 51, 0x80, BugCrack), \
+    DECLARE_APPLET( 55, 0x80, BootsNCat), \
     DECLARE_APPLET(  4, 0x14, Brancher), \
     DECLARE_APPLET( 31, 0x04, Burst), \
     DECLARE_APPLET( 65, 0x10, Button), \
@@ -34,7 +35,7 @@
     DECLARE_APPLET( 57, 0x02, DrumMap), \
     DECLARE_APPLET(  9, 0x08, DualQuant), \
     DECLARE_APPLET( 18, 0x02, DualTM), \
-    DECLARE_APPLET( 15, 0x02, AnnularFusion), \
+    DECLARE_APPLET( 15, 0x02, EuclidX), \
     DECLARE_APPLET( 63, 0x06, EbbAndLfo), \
     DECLARE_APPLET( 45, 0x02, EnigmaJr), \
     DECLARE_APPLET( 42, 0x11, EnvFollow), \
@@ -55,7 +56,7 @@
     DECLARE_APPLET( 26, 0x08, ScaleDuet), \
     DECLARE_APPLET( 40, 0x40, Schmitt), \
     DECLARE_APPLET( 23, 0x80, Scope), \
-    DECLARE_APPLET( 14, 0x02, Sequence5), \
+    DECLARE_APPLET( 14, 0x02, SequenceX), \
     DECLARE_APPLET( 48, 0x45, ShiftGate), \
     DECLARE_APPLET( 58, 0x01, Shredder), \
     DECLARE_APPLET( 36, 0x04, Shuffle), \

@@ -18,12 +18,15 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+/* original 8-step mod by Logarhythm, adapted by djphazer
+ */
+
 #include "HSMIDI.h"
 
 // DON'T GO PAST 8!
-#define SEQ5_STEPS 8
+#define SEQX_STEPS 8
 
-class Sequence5 : public HemisphereApplet {
+class SequenceX : public HemisphereApplet {
 public:
 
     const char* applet_name() { // Maximum 10 characters
@@ -31,7 +34,7 @@ public:
     }
 
     void Start() {
-        for (int s = 0; s < SEQ5_STEPS; s++) note[s] = random(0, 30);
+        for (int s = 0; s < SEQX_STEPS; s++) note[s] = random(0, 30);
     }
 
     void Controller() {
@@ -61,7 +64,7 @@ public:
     }
 
     void OnButtonPress() {
-        if (++cursor == SEQ5_STEPS) cursor = 0;
+        if (++cursor == SEQX_STEPS) cursor = 0;
     }
 
     void OnEncoderMove(int direction) {
@@ -76,7 +79,7 @@ public:
 
     uint64_t OnDataRequest() {
         uint64_t data = 0;
-        for (int s = 0; s < SEQ5_STEPS; s++)
+        for (int s = 0; s < SEQX_STEPS; s++)
         {
             Pack(data, PackLocation {uint8_t(s * 5),5}, note[s]);
         }
@@ -85,7 +88,7 @@ public:
     }
 
     void OnDataReceive(uint64_t data) {
-        for (int s = 0; s < SEQ5_STEPS; s++)
+        for (int s = 0; s < SEQX_STEPS; s++)
         {
             note[s] = Unpack(data, PackLocation {uint8_t(s * 5),5});
         }
@@ -105,19 +108,19 @@ protected:
 private:
     int cursor = 0;
     char muted = 0; // Bitfield for muted steps; ((muted >> step) & 1) means muted
-    int note[SEQ5_STEPS]; // Sequence value (0 - 30)
+    int note[SEQX_STEPS]; // Sequence value (0 - 30)
     int step = 0; // Current sequencer step
     bool reset = true;
 
     void Advance(int starting_point) {
-        if (++step == SEQ5_STEPS) step = 0;
+        if (++step == SEQX_STEPS) step = 0;
         // If all the steps have been muted, stay where we were
         if (step_is_muted(step) && step != starting_point) Advance(starting_point);
     }
 
     void DrawPanel() {
         // Sliders
-        for (int s = 0; s < SEQ5_STEPS; s++)
+        for (int s = 0; s < SEQX_STEPS; s++)
         {
             //int x = 6 + (12 * s);
             int x = 6 + (7 * s); // APD:  narrower to fit more
@@ -165,41 +168,41 @@ private:
 ////////////////////////////////////////////////////////////////////////////////
 //// Hemisphere Applet Functions
 ///
-///  Once you run the find-and-replace to make these refer to Sequence5,
+///  Once you run the find-and-replace to make these refer to SequenceX,
 ///  it's usually not necessary to do anything with these functions. You
 ///  should prefer to handle things in the HemisphereApplet child class
 ///  above.
 ////////////////////////////////////////////////////////////////////////////////
-Sequence5 Sequence5_instance[2];
+SequenceX SequenceX_instance[2];
 
-void Sequence5_Start(bool hemisphere) {
-    Sequence5_instance[hemisphere].BaseStart(hemisphere);
+void SequenceX_Start(bool hemisphere) {
+    SequenceX_instance[hemisphere].BaseStart(hemisphere);
 }
 
-void Sequence5_Controller(bool hemisphere, bool forwarding) {
-    Sequence5_instance[hemisphere].BaseController(forwarding);
+void SequenceX_Controller(bool hemisphere, bool forwarding) {
+    SequenceX_instance[hemisphere].BaseController(forwarding);
 }
 
-void Sequence5_View(bool hemisphere) {
-    Sequence5_instance[hemisphere].BaseView();
+void SequenceX_View(bool hemisphere) {
+    SequenceX_instance[hemisphere].BaseView();
 }
 
-void Sequence5_OnButtonPress(bool hemisphere) {
-    Sequence5_instance[hemisphere].OnButtonPress();
+void SequenceX_OnButtonPress(bool hemisphere) {
+    SequenceX_instance[hemisphere].OnButtonPress();
 }
 
-void Sequence5_OnEncoderMove(bool hemisphere, int direction) {
-    Sequence5_instance[hemisphere].OnEncoderMove(direction);
+void SequenceX_OnEncoderMove(bool hemisphere, int direction) {
+    SequenceX_instance[hemisphere].OnEncoderMove(direction);
 }
 
-void Sequence5_ToggleHelpScreen(bool hemisphere) {
-    Sequence5_instance[hemisphere].HelpScreen();
+void SequenceX_ToggleHelpScreen(bool hemisphere) {
+    SequenceX_instance[hemisphere].HelpScreen();
 }
 
-uint64_t Sequence5_OnDataRequest(bool hemisphere) {
-    return Sequence5_instance[hemisphere].OnDataRequest();
+uint64_t SequenceX_OnDataRequest(bool hemisphere) {
+    return SequenceX_instance[hemisphere].OnDataRequest();
 }
 
-void Sequence5_OnDataReceive(bool hemisphere, uint64_t data) {
-    Sequence5_instance[hemisphere].OnDataReceive(data);
+void SequenceX_OnDataReceive(bool hemisphere, uint64_t data) {
+    SequenceX_instance[hemisphere].OnDataReceive(data);
 }

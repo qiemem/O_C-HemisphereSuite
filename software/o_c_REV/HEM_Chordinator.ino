@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "braids_quantizer.h"
+#include "bjorklund.h"
 
 class Chordinator : public HemisphereApplet {
 public:
