@@ -98,12 +98,15 @@ public:
     }
 
     void OnButtonPress() {
-        cursor++;
-        if (cursor > 5) cursor = 0;
-        ResetCursor();
+        CursorAction(cursor, 5);
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 5);
+            return;
+        }
+
         // Parameter Change handler
         // var cursor is the param pointer
         // var direction is the the movement of the encoder
@@ -224,12 +227,14 @@ private:
             }
         }
         switch (cursor) {
-            case 0: gfxCursor(43, 22, 18); break;
-            case 1: gfxCursor(43, 32, 18); break;
-            case 2: gfxCursor(43, 42, 18); break;
-            case 3: gfxCursor(43, 22, 18); break;
-            case 4: gfxCursor(43, 32, 18); break;
-            case 5: gfxCursor(40, 42, 24); break;
+            case 0:
+            case 3: gfxCursor(43, 23, 18); break;
+
+            case 1:
+            case 4: gfxCursor(43, 33, 18); break;
+
+            case 2: gfxCursor(43, 43, 18); break;
+            case 5: gfxCursor(40, 43, 24); break;
         }
 
         // gfxPrint(1, 38, "x");

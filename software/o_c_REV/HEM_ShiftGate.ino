@@ -47,10 +47,15 @@ public:
     }
 
     void OnButtonPress() {
-        if (++cursor > 3) cursor = 0;
+        CursorAction(cursor, 3);
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 3);
+            return;
+        }
+
         byte ch = cursor > 1 ? 1 : 0;
         byte c = cursor > 1 ? cursor - 2 : cursor;
         if (c == 0) length[ch] = constrain(length[ch] + direction, 1, 16);

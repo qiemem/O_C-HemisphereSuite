@@ -68,13 +68,11 @@ public:
 
     gfxPrint(0, 15, OC::scale_names_short[scale]);
     if (cursor == 0) {
-      gfxCursor(0, 23, 30);
-      if (selected) gfxInvert(0, 14, 30, 9);
+      gfxCursor(0, 23, 30, selected);
     }
     gfxPrint(36, 15, OC::Strings::note_names_unpadded[root]);
     if (cursor == 1) {
-      gfxCursor(36, 23, 12);
-      if (selected) gfxInvert(36, 14, 12, 9);
+      gfxCursor(36, 23, 12, selected);
     }
 
     uint16_t mask = chord_mask;

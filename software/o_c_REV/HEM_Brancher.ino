@@ -26,25 +26,27 @@ public:
     }
 
     void Start() {
-    	    p = 50;
-    	    choice = 0;
+        p = 50;
+        choice = 0;
     }
 
     void Controller() {
-        bool master_clock = MasterClockForwarded();
-
+        // handles physical and logical clock
         if (Clock(0)) {
             int prob = p + Proportion(DetentedIn(0), HEMISPHERE_MAX_CV, 100);
             choice = (random(1, 100) <= prob) ? 0 : 1;
 
-            // If Master Clock Forwarding is enabled, respond to this clock by
-            // sending a clock
-            if (master_clock) ClockOut(choice);
+            // will be true only for logical clocks
+            clocked = !Gate(0);
+
+            if (clocked) ClockOut(choice);
         }
 
-        // Pass along the gate state if Master Clock Forwarding is off. If it's on,
-        // the clock is handled above
-        if (!master_clock) GateOut(choice, Gate(0));
+        // only pass thru physical gates
+        if (!clocked) {
+            GateOut(choice, Gate(0));
+            GateOut(1 - choice, 0); // reset the other output
+        }
     }
 
     void View() {
@@ -53,7 +55,7 @@ public:
     }
 
     void OnButtonPress() {
-    		choice = 1 - choice;
+        choice = 1 - choice;
     }
 
     /* Change the pability */
@@ -82,6 +84,7 @@ protected:
 private:
 	int p;
 	int choice;
+    bool clocked; // indicates a logical clock without a physical gate
 
 	void DrawInterface() {
         // Show the probability in the middle

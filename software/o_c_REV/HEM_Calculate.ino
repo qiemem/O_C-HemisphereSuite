@@ -41,16 +41,6 @@ public:
             operation[ch] = ch;
             rand_clocked[ch] = 0;
         }
-        const char * op_name_list[] = {"Min", "Max", "Sum", "Diff", "Mean", "S&H", "Rnd"};
-        // hem_MIN goes in the Rand and S&H slots, because those are handled in Controller() and
-        // don't need functions. But providing 0 isn't safe because the encoder change can
-        // happen any time and cause the system to try to run one of those null functions.
-        CalcFunction calc_fn_list[] = {hem_MIN, hem_MAX, hem_SUM, hem_DIFF, hem_MEAN, hem_MIN, hem_MIN};
-        for(int i = 0; i < HEMISPHERE_NUMBER_OF_CALC; i++)
-        {
-            op_name[i] = op_name_list[i];
-            calc_fn[i] = calc_fn_list[i];
-        }
     }
 
     void Controller() {
@@ -114,8 +104,11 @@ protected:
     }
     
 private:
-    const char* op_name[HEMISPHERE_NUMBER_OF_CALC];
-    CalcFunction calc_fn[HEMISPHERE_NUMBER_OF_CALC];
+    const char* op_name[HEMISPHERE_NUMBER_OF_CALC] = {"Min", "Max", "Sum", "Diff", "Mean", "S&H", "Rnd"};
+    // hem_MIN goes in the Rand and S&H slots, because those are handled in Controller() and
+    // don't need functions. But providing 0 isn't safe because the encoder change can
+    // happen any time and cause the system to try to run one of those null functions.
+    CalcFunction calc_fn[HEMISPHERE_NUMBER_OF_CALC] = {hem_MIN, hem_MAX, hem_SUM, hem_DIFF, hem_MEAN, hem_MIN, hem_MIN};
     int hold[2];
     int operation[2];
     int selected;

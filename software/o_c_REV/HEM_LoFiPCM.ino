@@ -82,28 +82,28 @@ public:
     }
 
     void OnButtonPress() {
-        isEditing = !isEditing;
+        CursorAction(cursor, 3);
     }
 
     void OnEncoderMove(int direction) {
-        if (!isEditing) {
-            cursor = constrain(cursor + direction, 0, 3);
-            ResetCursor();
-        } else {
-            switch (cursor) {
-            case 0:
-                dt_pct = constrain(dt_pct + direction, 0, 99);
-                break;
-            case 1:
-                feedback = constrain(feedback + direction, 0, 125);
-                break;
-            case 2:
-                rate = constrain(rate + direction, 1, 32);
-                break;
-            case 3:
-                depth = constrain(depth + direction, 0, 13);
-                break;
-            }
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 3);
+            return;
+        }
+
+        switch (cursor) {
+        case 0:
+            dt_pct = constrain(dt_pct + direction, 0, 99);
+            break;
+        case 1:
+            feedback = constrain(feedback + direction, 0, 125);
+            break;
+        case 2:
+            rate = constrain(rate + direction, 1, 32);
+            break;
+        case 3:
+            depth = constrain(depth + direction, 0, 13);
+            break;
         }
     }
 
@@ -149,7 +149,6 @@ private:
     uint8_t rate_mod = rate;
     int depth = 0; // bit reduction depth aka bitcrush
     int cursor; //for gui
-    bool isEditing = false;
     
     void DrawWaveform() {
         int inc = rate_mod/2 + 1;
@@ -173,8 +172,7 @@ private:
             }
             gfxPrint(4 + pad(100, dt_pct), 15, dt_pct);
             gfxPrint(36 + pad(1000, fdbk_g), 15, fdbk_g);
-            isEditing ? gfxInvert(10 + 31 * cursor, 14, 20, 9)
-                      : gfxCursor(10 + 31 * cursor, 23, 20);
+            gfxCursor(10 + 31 * cursor, 23, 20);
         } else {
             gfxIcon(0, 15, WAVEFORM_ICON);
             gfxIcon(8, 15, BURST_ICON);
@@ -182,8 +180,7 @@ private:
             gfxPrint(30, 15, rate_mod);
             gfxIcon(42, 15, UP_DOWN_ICON);
             gfxPrint(50, 15, depth);
-            isEditing ? gfxInvert(30 + (cursor-2)*20, 14, 14, 9)
-                      : gfxCursor(30 + (cursor-2)*20, 23, 14);
+            gfxCursor(30 + (cursor-2)*20, 23, 14);
         }
     }
     

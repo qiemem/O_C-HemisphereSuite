@@ -91,7 +91,7 @@ public:
             // decrement delay and if it's 0, move the cursor
             if (--double_click_delay < 1) {
                 // if we hit zero before being reset (aka no double click), move the cursor
-                if (++cursor > 3) cursor = 0; // we should never be > 3, so this is just for safety
+                CursorButton();
             }
         }
     }
@@ -101,6 +101,10 @@ public:
         DrawParams();
         DrawMeters();
         DrawGrid();
+    }
+
+    void CursorButton() {
+        CursorAction(cursor, 3);
     }
 
     void OnButtonPress() {
@@ -115,11 +119,16 @@ public:
                 Shred(cursor);
             }
         } else {
-            if (++cursor > 3) cursor = 0;
+            CursorButton();
         }
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 3);
+            return;
+        }
+
         if (cursor < 2) {
             range[cursor] += direction;
             if (bipolar[cursor]) {

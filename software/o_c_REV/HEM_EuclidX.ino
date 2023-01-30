@@ -36,6 +36,14 @@ const int PARAM_SIZE = 5;
 class EuclidX : public HemisphereApplet {
 public:
 
+    enum EuclidXParam {
+        LENGTH1, BEATS1, OFFSET1, PADDING1,
+        LENGTH2, BEATS2, OFFSET2, PADDING2,
+        CV_DEST1,
+        CV_DEST2,
+        LAST_SETTING = CV_DEST2
+    };
+
     const char* applet_name() {
         return "EuclidX";
     }
@@ -68,17 +76,17 @@ public:
 
             // process CV inputs
             ForEachChannel(cv_ch) {
-                switch (cv_dest[cv_ch] - ch * (NUM_PARAMS-1)) {
-                case 0: // length
+                switch (cv_dest[cv_ch] - ch * LENGTH2) { // this is dumb, but efficient
+                case LENGTH1:
                     actual_length[ch] = constrain(actual_length[ch] + Proportion(cv_data[cv_ch], HEMISPHERE_MAX_CV, 31), 2, 32);
                     break;
-                case 1: // beats
+                case BEATS1:
                     actual_beats[ch] = constrain(actual_beats[ch] + Proportion(cv_data[cv_ch], HEMISPHERE_MAX_CV, actual_length[ch]), 1, actual_length[ch]);
                     break;
-                case 2: // offset
+                case OFFSET1:
                     actual_offset[ch] = constrain(actual_offset[ch] + Proportion(cv_data[cv_ch], HEMISPHERE_MAX_CV, actual_length[ch] + actual_padding[ch]), 0, actual_length[ch] + padding[ch] - 1);
                     break;
-				case 3: // padding
+				case PADDING1:
                     actual_padding[ch] = constrain(actual_padding[ch] + Proportion(cv_data[cv_ch], HEMISPHERE_MAX_CV, 32 - actual_length[ch]), 0, 32 - actual_length[ch]);
 					break;
                 default: break;
@@ -112,36 +120,40 @@ public:
     }
 
     void OnButtonPress() {
-        isEditing = !isEditing;
+        CursorAction(cursor, LAST_SETTING);
     }
 
     void OnEncoderMove(int direction) {
-        if (!isEditing) {
-            cursor = constrain(cursor + direction, 0, NUM_PARAMS*2 - 1);
-            ResetCursor();
-        } else {
-            int ch = cursor < NUM_PARAMS ? 0 : 1;
-            int f = cursor - (ch * NUM_PARAMS); // Cursor function
-            switch (f) {
-            case 0:
-                actual_length[ch] = length[ch] = constrain(length[ch] + direction, 2, 32);
-                if (beats[ch] > length[ch]) beats[ch] = length[ch];
-				if (padding[ch] > 32 - length[ch]) padding[ch] = 32 - length[ch];
-                if (offset[ch] >= length[ch] + padding[ch]) offset[ch] = length[ch] + padding[ch] - 1;
-                break;
-            case 1:
-                actual_beats[ch] = beats[ch] = constrain(beats[ch] + direction, 1, length[ch]);
-                break;
-            case 2:
-                actual_offset[ch] = offset[ch] = constrain(offset[ch] + direction, 0, length[ch] + padding[ch] - 1);
-                break;
-			case 3:
-				padding[ch] = constrain(padding[ch] + direction, 0, 32 - length[ch]);
-				break;
-            case 4: // CV destination
-                cv_dest[ch] = constrain(cv_dest[ch] + direction, 0, (NUM_PARAMS-1)*2 - 1);
-				break;
-            }
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, LAST_SETTING);
+            return;
+        }
+
+        int ch = cursor < LENGTH2 ? 0 : 1;
+        switch (cursor) {
+        case LENGTH1:
+        case LENGTH2:
+            actual_length[ch] = length[ch] = constrain(length[ch] + direction, 2, 32);
+            if (beats[ch] > length[ch]) beats[ch] = length[ch];
+            if (padding[ch] > 32 - length[ch]) padding[ch] = 32 - length[ch];
+            if (offset[ch] >= length[ch] + padding[ch]) offset[ch] = length[ch] + padding[ch] - 1;
+            break;
+        case BEATS1:
+        case BEATS2:
+            actual_beats[ch] = beats[ch] = constrain(beats[ch] + direction, 1, length[ch]);
+            break;
+        case OFFSET1:
+        case OFFSET2:
+            actual_offset[ch] = offset[ch] = constrain(offset[ch] + direction, 0, length[ch] + padding[ch] - 1);
+            break;
+        case PADDING1:
+        case PADDING2:
+            padding[ch] = constrain(padding[ch] + direction, 0, 32 - length[ch]);
+            break;
+        case CV_DEST1:
+        case CV_DEST2:
+            cv_dest[cursor - CV_DEST1] = (EuclidXParam) constrain(cv_dest[cursor - CV_DEST1] + direction, LENGTH1, PADDING2);
+            break;
         }
     }
 
@@ -155,6 +167,8 @@ public:
         Pack(data, PackLocation {5 * PARAM_SIZE, PARAM_SIZE}, offset[1]);
         Pack(data, PackLocation {6 * PARAM_SIZE, PARAM_SIZE}, cv_dest[0]);
         Pack(data, PackLocation {7 * PARAM_SIZE, PARAM_SIZE}, cv_dest[1]);
+        Pack(data, PackLocation {8 * PARAM_SIZE, PARAM_SIZE}, padding[0]);
+        Pack(data, PackLocation {9 * PARAM_SIZE, PARAM_SIZE}, padding[1]);
         return data;
     }
 
@@ -165,8 +179,10 @@ public:
         actual_beats[1]  = beats[1]  = Unpack(data, PackLocation {3 * PARAM_SIZE, PARAM_SIZE}) + 1;
         actual_offset[0] = offset[0] = Unpack(data, PackLocation {4 * PARAM_SIZE, PARAM_SIZE});
         actual_offset[1] = offset[1] = Unpack(data, PackLocation {5 * PARAM_SIZE, PARAM_SIZE});
-        cv_dest[0] = Unpack(data, PackLocation {6 * PARAM_SIZE, PARAM_SIZE});
-        cv_dest[1] = Unpack(data, PackLocation {7 * PARAM_SIZE, PARAM_SIZE});
+        cv_dest[0] = (EuclidXParam) Unpack(data, PackLocation {6 * PARAM_SIZE, PARAM_SIZE});
+        cv_dest[1] = (EuclidXParam) Unpack(data, PackLocation {7 * PARAM_SIZE, PARAM_SIZE});
+        actual_padding[0] = padding[0] = Unpack(data, PackLocation {8 * PARAM_SIZE, PARAM_SIZE});
+        actual_padding[1] = padding[1] = Unpack(data, PackLocation {9 * PARAM_SIZE, PARAM_SIZE});
     }
 
 protected:
@@ -181,8 +197,7 @@ protected:
 
 private:
     int step;
-    int cursor = 0; // Ch1: 0=Length, 1=Hits; Ch2: 2=Length 3=Hits
-    bool isEditing = false;
+    int cursor = LENGTH1; // EuclidXParam 
     uint32_t pattern[2];
 
     // Settings
@@ -195,7 +210,7 @@ private:
     uint8_t actual_offset[2];
     uint8_t actual_padding[2];
 
-    uint8_t cv_dest[2];
+    EuclidXParam cv_dest[2] = {BEATS1, BEATS2}; // input modulation
 
     void DrawSteps() {
         gfxLine(0, 45, 63, 45);
@@ -223,41 +238,52 @@ private:
     void DrawEditor() {
         const int spacing = 16;
 
-        gfxBitmap(8 + 0 * spacing, 15, 8, LOOP_ICON);
+        if (cursor < CV_DEST1) {
+            gfxBitmap(8 + 0 * spacing, 15, 8, LOOP_ICON);
+        }
         gfxBitmap(8 + 1 * spacing, 15, 8, X_NOTE_ICON);
         gfxBitmap(8 + 2 * spacing, 15, 8, LEFT_RIGHT_ICON);
         gfxPrint(8 + 3 * spacing, 15, "+");
 
+        int y = 15;
         ForEachChannel (ch) {
-            int y = 15 + 10 * (ch + 1);
+            y += 10;
             gfxPrint(3 + 0 * spacing + pad(10, actual_length[ch]), y, actual_length[ch]);
             gfxPrint(3 + 1 * spacing + pad(10, actual_beats[ch]), y, actual_beats[ch]);
             gfxPrint(3 + 2 * spacing + pad(10, actual_offset[ch]), y, actual_offset[ch]);
             gfxPrint(3 + 3 * spacing + pad(10, actual_padding[ch]), y, actual_padding[ch]);
 
-            int f = cursor - ch * NUM_PARAMS;
-            switch (f) {
-            case 0:
-            case 1:
-            case 2:
-            case 3:
-                gfxCursor(3 + f * spacing, y + 7, 13);
-                if (isEditing) gfxInvert(3+f*spacing, y-1, 13, 9);
-                break;
-            case 4: // CV dest selection
-                gfxBitmap(0, 13+ch*3, 8, CV_ICON);
-                if (isEditing) gfxInvert(0, 13+ch*3, 8, 6);
-                break;
-            }
-
             // CV assignment indicators
             ForEachChannel(ch_dest) {
-                int ff = cv_dest[ch_dest] - (NUM_PARAMS-1)*ch;
-                if (ff >= 0 && ff < (NUM_PARAMS-1))
+                int ff = cv_dest[ch_dest] - LENGTH2*ch;
+                if (ff >= 0 && ff < LENGTH2)
                     gfxBitmap(ff * spacing, y, 3, ch_dest?SUB_TWO:SUP_ONE);
             }
         }
 
+        int ch = cursor < LENGTH2 ? 0 : 1;
+        int f = cursor - ch * LENGTH2;
+        y = 33;
+        switch (cursor) {
+        case LENGTH2:
+        case BEATS2:
+        case OFFSET2:
+        case PADDING2:
+            y += 10;
+        case LENGTH1:
+        case BEATS1:
+        case OFFSET1:
+        case PADDING1:
+            gfxCursor(3 + f * spacing, y, 13);
+            break;
+
+        case CV_DEST1:
+        case CV_DEST2:
+            gfxBitmap(0, 13 + (cursor - CV_DEST1)*5, 8, CV_ICON);
+            gfxBitmap(8, 15, 3, (cursor - CV_DEST1)? SUB_TWO : SUP_ONE);
+            gfxCursor(0, 19 + (cursor - CV_DEST1)*5, 11, 7);
+            break;
+        }
     }
 };
 

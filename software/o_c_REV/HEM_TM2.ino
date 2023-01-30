@@ -41,6 +41,44 @@
 
 class DualTM : public HemisphereApplet {
 public:
+    
+    enum TM2Cursor {
+        LENGTH,
+        PROB,
+        SCALE,
+        RANGE,
+        OUT_A,
+        OUT_B,
+        CVMODE1,
+        CVMODE2,
+        SLEW,
+        LAST_SETTING = SLEW
+    };
+
+    enum OutputMode {
+        PITCH_SUM,
+        PITCH1,
+        PITCH2,
+        MOD1,
+        MOD2,
+        TRIG1,
+        TRIG2,
+        GATE1,
+        GATE2,
+        GATE_SUM,
+        OUTMODE_LAST
+    };
+
+    enum InputMode {
+        SLEW_MOD,
+        LENGTH_MOD,
+        P_MOD,
+        RANGE_MOD,
+        TRANSPOSE1,
+        TRANSPOSE2,
+        TRANSPOSE_BOTH,
+        INMODE_LAST
+    };
 
     const char* applet_name() {
         return "DualTM";
@@ -49,14 +87,8 @@ public:
     void Start() {
         reg = random(0, 65535);
         reg2 = ~reg;
-        Output[0] = 0;
-        Output[1] = 0;
-        p = 0;
-        length = 16;
-        quant_range = 24;
-        cursor = 0;
+
         quantizer.Init();
-        scale = OC::Scales::SCALE_SEMI;
         quantizer.Configure(OC::Scales::GetScale(scale), 0xffff); // Semi-tone
     }
 
@@ -70,7 +102,7 @@ public:
         // default to no mod
         p_mod = p;
         len_mod = length;
-        range_mod = quant_range;
+        range_mod = range;
         smooth_mod = smoothing;
         int note_trans1 = 0;
         int note_trans2 = 0;
@@ -78,32 +110,33 @@ public:
 
         // process CV inputs
         ForEachChannel(ch) {
-            // 0=length; 1=p_mod; 2=range; 3=trans1; 4=trans2; 5=trans1+2
             switch (cvmode[ch]) {
-            case -1: // bi-polar mod of slew factor
+            case SLEW_MOD:
                 smooth_mod = constrain(smooth_mod + Proportion(cv_data[ch], HEMISPHERE_MAX_CV, 128), 1, 128);
                 break;
-            case 0: // bi-polar modulation of length
+            case LENGTH_MOD:
                 len_mod = constrain(len_mod + Proportion(cv_data[ch], HEMISPHERE_MAX_CV, TM2_MAX_LENGTH), TM2_MIN_LENGTH, TM2_MAX_LENGTH);
                 break;
 
-            case 1: // bi-polar modulation of probability
+            case P_MOD:
                 p_mod = constrain(p_mod + Proportion(cv_data[ch], HEMISPHERE_MAX_CV, 100), 0, 100);
                 break;
 
-            case 2: // bi-polar modulation of note range
+            case RANGE_MOD:
                 range_mod = constrain(range_mod + Proportion(cv_data[ch], HEMISPHERE_MAX_CV, 32), 1, 32);
                 break;
 
-            case 3: // bi-polar transpose before quantize
+            // bi-polar transpose before quantize
+            case TRANSPOSE1:
                 note_trans1 = Proportion(cv_data[ch], HEMISPHERE_MAX_CV, range_mod);
                 break;
-            case 4:
+            case TRANSPOSE2:
                 note_trans2 = Proportion(cv_data[ch], HEMISPHERE_MAX_CV, range_mod);
                 break;
-            case 5:
+            case TRANSPOSE_BOTH:
                 note_trans3 = Proportion(cv_data[ch], HEMISPHERE_MAX_CV, range_mod);
                 break;
+
             default: break;
             }
         }
@@ -111,7 +144,7 @@ public:
         // Advance the register on clock, flipping bits as necessary
         if (clk) {
             // If the cursor is not on the p value, and Digital 2 is not gated, the sequence remains the same
-            int prob = (cursor == 1 || Gate(1)) ? p_mod : 0;
+            int prob = (cursor == PROB || Gate(1)) ? p_mod : 0;
 
             // Grab the bit that's about to be shifted away
             int last = (reg >> (len_mod - 1)) & 0x01;
@@ -127,54 +160,56 @@ public:
         }
  
         // Send 8-bit scaled and quantized CV
-        // scaled = note * quant_range / 0x1f
+        // scaled = note * range / 0x1f
         int32_t note = Proportion(reg & 0xff, 0xff, range_mod);
         int32_t note2 = Proportion(reg2 & 0xff, 0xff, range_mod);
 
         /*
-        note *= quant_range;
+        note *= range;
         simfloat x = int2simfloat(note) / (int32_t)0x1f;
         note = simfloat2int(x);
         */
 
         ForEachChannel(ch) {
             switch (outmode[ch]) {
-            case -1: // pitch 1+2
+            case PITCH_SUM:
               Output[ch] = slew(Output[ch], quantizer.Lookup(note + note2 + note_trans3 + 64));
               break;
-            case 0: // pitch 1
+            case PITCH1:
               Output[ch] = slew(Output[ch], quantizer.Lookup(note + note_trans1 + note_trans3 + 64));
               break;
-            case 1: // pitch 2
+            case PITCH2:
               Output[ch] = slew(Output[ch], quantizer.Lookup(note2 + note_trans2 + note_trans3 + 64));
               break;
-            case 2: // mod A - 8-bit bi-polar proportioned CV
+            case MOD1: // 8-bit bi-polar proportioned CV
               Output[ch] = slew(Output[ch], Proportion( int(reg & 0xff)-0x7f, 0x80, HEMISPHERE_MAX_CV) );
               break;
-            case 3: // mod B
+            case MOD2:
               Output[ch] = slew(Output[ch], Proportion( int(reg2 & 0xff)-0x7f, 0x80, HEMISPHERE_MAX_CV) );
               break;
-            case 4: // trig A
+            case TRIG1:
               if (clk && (reg & 0x01) == 1) // trigger if 1st bit is high
                 Output[ch] = HEMISPHERE_MAX_CV; //ClockOut(ch);
               else // decay
                 Output[ch] = slew(Output[ch]);
               break;
-            case 5: // trig B
-              if (clk && (reg2 & 0x01) == 1) // trigger if 1st bit is high
-                Output[ch] = HEMISPHERE_MAX_CV; //ClockOut(ch);
+            case TRIG2:
+              if (clk && (reg2 & 0x01) == 1)
+                Output[ch] = HEMISPHERE_MAX_CV;
               else
                 Output[ch] = slew(Output[ch]);
               break;
-            case 6: // gate A
+            case GATE1:
               Output[ch] = slew(Output[ch], (reg & 0x01)*HEMISPHERE_MAX_CV );
               break;
-            case 7: // gate B
+            case GATE2:
               Output[ch] = slew(Output[ch], (reg2 & 0x01)*HEMISPHERE_MAX_CV );
               break;
-            case 8: // gate A+B
+            case GATE_SUM:
               Output[ch] = slew(Output[ch], ((reg & 0x01)+(reg2 & 0x01))*HEMISPHERE_3V_CV );
               break;
+
+            default: break;
             }
 
             Out(ch, Output[ch]);
@@ -188,46 +223,48 @@ public:
     }
 
     void OnButtonPress() {
-        isEditing = !isEditing;
+        CursorAction(cursor, LAST_SETTING);
     }
 
     void OnEncoderMove(int direction) {
-        if (!isEditing) {
-            cursor = constrain(cursor + direction, 0, 8);
-            ResetCursor();  // Reset blink so it's immediately visible when moved
-        } else {
-            switch (cursor) {
-            case 0:
-                length = constrain(length + direction, TM2_MIN_LENGTH, TM2_MAX_LENGTH);
-                break;
-            case 1:
-                p = constrain(p + direction, 0, 100);
-                break;
-            case 2:
-                scale += direction;
-                if (scale >= TM2_MAX_SCALE) scale = 0;
-                if (scale < 0) scale = TM2_MAX_SCALE - 1;
-                quantizer.Configure(OC::Scales::GetScale(scale), 0xffff);
-                break;
-            case 3:
-                quant_range = constrain(quant_range + direction, 1, 32);
-                break;
-            case 4:
-                outmode[0] = constrain(outmode[0] + direction, -1, 8);
-                break;
-            case 5:
-                outmode[1] = constrain(outmode[1] + direction, -1, 8);
-                break;
-            case 6:
-                cvmode[0] = constrain(cvmode[0] + direction, -1, 5);
-                break;
-            case 7:
-                cvmode[1] = constrain(cvmode[1] + direction, -1, 5);
-                break;
-            case 8:
-                smoothing = constrain(smoothing + direction, 1, 128);
-                break;
-            }
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, LAST_SETTING);
+            return;
+        }
+
+        switch ((TM2Cursor)cursor) {
+        case LENGTH:
+            length = constrain(length + direction, TM2_MIN_LENGTH, TM2_MAX_LENGTH);
+            break;
+        case PROB:
+            p = constrain(p + direction, 0, 100);
+            break;
+        case SCALE:
+            scale += direction;
+            if (scale >= TM2_MAX_SCALE) scale = 0;
+            if (scale < 0) scale = TM2_MAX_SCALE - 1;
+            quantizer.Configure(OC::Scales::GetScale(scale), 0xffff);
+            break;
+        case RANGE:
+            range = constrain(range + direction, 1, 32);
+            break;
+        case OUT_A:
+            outmode[0] = (OutputMode) constrain(outmode[0] + direction, 0, OUTMODE_LAST-1);
+            break;
+        case OUT_B:
+            outmode[1] = (OutputMode) constrain(outmode[1] + direction, 0, OUTMODE_LAST-1);
+            break;
+        case CVMODE1:
+            cvmode[0] = (InputMode) constrain(cvmode[0] + direction, 0, INMODE_LAST-1);
+            break;
+        case CVMODE2:
+            cvmode[1] = (InputMode) constrain(cvmode[1] + direction, 0, INMODE_LAST-1);
+            break;
+        case SLEW:
+            smoothing = constrain(smoothing + direction, 1, 128);
+            break;
+
+        default: break;
         }
     }
         
@@ -235,12 +272,12 @@ public:
         uint64_t data = 0;
         Pack(data, PackLocation {0,7}, p);
         Pack(data, PackLocation {7,5}, length - 1);
-        Pack(data, PackLocation {12,5}, quant_range - 1);
-        Pack(data, PackLocation {17,4}, outmode[0]+1);
-        Pack(data, PackLocation {21,4}, outmode[1]+1);
+        Pack(data, PackLocation {12,5}, range - 1);
+        Pack(data, PackLocation {17,4}, outmode[0]);
+        Pack(data, PackLocation {21,4}, outmode[1]);
         Pack(data, PackLocation {25,8}, constrain(scale, 0, 255));
-        Pack(data, PackLocation {33,4}, cvmode[0]+1);
-        Pack(data, PackLocation {37,4}, cvmode[1]+1);
+        Pack(data, PackLocation {33,4}, cvmode[0]);
+        Pack(data, PackLocation {37,4}, cvmode[1]);
 
         // maybe don't bother saving the damn register
         //Pack(data, PackLocation {32,32}, reg);
@@ -251,13 +288,13 @@ public:
     void OnDataReceive(uint64_t data) {
         p = Unpack(data, PackLocation {0,7});
         length = Unpack(data, PackLocation {7,5}) + 1;
-        quant_range = Unpack(data, PackLocation{12,5}) + 1;
-        outmode[0] = Unpack(data, PackLocation {17,4}) - 1;
-        outmode[1] = Unpack(data, PackLocation {21,4}) - 1;
+        range = Unpack(data, PackLocation{12,5}) + 1;
+        outmode[0] = (OutputMode) Unpack(data, PackLocation {17,4});
+        outmode[1] = (OutputMode) Unpack(data, PackLocation {21,4});
         scale = Unpack(data, PackLocation {25,8});
         quantizer.Configure(OC::Scales::GetScale(scale), 0xffff);
-        cvmode[0] = Unpack(data, PackLocation {33,4}) - 1;
-        cvmode[1] = Unpack(data, PackLocation {37,4}) - 1;
+        cvmode[0] = (InputMode) Unpack(data, PackLocation {33,4});
+        cvmode[1] = (InputMode) Unpack(data, PackLocation {37,4});
 
         reg = Unpack(data, PackLocation {32,32});
         reg2 = Unpack(data, PackLocation {0, 32}); // lol it could be fun
@@ -274,35 +311,28 @@ protected:
     }
     
 private:
-    int length; // Sequence length
+    int length = 16; // Sequence length
     int len_mod; // actual length after CV mod
-    int cursor;  // 0 = length, 1 = p, 2 = scale, 3=range, 4=OutA, 5=OutB, 6=CV1, 7=CV2
-    bool isEditing = false;
+    int cursor; // TM2Cursor
     braids::Quantizer quantizer;
 
     // Settings
     uint32_t reg; // 32-bit sequence register
     uint32_t reg2; // DJP
 
-    int Output[2];
+    // most recent output values
+    int Output[2] = {0, 0};
 
-    int p; // Probability of bit flipping on each cycle
+    int p = 0; // Probability of bit flipping on each cycle
     int p_mod;
-    int scale; // Scale used for quantized output
-    int quant_range;
+    int scale = OC::Scales::SCALE_SEMI; // Scale used for quantized output
+    int range = 24;
     int range_mod;
     int smoothing = 4;
     int smooth_mod;
 
-    // output modes:
-    // 0=pitch A; 2=mod A; 4=trig A; 6=gate A
-    // 1=pitch B; 3=mod B; 5=trig B; 7=gate B
-    // -1=pitch A+B; 8=gate A+B
-    int outmode[2] = {0, 5};
-
-    // CV input mappings:
-    // 0=length; 1=p_mod; 2=range; 3=trans1; 4=trans2; 5=trans1+2
-    int cvmode[2] = {0, 5};
+    OutputMode outmode[2] = {PITCH1, TRIG2};
+    InputMode cvmode[2] = {LENGTH_MOD, RANGE_MOD};
 
     int slew(int old_val, const int new_val = 0) {
         // more smoothing causes more ticks to be skipped
@@ -312,11 +342,74 @@ private:
         return old_val; 
     }
 
+    void DrawOutputMode(int ch) {
+        gfxPrint(1 + 31*ch, 36, ch ? (hemisphere ? "D" : "B") : (hemisphere ? "C" : "A") );
+        gfxPrint(":");
+
+        switch (outmode[ch]) {
+        case PITCH_SUM: gfxBitmap(24+ch*32, 35, 3, SUP_ONE);
+        case PITCH1:
+        case PITCH2:
+            gfxBitmap(15 + ch*32, 35, 8, NOTE_ICON);
+            break;
+        case MOD1:
+        case MOD2:
+            gfxBitmap(15 + ch*32, 35, 8, WAVEFORM_ICON);
+            break;
+        case TRIG1:
+        case TRIG2:
+            gfxBitmap(15 + ch*32, 35, 8, CLOCK_ICON);
+            break;
+        case GATE_SUM: gfxBitmap(24+ch*32, 35, 3, SUB_TWO);
+        case GATE1:
+        case GATE2:
+            gfxBitmap(15 + ch*32, 35, 8, METER_ICON);
+            break;
+
+        default: break;
+        }
+
+        // indicator for reg1 or reg2
+        gfxBitmap(24+ch*32, 35, 3, (outmode[ch] % 2) ? SUP_ONE : SUB_TWO );
+    }
+
+    void DrawCVMode(int ch) {
+        gfxIcon(1 + 31*ch, 35, CV_ICON);
+        gfxBitmap(9 + 31*ch, 35, 3, ch ? SUB_TWO : SUP_ONE);
+
+        switch (cvmode[ch]) {
+        case SLEW_MOD:
+            gfxIcon(15 + ch*32, 35, MOD_ICON);
+            break;
+        case LENGTH_MOD:
+            gfxIcon(15 + ch*32, 35, LOOP_ICON);
+            break;
+        case P_MOD:
+            gfxPrint(15 + ch*32, 35, "p");
+            break;
+        case RANGE_MOD:
+            gfxIcon(15 + ch*32, 35, UP_DOWN_ICON);
+            break;
+        case TRANSPOSE1:
+            gfxIcon(15 + ch*32, 35, BEND_ICON);
+            gfxBitmap(24+ch*32, 35, 3, SUP_ONE);
+            break;
+        case TRANSPOSE_BOTH:
+            gfxBitmap(24+ch*32, 35, 3, SUP_ONE);
+        case TRANSPOSE2:
+            gfxIcon(15 + ch*32, 35, BEND_ICON);
+            gfxBitmap(24+ch*32, 35, 3, SUB_TWO);
+            break;
+
+        default: break;
+        }
+    }
+
     void DrawSelector() {
         gfxBitmap(1, 14, 8, LOOP_ICON);
         gfxPrint(12 + pad(10, len_mod), 15, len_mod);
         gfxPrint(32, 15, "p=");
-        if (cursor == 1 || Gate(1)) { // p unlocked
+        if (cursor == PROB || Gate(1)) { // p unlocked
             gfxPrint(pad(100, p_mod), p_mod);
         } else { // p is disabled
             gfxBitmap(49, 14, 8, LOCK_ICON);
@@ -326,96 +419,37 @@ private:
         gfxBitmap(41, 25, 8, UP_DOWN_ICON);
         gfxPrint(49, 25, range_mod); // APD
 
-        if (cursor < 6) {
-            gfxPrint(1, 36, "A:");
-            gfxPrint(32, 36, "B:");
+        switch ((TM2Cursor)cursor) {
+        default:
+            ForEachChannel(ch) DrawOutputMode(ch);
 
-            ForEachChannel(ch) {
-                switch (outmode[ch]) {
-                case -1: gfxBitmap(24+ch*32, 35, 3, SUP_ONE);
-                case 0: // pitch output
-                case 1:
-                    gfxBitmap(15 + ch*32, 35, 8, NOTE_ICON);
-                    break;
-                case 2: // mod output
-                case 3:
-                    gfxBitmap(15 + ch*32, 35, 8, WAVEFORM_ICON);
-                    break;
-                case 4: // trig output
-                case 5:
-                    gfxBitmap(15 + ch*32, 35, 8, CLOCK_ICON);
-                    break;
-                case 8: gfxBitmap(24+ch*32, 35, 3, SUB_TWO);
-                case 6: // gate output
-                case 7:
-                    gfxBitmap(15 + ch*32, 35, 8, METER_ICON);
-                    break;
-                }
-                // indicator for reg1 or reg2
-                gfxBitmap(24+ch*32, 35, 3, (outmode[ch] % 2) ? SUB_TWO : SUP_ONE);
-            }
-        } else if (cursor < 8) { // CV inputs
-            gfxIcon(1, 35, CV_ICON);
-            gfxBitmap(9, 35, 3, SUP_ONE);
-            gfxIcon(32, 35, CV_ICON);
-            gfxBitmap(40, 35, 3, SUB_TWO);
+            break;
+        case CVMODE1:
+        case CVMODE2:
+            ForEachChannel(ch) DrawCVMode(ch);
 
-            ForEachChannel(ch) {
-                // 0=length; 1=p_mod; 2=range; 3=trans1; 4=trans2; 5=trans1+2
-                switch (cvmode[ch]) {
-                case -1: // smoothing
-                    gfxIcon(15 + ch*32, 35, MOD_ICON);
-                    break;
-                case 0:
-                    gfxIcon(15 + ch*32, 35, LOOP_ICON);
-                    break;
-                case 1:
-                    gfxPrint(15 + ch*32, 35, "p");
-                    break;
-                case 2:
-                    gfxIcon(15 + ch*32, 35, UP_DOWN_ICON);
-                    break;
-                case 3:
-                    gfxIcon(15 + ch*32, 35, BEND_ICON);
-                    gfxBitmap(24+ch*32, 35, 3, SUP_ONE);
-                    break;
-                case 5:
-                    gfxBitmap(24+ch*32, 35, 3, SUP_ONE);
-                case 4:
-                    gfxIcon(15 + ch*32, 35, BEND_ICON);
-                    gfxBitmap(24+ch*32, 35, 3, SUB_TWO);
-                    break;
-                }
-            }
-        } else { // smoothing
+            break;
+        case SLEW:
             gfxPrint(1, 35, "Slew:");
             gfxPrint(smooth_mod);
 
             gfxCursor(31, 43, 18);
-            if (isEditing) gfxInvert(31, 34, 18, 9);
+            break;
         }
 
-        switch (cursor) {
-            case 0: gfxCursor(13, 23, 12); break; // Length Cursor
-            case 1: gfxCursor(45, 23, 18); break; // Probability Cursor
-            case 2: gfxCursor(12, 33, 25); break; // Scale Cursor
-            case 3: gfxCursor(49, 33, 14); break; // Quant Range Cursor // APD
-            case 6:
-            case 4: gfxCursor(14, 43, 10); break; // Out A / CV 1
-            case 7:
-            case 5: gfxCursor(46, 43, 10); break; // Out B / CV 2
-        }
-        if (isEditing) {
-            switch (cursor) {
-                case 0: gfxInvert(13, 14, 12, 9); break;
-                case 1: gfxInvert(45, 14, 18, 9); break;
-                case 2: gfxInvert(12, 24, 25, 9); break;
-                case 3: gfxInvert(49, 24, 14, 9); break;
-                case 6:
-                case 4: gfxInvert(14, 34, 14, 9); break;
-                case 7:
-                case 5: gfxInvert(46, 34, 14, 9); break;
-            }
+        switch ((TM2Cursor)cursor) {
+            case LENGTH: gfxCursor(13, 23, 12); break;
+            case PROB: gfxCursor(45, 23, 18); break;
+            case SCALE: gfxCursor(12, 33, 25); break;
+            case RANGE: gfxCursor(49, 33, 14); break;
+
+            case OUT_A:
+            case CVMODE1: gfxCursor(14, 43, 10); break;
+
+            case OUT_B:
+            case CVMODE2: gfxCursor(46, 43, 10); break;
+
+            default: break;
         }
     }
 

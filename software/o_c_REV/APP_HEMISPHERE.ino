@@ -66,7 +66,8 @@ enum HEMISPHERE_SETTINGS {
     HEMISPHERE_RIGHT_DATA_B3,
     HEMISPHERE_LEFT_DATA_B4,
     HEMISPHERE_RIGHT_DATA_B4,
-    HEMISPHERE_CLOCK_DATA,
+    HEMISPHERE_CLOCK_DATA1,
+    HEMISPHERE_CLOCK_DATA2,
     HEMISPHERE_SETTING_LAST
 };
 
@@ -103,7 +104,8 @@ public:
                 (uint64_t(values_[2 + h]));
             available_applets[index].OnDataReceive(h, data);
         }
-        ClockSetup.OnDataReceive(0, uint64_t(values_[HEMISPHERE_CLOCK_DATA]));
+        ClockSetup.OnDataReceive(0, (uint64_t(values_[HEMISPHERE_CLOCK_DATA2]) << 16) |
+                                    uint64_t(values_[HEMISPHERE_CLOCK_DATA1]));
     }
 
     void SetApplet(int hemisphere, int index) {
@@ -266,7 +268,9 @@ public:
             apply_value(6 + h, (data >> 32) & 0xffff);
             apply_value(8 + h, (data >> 48) & 0xffff);
         }
-        apply_value(HEMISPHERE_CLOCK_DATA, ClockSetup.OnDataRequest(0));
+        uint64_t data = ClockSetup.OnDataRequest(0);
+        apply_value(HEMISPHERE_CLOCK_DATA1, data & 0xffff);
+        apply_value(HEMISPHERE_CLOCK_DATA2, (data >> 16) & 0xffff);
     }
 
     void OnSendSysEx() {
@@ -371,7 +375,8 @@ SETTINGS_DECLARE(HemisphereManager, HEMISPHERE_SETTING_LAST) {
     {0, 0, 65535, "Data R block 3", NULL, settings::STORAGE_TYPE_U16},
     {0, 0, 65535, "Data L block 4", NULL, settings::STORAGE_TYPE_U16},
     {0, 0, 65535, "Data R block 4", NULL, settings::STORAGE_TYPE_U16},
-    {0, 0, 65535, "Clock data", NULL, settings::STORAGE_TYPE_U16}
+    {0, 0, 65535, "Clock data 1", NULL, settings::STORAGE_TYPE_U16},
+    {0, 0, 65535, "Clock data 2", NULL, settings::STORAGE_TYPE_U16}
 };
 
 HemisphereManager manager;
@@ -433,7 +438,7 @@ void HEMISPHERE_handleButtonEvent(const UI::Event &event) {
     }
 
     if (event.type == UI::EVENT_BUTTON_LONG_PRESS) {
-        if (event.control == OC::CONTROL_BUTTON_DOWN) manager.ToggleClockSetup();
+        if (event.control == OC::CONTROL_BUTTON_DOWN) HemisphereApplet::CycleEditMode();
         if (event.control == OC::CONTROL_BUTTON_L) manager.ToggleClockRun();
     }
 }

@@ -20,9 +20,9 @@
     DECLARE_APPLET( 47, 0x09, ASR), \
     DECLARE_APPLET( 56, 0x10, AttenuateOffset), \
     DECLARE_APPLET( 41, 0x41, Binary), \
-    DECLARE_APPLET( 51, 0x80, BugCrack), \
     DECLARE_APPLET( 55, 0x80, BootsNCat), \
     DECLARE_APPLET(  4, 0x14, Brancher), \
+    DECLARE_APPLET( 51, 0x80, BugCrack), \
     DECLARE_APPLET( 31, 0x04, Burst), \
     DECLARE_APPLET( 65, 0x10, Button), \
     DECLARE_APPLET( 12, 0x10, Calculate),\
@@ -35,18 +35,18 @@
     DECLARE_APPLET( 57, 0x02, DrumMap), \
     DECLARE_APPLET(  9, 0x08, DualQuant), \
     DECLARE_APPLET( 18, 0x02, DualTM), \
-    DECLARE_APPLET( 15, 0x02, EuclidX), \
     DECLARE_APPLET( 63, 0x06, EbbAndLfo), \
     DECLARE_APPLET( 45, 0x02, EnigmaJr), \
     DECLARE_APPLET( 42, 0x11, EnvFollow), \
+    DECLARE_APPLET( 15, 0x02, EuclidX), \
     DECLARE_APPLET( 29, 0x04, GateDelay), \
     DECLARE_APPLET( 17, 0x50, GatedVCA), \
     DECLARE_APPLET( 16, 0x80, LoFiPCM), \
     DECLARE_APPLET( 10, 0x44, Logic), \
     DECLARE_APPLET( 21, 0x01, LowerRenz), \
+    DECLARE_APPLET( 50, 0x04, Metronome), \
     DECLARE_APPLET(150, 0x20, hMIDIIn), \
     DECLARE_APPLET( 27, 0x20, hMIDIOut), \
-    DECLARE_APPLET( 50, 0x04, Metronome), \
     DECLARE_APPLET( 33, 0x10, MixerBal), \
     DECLARE_APPLET( 20, 0x02, Palimpsest), \
     DECLARE_APPLET( 59, 0x04, ProbabilityDivider), \

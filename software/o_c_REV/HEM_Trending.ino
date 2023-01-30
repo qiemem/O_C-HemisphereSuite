@@ -92,11 +92,15 @@ public:
     }
 
     void OnButtonPress() {
-        if (++cursor > 2) cursor = 0;
-        ResetCursor();
+        CursorAction(cursor, 2);
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 2);
+            return;
+        }
+
         if (cursor < 2) {
             assign[cursor] = constrain(assign[cursor] + direction, 0, 5);
             reset[cursor] = 1;

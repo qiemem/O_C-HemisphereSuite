@@ -31,6 +31,9 @@ static constexpr uint16_t CLOCK_TEMPO_MAX = 300;
 static constexpr uint32_t CLOCK_TICKS_MIN = 1000000 / CLOCK_TEMPO_MAX;
 static constexpr uint32_t CLOCK_TICKS_MAX = 1000000 / CLOCK_TEMPO_MIN;
 
+constexpr int MIDI_OUT_PPQN = 24;
+constexpr int CLOCK_MAX_MULTIPLE = 24;
+constexpr int CLOCK_MIN_MULTIPLE = -31; // becomes /32
 
 class ClockManager {
     static ClockManager *instance;
@@ -45,7 +48,7 @@ class ClockManager {
     uint32_t beat_tick[3] = {0,0,0}; // The tick to count from
     uint32_t last_tock_check[3] = {0,0,0}; // To avoid checking the tock more than once per tick
     bool tock[3] = {0,0,0}; // The current tock value
-    int tocks_per_beat[3] = {1, 1, 24}; // Multiplier
+    int tocks_per_beat[3] = {1, 1, MIDI_OUT_PPQN}; // Multiplier
     int clock_ppqn = 4; // external clock multiple
     bool cycle = 0; // Alternates for each tock, for display purposes
     int count[3] = {0,0,0}; // Multiple counter, 0 is a special case when first starting the clock
@@ -63,7 +66,7 @@ public:
     }
 
     void SetMultiply(int multiply, bool ch = 0) {
-        multiply = constrain(multiply, 1, 24);
+        multiply = constrain(multiply, CLOCK_MIN_MULTIPLE, CLOCK_MAX_MULTIPLE);
         tocks_per_beat[ch] = multiply;
     }
 
@@ -112,21 +115,42 @@ public:
 
         // Reset only when all multipliers have been met
         bool reset = 1;
+        int div_count = 1;
+
+        for (int ch = 0; ch < 2; ch++) {
+            if (tocks_per_beat[ch] < 0)
+                div_count = div_count * ( 1 - tocks_per_beat[ch] );
+        }
 
         // count and calculate Tocks
         for (int ch = 0; ch < 3; ch++) {
-            uint32_t next_tock_tick = beat_tick[ch] + count[ch]*ticks_per_beat / static_cast<uint32_t>(tocks_per_beat[ch]);
-            tock[ch] = now >= next_tock_tick;
-            if (tock[ch]) ++count[ch]; // increment multiplier counter
+            if (tocks_per_beat[ch] == 0) { // disabled
+                tock[ch] = 0; continue;
+            }
 
-            reset = reset && (count[ch] > tocks_per_beat[ch]); // multiplier has been exceeded
+            if (tocks_per_beat[ch] > 0) { // multiply
+                uint32_t next_tock_tick = beat_tick[ch] + count[ch]*ticks_per_beat / static_cast<uint32_t>(tocks_per_beat[ch]);
+                tock[ch] = now >= next_tock_tick;
+                if (tock[ch]) ++count[ch]; // increment multiplier counter
+
+                reset = reset && (count[ch] > tocks_per_beat[ch]); // multiplier has been exceeded
+            } else { // division: -1 becomes /2, -2 becomes /3, etc.
+                int div = 1 - tocks_per_beat[ch];
+                bool beat_exceeded = (now >= (beat_tick[ch] + count[ch] * ticks_per_beat));
+                if (beat_exceeded) ++count[ch];
+
+                tock[ch] = beat_exceeded && ((count[ch] % div) == 1);
+
+                reset = reset && (count[ch] > div_count);
+            }
+
         }
-        if (reset) Reset(1); // skip one
+        if (reset) Reset(1); // skip the one we're already on
 
         // handle syncing to physical clocks
         if (clocked && clock_tick) {
 
-            uint32_t clock_diff = now - clock_tick; // 4 PPQN clock input
+            uint32_t clock_diff = now - clock_tick;
             if (clock_ppqn * clock_diff > CLOCK_TICKS_MAX) clock_tick = 0; // too slow, reset clock tracking
 
             // if there is a previous clock tick, update tempo and sync
@@ -136,7 +160,6 @@ public:
                 tempo = 1000000 / ticks_per_beat; // imprecise, for display purposes
 
                 int ticks_per_clock = ticks_per_beat / clock_ppqn; // rounded down
-                //int clock_err = ticks_per_beat % CLOCK_PPQN; // rounding error
 
                 // time since last beat
                 int tick_offset = now - beat_tick[2];

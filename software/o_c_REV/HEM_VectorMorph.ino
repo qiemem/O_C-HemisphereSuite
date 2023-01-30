@@ -59,10 +59,14 @@ public:
     }
 
     void OnButtonPress() {
-        if (++cursor > 3) cursor = 0;
+        CursorAction(cursor, 3);
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 3);
+            return;
+        }
         byte c = cursor;
         byte ch = cursor < 2 ? 0 : 1;
         if (ch) c -= 2;
@@ -131,7 +135,7 @@ private:
         
         // Cursors
         if (c == 0) gfxCursor(8, 23, 55);
-        if (c == 1 && CursorBlink()) gfxFrame(0, 24, 63, 40);
+        if (c == 1 && (EditMode() || CursorBlink()) ) gfxFrame(0, 24, 63, 40);
         
         // Link icon
         if (linked) gfxIcon(54, 15, LINK_ICON);

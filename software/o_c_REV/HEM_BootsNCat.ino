@@ -100,10 +100,15 @@ public:
     }
 
     void OnButtonPress() {
-        if (++cursor > 4) cursor = 0;
+        CursorAction(cursor, 4);
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 4);
+            return;
+        }
+
         if (cursor == 4) { // Blend
             blend = constrain(blend + direction, 0, BNC_MAX_PARAM);
         } else {
@@ -121,7 +126,6 @@ public:
                 SetEGFreq(ch);
             }
         }
-        ResetCursor();
     }
         
     uint64_t OnDataRequest() {
@@ -191,6 +195,7 @@ private:
         byte p = is_cursor ? 1 : 3;
         gfxDottedLine(x, y + 4, 62, y + 4, p);
         gfxRect(x + w, y, 2, 7);
+        if (EditMode() && is_cursor) gfxInvert(x, y, 17, 8);
     }
 
     void SetBDFreq() {

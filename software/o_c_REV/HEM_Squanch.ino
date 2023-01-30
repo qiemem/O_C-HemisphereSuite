@@ -66,10 +66,15 @@ public:
     }
 
     void OnButtonPress() {
-        if (++cursor > 2) cursor = 0;
+        CursorAction(cursor, 2);
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 2);
+            return;
+        }
+
         if (cursor == 2) { // Scale selection
             scale += direction;
             if (scale >= OC::Scales::NUM_SCALES) scale = 0;
@@ -117,8 +122,7 @@ private:
     int16_t shift[2];
 
     void DrawInterface() {
-        const uint8_t notes[2][8] = {{0xc0, 0xe0, 0xe0, 0xe0, 0x7f, 0x02, 0x14, 0x08},
-                                     {0xc0, 0xa0, 0xa0, 0xa0, 0x7f, 0x00, 0x00, 0x00}};
+        const uint8_t * notes[2] = {NOTE_ICON, NOTE2_ICON};
 
         // Display icon if clocked
         if (!continuous) gfxIcon(56, 25, CLOCK_ICON);
@@ -139,8 +143,8 @@ private:
 
         // Cursors
         if (cursor == 0) gfxCursor(10, 23, 18);
-        if (cursor == 1) gfxCursor(42, 23, 18);
-        if (cursor == 2) gfxCursor(13, 33, 30); // Scale Cursor
+        if (cursor == 1) gfxCursor(44, 23, 18);
+        if (cursor == 2) gfxCursor(12, 33, 30); // Scale Cursor
 
         // Little note display
 

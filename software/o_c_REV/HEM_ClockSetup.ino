@@ -18,12 +18,22 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#define MIDI_CLOCK 0xF8
-#define MIDI_START 0xFA
-#define MIDI_STOP  0xFC
-
 class ClockSetup : public HemisphereApplet {
 public:
+
+    enum ClockSetupCursor {
+        PLAY_STOP,
+        FORWARDING,
+        EXT_PPQN,
+        TEMPO,
+        MULT1,
+        MULT2,
+        TRIG1,
+        TRIG2,
+        TRIG3,
+        TRIG4,
+        LAST_SETTING = TRIG4
+    };
 
     const char* applet_name() {
         return "ClockSet";
@@ -35,13 +45,13 @@ public:
     void Controller() {
         if (start_q){
             start_q = 0;
-            usbMIDI.sendRealTime(MIDI_START);
+            usbMIDI.sendRealTime(usbMIDI.Start);
         }
         if (stop_q){
             stop_q = 0;
-            usbMIDI.sendRealTime(MIDI_STOP);
+            usbMIDI.sendRealTime(usbMIDI.Stop);
         }
-        if (clock_m->IsRunning() && clock_m->MIDITock()) usbMIDI.sendRealTime(MIDI_CLOCK);
+        if (clock_m->IsRunning() && clock_m->MIDITock()) usbMIDI.sendRealTime(usbMIDI.Clock);
     }
 
     void View() {
@@ -49,39 +59,61 @@ public:
     }
 
     void OnButtonPress() {
-        if (cursor == 0) PlayStop();
-        else if (cursor == 1) clock_m->ToggleForwarding();
-        else if (cursor > 5) clock_m->Boop(cursor-6);
-        else isEditing = !isEditing;
+        if (!EditMode()) { // special cases for toggle buttons
+            if (cursor == PLAY_STOP) PlayStop();
+            else if (cursor == FORWARDING) clock_m->ToggleForwarding();
+            else if (cursor >= TRIG1) clock_m->Boop(cursor-TRIG1);
+            else CursorAction(cursor, LAST_SETTING);
+        }
+        else CursorAction(cursor, LAST_SETTING);
     }
 
     void OnEncoderMove(int direction) {
-        if (!isEditing) {
-            cursor = constrain(cursor + direction, 0, 9);
-            ResetCursor();
-        } else {
-            switch (cursor) {
-            case 2: // input PPQN
-                clock_m->SetClockPPQN(clock_m->GetClockPPQN() + direction);
-                break;
-            case 3: // Set tempo
-                clock_m->SetTempoBPM(clock_m->GetTempo() + direction);
-                break;
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, LAST_SETTING);
+            return;
+        }
 
-            case 4: // Set multiplier
-            case 5:
-                clock_m->SetMultiply(clock_m->GetMultiply(cursor-4) + direction, cursor-4);
-                break;
-            }
+        switch ((ClockSetupCursor)cursor) {
+        case PLAY_STOP:
+            PlayStop();
+            break;
+
+        case FORWARDING:
+            clock_m->ToggleForwarding();
+            break;
+
+        case TRIG1:
+        case TRIG2:
+        case TRIG3:
+        case TRIG4:
+            clock_m->Boop(cursor-TRIG1);
+            break;
+
+        case EXT_PPQN:
+            clock_m->SetClockPPQN(clock_m->GetClockPPQN() + direction);
+            break;
+        case TEMPO:
+            clock_m->SetTempoBPM(clock_m->GetTempo() + direction);
+            break;
+
+        case MULT1:
+        case MULT2:
+            clock_m->SetMultiply(clock_m->GetMultiply(cursor - MULT1) + direction, cursor - MULT1);
+            break;
+
+        default: break;
         }
     }
 
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         Pack(data, PackLocation { 0, 1 }, clock_m->IsRunning() || clock_m->IsPaused());
-        Pack(data, PackLocation { 1, 9 }, clock_m->GetTempo());
-        Pack(data, PackLocation { 10, 5 }, clock_m->GetMultiply());
-        Pack(data, PackLocation { 15, 1 }, clock_m->IsForwarded());
+        Pack(data, PackLocation { 1, 1 }, clock_m->IsForwarded());
+        Pack(data, PackLocation { 2, 9 }, clock_m->GetTempo());
+        Pack(data, PackLocation { 11, 6 }, clock_m->GetMultiply(0)+32);
+        Pack(data, PackLocation { 17, 6 }, clock_m->GetMultiply(1)+32);
+        Pack(data, PackLocation { 23, 5 }, clock_m->GetClockPPQN());
         return data;
     }
 
@@ -91,10 +123,11 @@ public:
         } else {
             clock_m->Stop();
         }
-        clock_m->SetTempoBPM(Unpack(data, PackLocation { 1, 9 }));
-        clock_m->SetMultiply(Unpack(data, PackLocation { 10, 5 }),0);
-        clock_m->SetMultiply(Unpack(data, PackLocation { 10, 5 }),1);
-        clock_m->SetForwarding(Unpack(data, PackLocation { 15, 1 }));
+        clock_m->SetForwarding(Unpack(data, PackLocation { 1, 1 }));
+        clock_m->SetTempoBPM(Unpack(data, PackLocation { 2, 9 }));
+        clock_m->SetMultiply(Unpack(data, PackLocation { 11, 6 })-32,0);
+        clock_m->SetMultiply(Unpack(data, PackLocation { 17, 6 })-32,1);
+        clock_m->SetClockPPQN(Unpack(data, PackLocation { 23, 5 }));
     }
 
 protected:
@@ -108,8 +141,7 @@ protected:
     }
 
 private:
-    char cursor; // 0=Play/Stop, 1=Forwarding, 2=External PPQN, 3=Tempo, 4,5=Multiply
-    bool isEditing = false;
+    int cursor; // ClockSetupCursor
     bool start_q;
     bool stop_q;
     ClockManager *clock_m = clock_m->get();
@@ -157,41 +189,40 @@ private:
         gfxPrint(" BPM");
 
         // Multiply
-        gfxPrint(1, 37, "x");
-        gfxPrint(clock_m->GetMultiply(0));
-
-        // secondary multiplier when forwarding internal clock
-        gfxPrint(65, 37, "x");
-        gfxPrint(clock_m->GetMultiply(1));
+        ForEachChannel(ch) {
+            int mult = clock_m->GetMultiply(ch);
+            gfxPrint(1 + ch*64, 37, (mult >= 0) ? "x" : "/");
+            gfxPrint( (mult >= 0) ? mult : 1 - mult );
+        }
 
         // Manual triggers
-        gfxIcon(4, 49, BURST_ICON);
-        gfxIcon(36, 49, BURST_ICON);
-        gfxIcon(68, 49, BURST_ICON);
-        gfxIcon(100, 49, BURST_ICON);
+        for (int i=0; i<4; i++) { gfxIcon(4 + i*32, 49, BURST_ICON); }
 
-        switch (cursor) {
-        case 0: gfxFrame(11, 14, 10, 10); break; // Play/Stop
-        case 1: gfxFrame(49, 14, 10, 10); break; // Forwarding
+        switch ((ClockSetupCursor)cursor) {
+        case PLAY_STOP: gfxFrame(11, 14, 10, 10); break;
+        case FORWARDING: gfxFrame(49, 14, 10, 10); break;
 
-        case 2: // Clock PPQN
-            isEditing ? gfxInvert(100,14, 12,9) : gfxCursor(100,23, 12);
+        case EXT_PPQN:
+            gfxCursor(100,23, 12);
             break;
 
-        case 3: // BPM
-            isEditing ? gfxInvert(22, 25, 18, 9) : gfxCursor(22, 34, 18);
+        case TEMPO:
+            gfxCursor(22, 34, 18);
             break;
 
-        case 4: // Multipliers
-        case 5:
-            isEditing ? gfxInvert(8 + 64*(cursor-4), 36, 12, 9) : gfxCursor(8 + 64*(cursor-4), 45, 12);
+        case MULT1:
+        case MULT2:
+            gfxCursor(8 + 64*(cursor-MULT1), 45, 12);
             break;
 
+        case TRIG1:
+        case TRIG2:
+        case TRIG3:
+        case TRIG4:
+            gfxFrame(3 + 32*(cursor-TRIG1), 48, 10, 10);
+            break;
 
-        case 6: gfxFrame(3, 48, 10, 10); break; // Manual Trig 1
-        case 7: gfxFrame(35, 48, 10, 10); break; // Manual Trig 2
-        case 8: gfxFrame(67, 48, 10, 10); break; // Manual Trig 3
-        case 9: gfxFrame(99, 48, 10, 10); break; // Manual Trig 4
+        default: break;
         }
     }
 };

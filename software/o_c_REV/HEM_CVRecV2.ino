@@ -40,7 +40,7 @@ public:
         if (Clock(1)) reset = true;
         if (reset) {
             step = start;
-            if (punch_out) punch_out = end - start;
+            if (punch_out) punch_out = end - start + 1; // inclusive
         }
 
         // check for deferred recording
@@ -90,39 +90,46 @@ public:
     }
 
     void OnButtonPress() {
-        if (cursor == 2) { // special case to toggle smoothing
+        if (cursor == 2 && !EditMode()) { // special case to toggle smoothing
             smooth = 1 - smooth;
             ResetCursor();
             return;
         }
 
-        isEditing = 1 - isEditing; // toggle editing
-        if (cursor == 3 && !isEditing) { // activate recording if selected
-            punch_out = (mode > 0) ? end - start : 0;
+        if (cursor == 3 && EditMode()) { // activate recording if selected
+            punch_out = (mode > 0) ? end - start + 1 : 0;
         }
+
+        CursorAction(cursor, 3);
     }
 
     void OnEncoderMove(int direction) {
-        if (isEditing) {
-            if (cursor == 0) {
-                int16_t fs = start; // Former start value
-                start = constrain(start + direction, 0, end - 1);
-                if (fs != start && punch_out) punch_out -= direction;
-            }
-            if (cursor == 1) {
-                int16_t fe = end; // Former end value
-                end = constrain(end + direction, start + 1, CVREC_MAX_STEP - 1);
-                if (fe != end && punch_out) punch_out += direction;
-            }
-            //if (cursor == 2) smooth = direction > 0 ? 1 : 0;
-            if (cursor == 3) mode = constrain(mode + direction, 0, 3);
-
+        if (!EditMode()) { //not editing, move cursor
+            MoveCursor(cursor, direction, 3);
             return;
         }
         
-        //not editing, move cursor
-        cursor = constrain(cursor + direction, 0, 3);
-        ResetCursor();
+        switch (cursor) {
+        case 0: {
+            int16_t fs = start; // Former start value
+            start = constrain(start + direction, 0, end - 1);
+            if (fs != start && punch_out) punch_out -= direction;
+            break;
+        }
+        case 1: {
+            int16_t fe = end; // Former end value
+            end = constrain(end + direction, start + 1, CVREC_MAX_STEP - 1);
+            if (fe != end && punch_out) punch_out += direction;
+            break;
+        }
+        case 2:
+            smooth = 1 - smooth;
+            ResetCursor();
+            break;
+        case 3:
+            mode = constrain(mode + direction, 0, 3);
+            break;
+        }
     }
         
     uint64_t OnDataRequest() {
@@ -157,7 +164,6 @@ private:
     simfloat rise[2];
     simfloat signal[2];
     bool smooth;
-    bool isEditing = 0;
     bool reset = true;
 
     // Transport
@@ -181,13 +187,6 @@ private:
         // Record Mode
         gfxPrint(1, 35, CVRecV2_MODES[mode]);
 
-        // Cursor
-        switch(cursor){
-            case 0: gfxCursor(19, 23, 18); break;
-            case 1: gfxCursor(43, 23, 18); break;
-            case 3: gfxCursor(1, 43, 63); break;
-        }
-
         // Status icon
         if (mode > 0 && punch_out > 0) {
             if (!CursorBlink()) gfxIcon(54, 35, RECORD_ICON);
@@ -197,12 +196,11 @@ private:
         // Record time indicator
         if (punch_out > 0) gfxInvert(0, 34, punch_out / 6, 9);
 
-        if (isEditing) {
-            switch(cursor){
-                case 0: gfxInvert(19, 14, 18, 9); break;
-                case 1: gfxInvert(43, 14, 18, 9); break;
-                case 3: gfxInvert(1, 34, 63, 9); break;
-            }
+        // Cursor
+        switch(cursor){
+            case 0: gfxCursor(19, 23, 18); break;
+            case 1: gfxCursor(43, 23, 18); break;
+            case 3: gfxCursor(1, 43, 63); break;
         }
 
         // Step indicator

@@ -56,23 +56,23 @@ public:
     }
 
     void OnButtonPress() {
-        isEditing = !isEditing;
+        CursorAction(cursor, 3);
     }
 
     void OnEncoderMove(int direction) {
-        if (!isEditing) {
-            cursor = constrain(cursor + direction, 0, 3);
-            ResetCursor();
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 3);
+            return;
+        }
+
+        uint8_t ch = cursor / 2;
+        if (cursor == 0 || cursor == 2) {
+            // Change voltage
+            int min = -HEMISPHERE_3V_CV / VOLTAGE_INCREMENTS;
+            int max = HEMISPHERE_MAX_CV / VOLTAGE_INCREMENTS;
+            voltage[ch] = constrain(voltage[ch] + direction, min, max);
         } else {
-            uint8_t ch = cursor / 2;
-            if (cursor == 0 || cursor == 2) {
-                // Change voltage
-                int min = -HEMISPHERE_3V_CV / VOLTAGE_INCREMENTS;
-                int max = HEMISPHERE_MAX_CV / VOLTAGE_INCREMENTS;
-                voltage[ch] = constrain(voltage[ch] + direction, min, max);
-            } else {
-                gate[ch] = 1 - gate[ch];
-            }
+            gate[ch] = 1 - gate[ch];
         }
     }
         
@@ -104,7 +104,6 @@ protected:
     
 private:
     int cursor;
-    bool isEditing = false;
     bool view[2];
     
     // Settings
@@ -122,8 +121,7 @@ private:
             if (view[ch]) gfxInvert(0, 14 + (ch * 20), 7, 9);
         }
 
-        isEditing ? gfxInvert(12, 14 + cursor * 10, 37, 9)
-                  : gfxCursor(12, 23 + cursor * 10, 37);
+        gfxCursor(12, 23 + cursor * 10, 37);
     }
 
 };

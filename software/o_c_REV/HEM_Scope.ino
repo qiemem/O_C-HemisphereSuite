@@ -63,7 +63,7 @@ public:
                 sample_num = LoopInt(++sample_num, 63);
 
                 for (int n = 0; n < 2; n++) {
-                  int sample = Proportion(In(n) + HEMISPHERE_3V_CV, HEMISPHERE_MAX_CV + HEMISPHERE_3V_CV, 255);
+                  int sample = Proportion(In(n) + HEMISPHERE_MAX_CV, 2*HEMISPHERE_MAX_CV, 255);
                   sample = constrain(sample, 0, 255);
                   snapshot[n][sample_num] = (uint8_t)sample;
                 }
@@ -91,17 +91,17 @@ public:
     }
 
     void OnButtonPress() {
-        if (current_setting == 2) // FREEZE button
+        if (current_setting == 2 && !EditMode()) // FREEZE button
             freeze = !freeze;
         else if (OC::CORE::ticks - last_encoder_move < SCOPE_CURRENT_SETTING_TIMEOUT) // params visible? toggle edit
-            isEditing = !isEditing;
+            CursorAction(current_setting, 2);
         else // show params
             last_encoder_move = OC::CORE::ticks;
     }
 
     void OnEncoderMove(int direction) {
-        if (!isEditing) { // switch setting
-            current_setting = constrain(current_setting + direction, 0, 2);
+        if (!EditMode()) { // switch setting
+            MoveCursor(current_setting, direction, 2);
         } else { // edit
             if(current_setting == 0) {
                 if (sample_ticks < 32) sample_ticks += direction;
@@ -148,7 +148,6 @@ private:
     // Scope
     int current_display;
     int current_setting;
-    bool isEditing = false;
     uint8_t snapshot[2][64];
     int sample_ticks; // Ticks between samples
     int sample_countdown; // Last time a sample was taken
@@ -187,7 +186,7 @@ private:
                 gfxPrint(freeze ? "ON" : "OFF");
             }
 
-            if (isEditing) gfxInvert(1, 25, 31, 9);
+            if (EditMode()) gfxInvert(1, 25, 31, 9);
         }
     }
 

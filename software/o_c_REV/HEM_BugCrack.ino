@@ -224,49 +224,51 @@ public:
     }
 
     void OnButtonPress() {
-        isEditing = !isEditing;
+        CursorAction(cursor, 9);
     }
 
     void OnEncoderMove(int direction) {
-        if (!isEditing) {
-            cursor = constrain(cursor + direction, 0, 9);
-        } else {
-            switch (cursor) {
-            // Kick drum
-            case 0:
-                tone_kick = constrain(tone_kick + direction, 0, BNC_MAX_PARAM);
-                break;
-            case 1:
-                decay_kick = constrain(decay_kick + direction, 0, BNC_MAX_PARAM);
-                break;
-            case 2:
-                punch = constrain(punch + direction, 0, BNC_MAX_PARAM);
-                break;
-            case 3:
-                decay_punch = constrain(decay_punch + direction, 0, BNC_MAX_PARAM);
-                break;
-            case 4:
-                cv_mode_kick = constrain(cv_mode_kick + direction, 0, 4);
-                break;
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 9);
+            return;
+        }
 
-            // Snare drum
-            case 5:
-                tone_snare = constrain(tone_snare + direction, 0, BNC_MAX_PARAM);
-                break;
-            case 6:
-                decay_snare = constrain(decay_snare + direction, 0, BNC_MAX_PARAM);
-                break;
-            case 7:
-                snap = constrain(snap + direction, 0, BNC_MAX_PARAM);
-                break;
-            case 8:
-                blend_snare = constrain(blend_snare + direction, 0, BNC_MAX_PARAM);
-                break;
-            case 9:
-                cv_mode_snare = constrain(cv_mode_snare + direction, 0, 4);
-                break;
-            }
-        } // isEditing
+        switch (cursor) {
+        // Kick drum
+        case 0:
+            tone_kick = constrain(tone_kick + direction, 0, BNC_MAX_PARAM);
+            break;
+        case 1:
+            decay_kick = constrain(decay_kick + direction, 0, BNC_MAX_PARAM);
+            break;
+        case 2:
+            punch = constrain(punch + direction, 0, BNC_MAX_PARAM);
+            break;
+        case 3:
+            decay_punch = constrain(decay_punch + direction, 0, BNC_MAX_PARAM);
+            break;
+        case 4:
+            cv_mode_kick = constrain(cv_mode_kick + direction, 0, 4);
+            break;
+
+        // Snare drum
+        case 5:
+            tone_snare = constrain(tone_snare + direction, 0, BNC_MAX_PARAM);
+            break;
+        case 6:
+            decay_snare = constrain(decay_snare + direction, 0, BNC_MAX_PARAM);
+            break;
+        case 7:
+            snap = constrain(snap + direction, 0, BNC_MAX_PARAM);
+            break;
+        case 8:
+            blend_snare = constrain(blend_snare + direction, 0, BNC_MAX_PARAM);
+            break;
+        case 9:
+            cv_mode_snare = constrain(cv_mode_snare + direction, 0, 4);
+            break;
+        }
+
     }
 
     uint64_t OnDataRequest() {
@@ -314,7 +316,6 @@ protected:
 
 private:
     int cursor = 0;
-    bool isEditing = false;
     VectorOscillator kick;
     VectorOscillator env_kick;
     VectorOscillator env_punch;
@@ -396,7 +397,7 @@ private:
                 gfxPrint(41, 55, CV_MODE_NAMES_SN[cv_mode_snare]);
                 break;
         }
-        if (isEditing) gfxInvert(1 + (cursor<5?0:31), 54, 31, 9);
+        if (EditMode()) gfxInvert(1 + (cursor<5?0:31), 54, 31, 9);
 
         // Level indicators
         ForEachChannel(ch)

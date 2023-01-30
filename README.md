@@ -24,7 +24,7 @@ I've merged bleeding-edge features from various other branches, and confirmed th
 
 ### How do I try it?
 
-I might release a .hex file if there is demand... but I think the beauty of this module is the fact that it's relatively easy to modify and build the source code to reprogram it. You are free to customize the firmware, similar to how you've no doubt already selected a custom set of physical modules.
+Check the [Releases](https://github.com/djphazer/O_C-BenisphereSuite/releases) section for a .hex file, or clone the repository and build it yourself! I think the beauty of this module is the fact that it's relatively easy to modify and build the source code to reprogram it. You are free to customize the firmware, similar to how you've no doubt already selected a custom set of physical modules.
 
 ### How do I build it?
 

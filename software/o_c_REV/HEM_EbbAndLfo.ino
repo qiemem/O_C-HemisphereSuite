@@ -7,8 +7,6 @@ public:
   void Start() { phase = 0; }
 
   void Controller() {
-    uint32_t phase_increment = ComputePhaseIncrement(pitch + In(0));
-    phase += phase_increment;
     if (Clock(1)) phase = 0;
     if (Clock(0)) {
       //uint32_t next_tick = predictor.Predict(ClockCycleTicks(0));
@@ -16,15 +14,46 @@ public:
       pitch = ComputePitch(new_freq);
       phase = 0;
     }
-    slope_mod = slope + Proportion(DetentedIn(1), HEMISPHERE_MAX_CV, 127);
+
+    // handle CV inputs
+    pitch_mod = pitch;
+    slope_mod = slope;
+    shape_mod = shape;
+    fold_mod = fold;
+
+    ForEachChannel(ch) {
+        switch (cv_type(ch)) {
+        case FREQ:
+            pitch_mod += In(ch);
+            break;
+        case SLOPE:
+            slope_mod += Proportion(DetentedIn(ch), HEMISPHERE_MAX_CV, 127);
+            break;
+        case SHAPE:
+            shape_mod += Proportion(DetentedIn(ch), HEMISPHERE_MAX_CV, 127);
+            break;
+        case FOLD:
+            fold_mod += Proportion(DetentedIn(ch), HEMISPHERE_MAX_CV, 127);
+            break;
+        }
+    }
     slope_mod = constrain(slope_mod, 0, 127);
+    while (shape_mod < 0) shape_mod += 128;
+    while (shape_mod > 127) shape_mod -= 128;
+    fold_mod = constrain(fold_mod, 0, 127);
+
+    uint32_t phase_increment = ComputePhaseIncrement(pitch_mod);
+    phase += phase_increment;
+
+    // COMPUTE
     int s = constrain(slope_mod * 65535 / 127, 0, 65535);
-    ProcessSample(s, shape * 65535 / 127, fold * 32767 / 127, phase, sample);
+    ProcessSample(s, shape_mod * 65535 / 127, fold_mod * 32767 / 127, phase, sample);
     if (phase < phase_increment) {
       eoa_reached = false;
     } else {
       eoa_reached = eoa_reached || (sample.flags & FLAG_EOA);
     }
+
 
     ForEachChannel(ch) {
       switch (output(ch)) {
@@ -55,8 +84,8 @@ public:
       int bottom = 32 + (h + 1) * ch;
       int last = bottom;
       for (int i = 0; i < 64; i++) {
-        ProcessSample(slope_mod * 65535 / 127, shape * 65535 / 127,
-                      fold * 32767 / 127, 0xffffffff / 64 * i, disp_sample);
+        ProcessSample(slope_mod * 65535 / 127, shape_mod * 65535 / 127,
+                      fold_mod * 32767 / 127, 0xffffffff / 64 * i, disp_sample);
         int next = 0;
         switch (output(ch)) {
         case UNIPOLAR:
@@ -104,49 +133,64 @@ public:
       gfxPrint(hemisphere == 0 ? " B:" : " D:");
       gfxPrint(out_labels[output(1)]);
       break;
+    case 5:
+      ForEachChannel(ch) {
+          gfxIcon(0 + ch*32, 56, CV_ICON);
+          gfxBitmap(8 + ch*32, 56, 3, ch ? SUB_TWO : SUP_ONE);
+          gfxPrint(13 + ch*32, 56, cv_labels[cv_type(ch)]);
+      }
+      break;
     }
-    if (isEditing) gfxInvert(0, 55, 64, 9);
+    if (EditMode()) gfxInvert(0, 55, 64, 9);
   }
 
   void OnButtonPress() {
-    isEditing = !isEditing;
+    CursorAction(cursor, 5);
   }
 
   void OnEncoderMove(int direction) {
-    if (!isEditing) cursor = constrain(cursor + direction, 0, 4);
-    else {
-        switch (cursor) {
-        case 0: {
-          uint32_t old_pi = ComputePhaseIncrement(pitch);
-          pitch += (knob_accel >> 8) * direction;
-          while (ComputePhaseIncrement(pitch) == old_pi) {
-            pitch += direction;
-          }
-          break;
-        }
-        case 1: {
-          // slope += (knob_accel >> 4) * direction;
-          slope = constrain(slope + direction, 0, 127);
-          break;
-        }
-        case 2: {
-          shape += direction;
-          while (shape < 0) shape += 128;
-          while (shape > 127) shape -= 128;
-          break;
-        }
-        case 3: {
-          fold = constrain(fold + direction, 0, 127);
-          break;
-        }
-        case 4: {
-          out += direction;
-          out %= 0b10000;
-        }
-        }
-        if (knob_accel < (1 << 13))
-          knob_accel <<= 1;
+    if (!EditMode()) {
+        MoveCursor(cursor, direction, 5);
+        return;
     }
+
+    switch (cursor) {
+    case 0: {
+      uint32_t old_pi = ComputePhaseIncrement(pitch);
+      pitch += (knob_accel >> 8) * direction;
+      while (ComputePhaseIncrement(pitch) == old_pi) {
+        pitch += direction;
+      }
+      break;
+    }
+    case 1: {
+      // slope += (knob_accel >> 4) * direction;
+      slope = constrain(slope + direction, 0, 127);
+      break;
+    }
+    case 2: {
+      shape += direction;
+      while (shape < 0) shape += 128;
+      while (shape > 127) shape -= 128;
+      break;
+    }
+    case 3: {
+      fold = constrain(fold + direction, 0, 127);
+      break;
+    }
+    case 4: {
+      out += direction;
+      out %= 0b10000;
+      break;
+    }
+    case 5:
+      cv += direction;
+      cv %= 0b10000;
+      break;
+    }
+
+    if (knob_accel < (1 << 13))
+      knob_accel <<= 1;
   }
 
   uint64_t OnDataRequest() {
@@ -198,12 +242,16 @@ private:
   const char* cv_labels[4] = {"Hz", "Sl", "Sh", "Fo"};
 
   int cursor = 0;
-  bool isEditing = false;
   int16_t pitch = -3 * 12 * 128;
   int slope = 64;
-  int slope_mod = 64; // actual value after CV mod
   int shape = 48; // triangle
   int fold = 0;
+
+  // actual values after CV mod
+  int16_t pitch_mod;
+  int slope_mod;
+  int shape_mod;
+  int fold_mod;
 
   uint8_t out = 0b0001; // Unipolar on A, bipolar on B
   uint8_t cv = 0b0001; // Freq on 1, shape on 2
@@ -220,7 +268,7 @@ private:
   }
 
   CV cv_type(int ch) {
-    return (CV) ((out >> ((1 - ch) * 2)) & 0b11);
+    return (CV) ((cv >> ((1 - ch) * 2)) & 0b11);
   }
 
   void gfxPrintFreq(int16_t pitch) {

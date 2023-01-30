@@ -66,26 +66,26 @@ public:
     }
 
     void OnButtonPress() {
-        isEditing = !isEditing;
+        CursorAction(cursor, 3);
     }
 
     void OnEncoderMove(int direction) {
-        if (!isEditing) {
-            cursor = constrain(cursor + direction, 0, 3);
-            ResetCursor();
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 3);
+            return;
+        }
+
+        uint8_t ch = cursor / 2;
+        if (cursor == 0 || cursor == 2) {
+            // Scale selection
+            scale[ch] += direction;
+            if (scale[ch] >= OC::Scales::NUM_SCALES) scale[ch] = 0;
+            if (scale[ch] < 0) scale[ch] = OC::Scales::NUM_SCALES - 1;
+            quantizer[ch].Configure(OC::Scales::GetScale(scale[ch]), 0xffff);
+            continuous[ch] = 1; // Re-enable continuous mode when scale is changed
         } else {
-            uint8_t ch = cursor / 2;
-            if (cursor == 0 || cursor == 2) {
-                // Scale selection
-                scale[ch] += direction;
-                if (scale[ch] >= OC::Scales::NUM_SCALES) scale[ch] = 0;
-                if (scale[ch] < 0) scale[ch] = OC::Scales::NUM_SCALES - 1;
-                quantizer[ch].Configure(OC::Scales::GetScale(scale[ch]), 0xffff);
-                continuous[ch] = 1; // Re-enable continuous mode when scale is changed
-            } else {
-                // Root selection
-                root[ch] = constrain(root[ch] + direction, 0, 11);
-            }
+            // Root selection
+            root[ch] = constrain(root[ch] + direction, 0, 11);
         }
     }
 
@@ -125,7 +125,6 @@ private:
     int last_note[2]; // Last quantized note
     bool continuous[2]; // Each channel starts as continuous and becomes clocked when a clock is received
     int cursor;
-    bool isEditing = false;
 
     // Settings
     int scale[2]; // Scale per channel
@@ -133,8 +132,7 @@ private:
 
     void DrawSelector()
     {
-        const uint8_t notes[2][8] = {{0xc0, 0xe0, 0xe0, 0xe0, 0x7f, 0x02, 0x14, 0x08},
-                                     {0xc0, 0xa0, 0xa0, 0xa0, 0x7f, 0x00, 0x00, 0x00}};
+        const uint8_t * notes[2] = {NOTE_ICON, NOTE2_ICON};
 
         ForEachChannel(ch)
         {
@@ -146,8 +144,7 @@ private:
             // Draw cursor
             int y = cursor % 2; // 0=top line, 1=bottom
             if (ch == (cursor / 2)) {
-                isEditing ? gfxInvert(y*10 + ch*31, 14 + y*10, 12+(1-y)*18, 9)
-                          : gfxCursor(y*10 + ch*31, 23 + y*10, 12+(1-y)*18);
+                gfxCursor(y*10 + ch*31, 23 + y*10, 12+(1-y)*18);
             }
 
             // Little note display
