@@ -24,13 +24,36 @@
 /* ------------ use DAC8564 -------------------------------------------------------------------------  */
 //#define DAC8564
 
+
+// Phazerville Suite includes basic support for the 10V OC Plus and VOR
+//
+// The VOR flag is set in platformio.ini. The other one is here if you need it. -NJM
+/* ------------ uncomment for use with Plum Audio VOR anabled versions (OCP, 1uO_c v2, 4Robots) ---------------------------------------------------------  */
+//#define VOR
+/* ------------ uncomment for use with Plum Audio 1uO_c 4Robots (To use Up button long press to change VOR instead activate screensaver) ----------------  */
+//#define VOR_NO_RANGE_BUTTON
+
+// idk what this means so I'm keeping it -NJM
+#if defined(VOR)
+  #define IO_10V
+#endif
+
 /* Flags for the full-width apps, these enable/disable them in OC_apps.ino but also zero out the app   */
-/* files to prevent them from taking up space. Only Enigma is enabled by default.                      */
-#define ENABLE_APP_ENIGMA
-#define ENABLE_APP_MIDI
-//#define ENABLE_APP_NEURAL_NETWORK
-#define ENABLE_APP_PONG
-#define ENABLE_APP_DARKEST_TIMELINE
+/* files to prevent them from taking up space.                                                         */
+// Sets of these are now defined in platformio.ini for convenience. -NJM
+
+// Hemisphere apps
+// #define ENABLE_APP_ENIGMA
+// #define ENABLE_APP_MIDI
+// #define ENABLE_APP_NEURAL_NETWORK
+// #define ENABLE_APP_PONG
+// #define ENABLE_APP_DARKEST_TIMELINE
+
+// Stock O&C apps
+// #define ENABLE_APP_QUANTERMAIN
+// #define ENABLE_APP_METAQ
+// #define ENABLE_APP_CHORDS
+// #define ENABLE_APP_SEQUINS
 
 
 #endif

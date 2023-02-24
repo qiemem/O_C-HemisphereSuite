@@ -27,8 +27,12 @@
 #define PCM_TO_CV(S) Proportion((int)S - 127, 128, CLIPLIMIT)
 #define CV_TO_PCM(S) Proportion(constrain(S, -CLIPLIMIT, CLIPLIMIT), CLIPLIMIT, 128) + 127
 
+uint8_t lofi_pcm_buffer[HEM_LOFI_PCM_BUFFER_SIZE];
+
 class LoFiPCM : public HemisphereApplet {
 public:
+    // TODO: consider making a singleton class to manage/share buffers
+    const int length = HEM_LOFI_PCM_BUFFER_SIZE;
 
     const char* applet_name() { // Maximum 10 characters
         return "LoFi Echo";
@@ -37,7 +41,7 @@ public:
     void Start() {
         countdown = HEM_LOFI_PCM_SPEED;
         // this might take too long, which causes crashes. It's not crucial.
-        //for (int i = 0; i < HEM_LOFI_PCM_BUFFER_SIZE; i++) pcm[i] = 127;
+        //for (int i = 0; i < HEM_LOFI_PCM_BUFFER_SIZE; i++) lofi_pcm_buffer[i] = 127;
         cursor = 1; //for gui
     }
 
@@ -52,7 +56,7 @@ public:
                     //ClockOut(1);
                 }
 
-                int cv = In(0);
+                int cv = SmoothedIn(0);
                 int cv2 = DetentedIn(1);
 
                 // bitcrush the input
@@ -63,15 +67,16 @@ public:
                 head_w = (head + length + dt_pct*length/100) % length; //have to add the extra length to keep modulo positive in case delaytime is neg
 
                 // mix input into the buffer ahead, respecting feedback
-                int fbmix = PCM_TO_CV(pcm[head]) * fdbk_g / 100 + cv;
-                pcm[head_w] = CV_TO_PCM(fbmix);
+                int fbmix = PCM_TO_CV(lofi_pcm_buffer[head]) * fdbk_g / 100 + cv;
+                lofi_pcm_buffer[head_w] = CV_TO_PCM(fbmix);
                 
-                Out(0, PCM_TO_CV(pcm[head]));
-                Out(1, PCM_TO_CV(pcm[length-1 - head])); // reverse buffer!
-
                 rate_mod = constrain( rate + Proportion(cv2, HEMISPHERE_MAX_CV, 32), 1, 64);
+
                 countdown = rate_mod;
             }
+
+            SmoothedOut(0, PCM_TO_CV(lofi_pcm_buffer[head]), rate_mod);
+            SmoothedOut(1, PCM_TO_CV(lofi_pcm_buffer[length-1 - head]), rate_mod); // reverse buffer!
         }
     }
 
@@ -134,10 +139,6 @@ protected:
     }
     
 private:
-    const int length = HEM_LOFI_PCM_BUFFER_SIZE;
-
-    // TODO: consider making a singleton class to manage/share buffers
-    uint8_t pcm[HEM_LOFI_PCM_BUFFER_SIZE];
     bool play = 0; //play always on unless gated on Digital 1
     uint16_t head = 0; // Location of read/play head
     uint16_t head_w = 0; // Location of write/record head
@@ -156,7 +157,7 @@ private:
         if (pos < 0) pos += length;
         for (int i = 0; i < 64; i++)
         {
-            int height = Proportion((int)pcm[pos]-127, 128, 16);
+            int height = Proportion((int)lofi_pcm_buffer[pos]-127, 128, 16);
             gfxLine(i, 46, i, 46+height);
 
             pos += inc;
@@ -183,7 +184,7 @@ private:
             gfxCursor(30 + (cursor-2)*20, 23, 14);
         }
     }
-    
+
 };
 
 

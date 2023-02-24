@@ -7,20 +7,21 @@ djphazer's done an excellent job of tracking credit for all the various contribu
 
 ## Phazerville Suite - an active o_C firmware fork
 
-Using [Benisphere](https://github.com/benirose/O_C-BenisphereSuite) as a starting point, this branch takes the Hemisphere Suite in new directions, with several new applets and enhancements to existing ones, with the goal of cramming as much functionality and flexibility into the nifty dual-applet design as possible.
+Using [Benisphere](https://github.com/benirose/O_C-BenisphereSuite) as a starting point, this branch takes the Hemisphere Suite in new directions, with several new applets and enhancements to existing ones. I've merged bleeding-edge features with the goal of cramming as much functionality and flexibility into the nifty dual-applet design as possible!
 
-I've merged bleeding-edge features from various other branches, and confirmed that it compiles and runs on my uo_C.
+I've also managed to squeeze in several stock O&C firmware apps: **Quantermain, Meta-Q, Acid Curds, Harrington 1200, Sequins** & **Quadraturia** are all here!
 
 ### Notable Features in this branch:
 
 * Improved internal clock controls, external clock sync, independent multipliers for each Hemisphere, MIDI Clock out via USB
+  - Note: push/release both UP+DOWN buttons simultaneously to access the Clock Setup screen
 * LoFi Tape has been transformed into LoFi Echo (credit to [armandvedel](https://github.com/armandvedel/O_C-HemisphereSuite_log) for the initial idea)
 * ShiftReg has been upgraded to DualTM - two concurrent 32-bit registers governed by the same length/prob/scale/range settings, both outputs configurable to Pitch, Mod, Trig, Gate from either register
 * EuclidX - AnnularFusion got a makeover, now includes configurable CV input modulation (credit to [qiemem](https://github.com/qiemem/O_C-HemisphereSuite/tree/expanded-clock-div) and [adegani](https://github.com/adegani/O_C-HemisphereSuite))
 * Sequence5 -> SequenceX (8 steps max) (from [logarhythm](https://github.com/Logarhythm1/O_C-HemisphereSuite))
 * EbbAndLfo (via [qiemem](https://github.com/qiemem/O_C-HemisphereSuite/tree/trig-and-tides)) - mini implementation of MI Tides, with v/oct tracking
 * Modal-editing style navigation (push to toggle editing)
-* other small tweaks + experimental applets
+* lots of other small tweaks + experimental applets
 
 ### How do I try it?
 
@@ -28,7 +29,18 @@ Check the [Releases](https://github.com/djphazer/O_C-BenisphereSuite/releases) s
 
 ### How do I build it?
 
-Building the code is fairly simple using Platform IO, a Python-based build toolchain, available as either a [standalone CLI](https://docs.platformio.org/en/latest/core/installation/methods/installer-script.html) or a [plugin within VSCode](https://platformio.org/install/ide?install=vscode). The project lives within the `software/o_c_REV` directory. From there, you can Build and Upload via USB to your module.
+Building the code is fairly simple using Platform IO, a Python-based build toolchain, available as either a [standalone CLI](https://docs.platformio.org/en/latest/core/installation/methods/installer-script.html):
+```
+wget https://raw.githubusercontent.com/platformio/platformio-core-installer/master/get-platformio.py -O get-platformio.py
+python3 get-platformio.py
+```
+...or as a [a full-featured IDE](https://platformio.org/install/ide), as well as a plugin for VSCode and other existing IDEs.
+
+The project lives within the `software/o_c_REV` directory. From there, you can Build and Upload via USB to your module:
+```
+pio run -e oc_prod -t upload
+```
+Various build environment configurations exist in `platformio.ini`. To build all the defaults, simply use `pio run`
 
 ### Credits
 

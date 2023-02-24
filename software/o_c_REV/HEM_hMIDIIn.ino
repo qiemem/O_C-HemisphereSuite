@@ -57,9 +57,6 @@ public:
         first_note = -1;
         channel = 0; // Default channel 1
 
-        const char * fn_name_list[] = {"Note#", "Trig", "Gate", "Veloc", "Mod", "Aft", "Bend", "Clock"};
-        for (int i = 0; i < 8; i++) fn_name[i] = fn_name_list[i];
-
         ForEachChannel(ch)
         {
             function[ch] = ch * 2;
@@ -179,11 +176,15 @@ public:
     }
 
     void OnButtonPress() {
-        if (++cursor > 3) cursor = 0;
-        ResetCursor();
+        CursorAction(cursor, 3);
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 3);
+            return;
+        }
+
         if (cursor == 3) return;
         if (cursor == 0) channel = constrain(channel + direction, 0, 15);
         else {
@@ -227,7 +228,7 @@ private:
     int cursor; // 0=MIDI channel, 1=A/C function, 2=B/D function
     int last_tick; // Tick of last received message
     int first_note; // First note received, for awaiting Note Off
-    const char* fn_name[8];
+    const char* fn_name[8] = {"Note#", "Trig", "Gate", "Veloc", "Mod", "Aft", "Bend", "Clock"};
     uint8_t clock_count; // MIDI clock counter (24ppqn)
     
     // Logging

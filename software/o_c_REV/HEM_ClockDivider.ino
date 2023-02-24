@@ -85,11 +85,15 @@ public:
     }
 
     void OnButtonPress() {
-        cursor = 1 - cursor;
-        ResetCursor();
+        CursorAction(cursor, 1);
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 1);
+            return;
+        }
+
         div[cursor] += direction;
         if (div[cursor] > HEM_CLOCKDIV_MAX) div[cursor] = HEM_CLOCKDIV_MAX;
         if (div[cursor] < -HEM_CLOCKDIV_MAX) div[cursor] = -HEM_CLOCKDIV_MAX;
@@ -122,14 +126,13 @@ private:
     int div[2] = {1, 2}; // Division data for outputs. Positive numbers are divisions, negative numbers are multipliers
     int count[2] = {0,0}; // Number of clocks since last output (for clock divide)
     int next_clock[2] = {0,0}; // Tick number for the next output (for clock multiply)
-    bool cursor = 0; // Which output is currently being edited
+    int cursor = 0; // Which output is currently being edited
     int cycle_time = 0; // Cycle time between the last two clock inputs
 
     void DrawSelector() {
         ForEachChannel(ch)
         {
             int y = 15 + (ch * 25);
-            if (ch == cursor) gfxCursor(0, y + 8, 63);
 
             if (div[ch] > 0) {
                 gfxPrint(1, y, "/");
@@ -142,6 +145,7 @@ private:
                 gfxPrint(" Mult");
             }
         }
+        gfxCursor(0, 23 + (cursor * 25), 63);
     }
 };
 

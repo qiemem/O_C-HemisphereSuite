@@ -54,7 +54,7 @@ typedef struct Applet {
   void (*OnDataReceive)(bool, uint64_t); // Send a data int to the applet
 } Applet;
 
-// The settings specify the selected applets, and 32 bits of data for each applet
+// The settings specify the selected applets, and 64 bits of data for each applet
 enum HEMISPHERE_SETTINGS {
     HEMISPHERE_SELECTED_LEFT_ID,
     HEMISPHERE_SELECTED_RIGHT_ID,
@@ -71,6 +71,9 @@ enum HEMISPHERE_SETTINGS {
     HEMISPHERE_SETTING_LAST
 };
 
+Applet available_applets[] = HEMISPHERE_APPLETS;
+static constexpr int HEMISPHERE_AVAILABLE_APPLETS = ARRAY_SIZE(available_applets);
+
 ////////////////////////////////////////////////////////////////////////////////
 //// Hemisphere Manager
 ////////////////////////////////////////////////////////////////////////////////
@@ -81,8 +84,7 @@ public:
     void Init() {
         select_mode = -1; // Not selecting
         midi_in_hemisphere = -1; // No MIDI In
-        Applet applets[] = HEMISPHERE_APPLETS;
-        memcpy(&available_applets, &applets, sizeof(applets));
+
         ClockSetup = DECLARE_APPLET(9999, 0x01, ClockSetup);
 
         help_hemisphere = -1;
@@ -323,7 +325,6 @@ public:
     }
 
 private:
-    Applet available_applets[HEMISPHERE_AVAILABLE_APPLETS];
     Applet ClockSetup;
     int my_applet[2]; // Indexes to available_applets
     int select_mode;

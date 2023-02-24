@@ -239,7 +239,8 @@ private:
 ClockSetup ClockSetup_instance[1];
 
 void ClockSetup_Start(bool hemisphere) {ClockSetup_instance[hemisphere].BaseStart(hemisphere);}
-void ClockSetup_Controller(bool hemisphere, bool forwarding) {ClockSetup_instance[hemisphere].BaseController(forwarding);}
+// NJM: don't call BaseController for ClockSetup
+void ClockSetup_Controller(bool hemisphere, bool forwarding) {ClockSetup_instance[hemisphere].Controller();}
 void ClockSetup_View(bool hemisphere) {ClockSetup_instance[hemisphere].BaseView();}
 void ClockSetup_OnButtonPress(bool hemisphere) {ClockSetup_instance[hemisphere].OnButtonPress();}
 void ClockSetup_OnEncoderMove(bool hemisphere, int direction) {ClockSetup_instance[hemisphere].OnEncoderMove(direction);}

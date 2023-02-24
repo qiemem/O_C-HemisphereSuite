@@ -20,7 +20,6 @@
 
 #ifdef ENABLE_APP_ENIGMA
 
-#include "OC_strings.h"
 #include "HSApplication.h"
 #include "HSMIDI.h"
 #include "enigma/TuringMachine.h"

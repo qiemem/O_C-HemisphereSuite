@@ -51,10 +51,10 @@ public:
     void Start() {
         ForEachChannel(ch)
         {
-            actual_length[ch] = length[ch] = 16;
-            actual_beats[ch] = beats[ch] = 4 + (ch * 4);
-            actual_offset[ch] = offset[ch] = 0;
-			actual_padding[ch] = padding[ch] = 0;
+            length[ch] = 16;
+            beats[ch] = 4 + ch*4;
+            offset[ch] = 0;
+            padding[ch] = ch*16;
             pattern[ch] = EuclideanPattern(length[ch], beats[ch], offset[ch], padding[ch]);
         }
         step = 0;
@@ -79,6 +79,14 @@ public:
                 switch (cv_dest[cv_ch] - ch * LENGTH2) { // this is dumb, but efficient
                 case LENGTH1:
                     actual_length[ch] = constrain(actual_length[ch] + Proportion(cv_data[cv_ch], HEMISPHERE_MAX_CV, 31), 2, 32);
+
+                    if (actual_beats[ch] > actual_length[ch])
+                        actual_beats[ch] = actual_length[ch];
+                    if (actual_padding[ch] > 32 - actual_length[ch])
+                        actual_padding[ch] = 32 - actual_length[ch];
+                    if (actual_offset[ch] >= actual_length[ch] + actual_padding[ch])
+                        actual_offset[ch] = actual_length[ch] + actual_padding[ch] - 1;
+
                     break;
                 case BEATS1:
                     actual_beats[ch] = constrain(actual_beats[ch] + Proportion(cv_data[cv_ch], HEMISPHERE_MAX_CV, actual_length[ch]), 1, actual_length[ch]);
@@ -86,9 +94,11 @@ public:
                 case OFFSET1:
                     actual_offset[ch] = constrain(actual_offset[ch] + Proportion(cv_data[cv_ch], HEMISPHERE_MAX_CV, actual_length[ch] + actual_padding[ch]), 0, actual_length[ch] + padding[ch] - 1);
                     break;
-				case PADDING1:
+                case PADDING1:
                     actual_padding[ch] = constrain(actual_padding[ch] + Proportion(cv_data[cv_ch], HEMISPHERE_MAX_CV, 32 - actual_length[ch]), 0, 32 - actual_length[ch]);
-					break;
+                    if (actual_offset[ch] >= actual_length[ch] + actual_padding[ch])
+                        actual_offset[ch] = actual_length[ch] + actual_padding[ch] - 1;
+                    break;
                 default: break;
                 }
             }
@@ -134,9 +144,12 @@ public:
         case LENGTH1:
         case LENGTH2:
             actual_length[ch] = length[ch] = constrain(length[ch] + direction, 2, 32);
-            if (beats[ch] > length[ch]) beats[ch] = length[ch];
-            if (padding[ch] > 32 - length[ch]) padding[ch] = 32 - length[ch];
-            if (offset[ch] >= length[ch] + padding[ch]) offset[ch] = length[ch] + padding[ch] - 1;
+            if (beats[ch] > length[ch])
+                beats[ch] = length[ch];
+            if (padding[ch] > 32 - length[ch])
+                padding[ch] = 32 - length[ch];
+            if (offset[ch] >= length[ch] + padding[ch])
+                offset[ch] = length[ch] + padding[ch] - 1;
             break;
         case BEATS1:
         case BEATS2:
@@ -149,6 +162,8 @@ public:
         case PADDING1:
         case PADDING2:
             padding[ch] = constrain(padding[ch] + direction, 0, 32 - length[ch]);
+            if (offset[ch] >= length[ch] + padding[ch])
+                offset[ch] = length[ch] + padding[ch] - 1;
             break;
         case CV_DEST1:
         case CV_DEST2:

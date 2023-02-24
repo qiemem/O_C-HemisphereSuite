@@ -67,13 +67,10 @@ public:
     gfxHeader(applet_name());
 
     gfxPrint(0, 15, OC::scale_names_short[scale]);
-    if (cursor == 0) {
-      gfxCursor(0, 23, 30, selected);
-    }
+    if (cursor == 0) gfxCursor(0, 23, 30);
+
     gfxPrint(36, 15, OC::Strings::note_names_unpadded[root]);
-    if (cursor == 1) {
-      gfxCursor(36, 23, 12, selected);
-    }
+    if (cursor == 1) gfxCursor(36, 23, 12);
 
     uint16_t mask = chord_mask;
     for (int i = 0; i < int(active_scale.num_notes); i++) {
@@ -98,7 +95,7 @@ public:
 
   void OnButtonPress() {
     if (cursor < 2) {
-      selected = !selected;
+      isEditing = !isEditing;
     } else {
       chord_mask ^= 1 << (cursor - 2);
       update_chord_quantizer();
@@ -106,24 +103,23 @@ public:
   }
 
   void OnEncoderMove(int direction) {
-    if (selected) {
-      switch (cursor) {
-      case 0:
-        set_scale(scale + direction);
-        break;
-      case 1:
-        root = constrain(root + direction, 0, 11);
-        break;
-      default:
-        // shouldn't happen...
-        break;
-      }
-      update_chord_quantizer();
-    } else {
-      cursor =
-          constrain(cursor + direction, 0, 1 + int(active_scale.num_notes));
-      ResetCursor();
+    if (!isEditing) {
+      MoveCursor(cursor, direction, 1 + int(active_scale.num_notes));
+      return;
     }
+
+    switch (cursor) {
+    case 0:
+      set_scale(scale + direction);
+      break;
+    case 1:
+      root = constrain(root + direction, 0, 11);
+      break;
+    default:
+      // shouldn't happen...
+      break;
+    }
+    update_chord_quantizer();
   }
 
   uint64_t OnDataRequest() {
@@ -159,7 +155,6 @@ private:
   braids::Scale active_scale;
 
   int cursor = 0;
-  bool selected = false;
 
   // Leftmost is root, second to left is 2, etc. Defaulting here to basic triad.
   uint16_t chord_mask = 0b10101;

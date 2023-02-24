@@ -93,10 +93,14 @@ public:
     }
 
     void OnButtonPress() {
-        cursor = 1 - cursor;
+        CursorAction(cursor, 1);
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 1);
+            return;
+        }
         delay[cursor] += direction;
         delay[cursor] = constrain(delay[cursor], 0, 99);
     }

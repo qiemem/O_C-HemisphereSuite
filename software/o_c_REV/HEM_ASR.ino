@@ -63,10 +63,15 @@ public:
     }
 
     void OnButtonPress() {
-        if (++cursor > 1) cursor = 0;
+        CursorAction(cursor, 1);
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 1);
+            return;
+        }
+
         if (cursor == 0) { // Index
             byte ix = buffer_m->GetIndex();
             buffer_m->SetIndex(ix + direction);

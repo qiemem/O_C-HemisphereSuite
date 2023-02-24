@@ -73,11 +73,14 @@ public:
     }
 
     void OnButtonPress() {
-        selected = 1 - selected;
-        ResetCursor();
+        CursorAction(selected, 1);
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(selected, direction, 1);
+            return;
+        }
         operation[selected] = constrain(operation[selected] + direction, 0, HEMISPHERE_NUMBER_OF_CALC - 1);
         rand_clocked[selected] = 0;
     }

@@ -37,6 +37,7 @@
 #define HEMISPHERE_MAX_CV 7680
 #define HEMISPHERE_CENTER_CV 0
 #endif
+#define HEMISPHERE_CENTER_DETENT 80
 #define HEMISPHERE_3V_CV 4608
 #define HEMISPHERE_CLOCK_TICKS 100
 #define HEMISPHERE_CURSOR_TICKS 12000
@@ -65,6 +66,8 @@ typedef int32_t simfloat;
 // Hemisphere-specific macros
 #define BottomAlign(h) (62 - h)
 #define ForEachChannel(ch) for(int_fast8_t ch = 0; ch < 2; ch++)
+#define gfx_offset (hemisphere * 64) // Graphics offset, based on the side
+#define io_offset (hemisphere * 2) // Input/Output offset, based on the side
 
 // Specifies where data goes in flash storage for each selcted applet, and how big it is
 typedef struct PackLocation {
@@ -74,6 +77,17 @@ typedef struct PackLocation {
 
 class HemisphereApplet {
 public:
+    static int inputs[4];
+    static int outputs[4];
+    static int outputs_smooth[4];
+    static int clock_countdown[4];
+    static int adc_lag_countdown[4]; // Time between a clock event and an ADC read event
+    static uint32_t last_clock[4]; // Tick number of the last clock observed by the child class
+    static uint32_t cycle_ticks[4]; // Number of ticks between last two clocks
+    static bool changed_cv[4]; // Has the input changed by more than 1/8 semitone since the last read?
+    static int last_cv[4]; // For change detection
+    static int cursor_countdown[2];
+
     static uint8_t modal_edit_mode;
     static void CycleEditMode() {
         ++modal_edit_mode %= 3;
@@ -86,19 +100,18 @@ public:
 
     void BaseStart(bool hemisphere_) {
         hemisphere = hemisphere_;
-        gfx_offset = hemisphere * 64;
-        io_offset = hemisphere * 2;
 
         // Initialize some things for startup
         ForEachChannel(ch)
         {
-            clock_countdown[ch]  = 0;
-            inputs[ch] = 0;
-            outputs[ch] = 0;
-            adc_lag_countdown[ch] = 0;
+            clock_countdown[io_offset + ch]  = 0;
+            inputs[io_offset + ch] = 0;
+            outputs[io_offset + ch] = 0;
+            outputs_smooth[io_offset + ch] = 0;
+            adc_lag_countdown[io_offset + ch] = 0;
         }
         help_active = 0;
-        cursor_countdown = HEMISPHERE_CURSOR_TICKS;
+        cursor_countdown[hemisphere] = HEMISPHERE_CURSOR_TICKS;
 
         // Shutdown FTM capture on Digital 4, used by Tuner
 #ifdef FLIP_180
@@ -124,20 +137,20 @@ public:
         {
             // Set CV inputs
             ADC_CHANNEL channel = (ADC_CHANNEL)(ch + io_offset);
-            inputs[ch] = OC::ADC::raw_pitch_value(channel);
-            if (abs(inputs[ch] - last_cv[ch]) > HEMISPHERE_CHANGE_THRESHOLD) {
-                changed_cv[ch] = 1;
-                last_cv[ch] = inputs[ch];
-            } else changed_cv[ch] = 0;
+            inputs[channel] = OC::ADC::raw_pitch_value(channel);
+            if (abs(inputs[channel] - last_cv[channel]) > HEMISPHERE_CHANGE_THRESHOLD) {
+                changed_cv[channel] = 1;
+                last_cv[channel] = inputs[channel];
+            } else changed_cv[channel] = 0;
 
             // Handle clock timing
-            if (clock_countdown[ch] > 0) {
-                if (--clock_countdown[ch] == 0) Out(ch, 0);
+            if (clock_countdown[channel] > 0) {
+                if (--clock_countdown[channel] == 0) Out(ch, 0);
             }
         }
 
         // Cursor countdowns. See CursorBlink(), ResetCursor(), gfxCursor()
-        if (--cursor_countdown < -HEMISPHERE_CURSOR_TICKS) cursor_countdown = HEMISPHERE_CURSOR_TICKS;
+        if (--cursor_countdown[hemisphere] < -HEMISPHERE_CURSOR_TICKS) cursor_countdown[hemisphere] = HEMISPHERE_CURSOR_TICKS;
 
         Controller();
     }
@@ -146,7 +159,6 @@ public:
         // If help is active, draw the help screen instead of the application screen
         if (help_active) DrawHelpScreen();
         else View();
-        last_view_tick = OC::CORE::ticks;
     }
 
     // Screensavers are deprecated in favor of screen blanking, but the BaseScreensaverView() remains
@@ -160,11 +172,11 @@ public:
 
     /* Check cursor blink cycle. */
     bool CursorBlink() {
-        return (cursor_countdown > 0);
+        return (cursor_countdown[hemisphere] > 0);
     }
 
     void ResetCursor() {
-        cursor_countdown = HEMISPHERE_CURSOR_TICKS;
+        cursor_countdown[hemisphere] = HEMISPHERE_CURSOR_TICKS;
     }
 
     void DrawHelpScreen() {
@@ -192,6 +204,7 @@ public:
         } else {
             cursor++;
             cursor %= max + 1;
+            ResetCursor();
         }
     }
     void MoveCursor(int &cursor, int direction, int max) {
@@ -331,18 +344,31 @@ public:
     //////////////// Offset I/O methods
     ////////////////////////////////////////////////////////////////////////////////
     int In(int ch) {
-        return inputs[ch];
+        return inputs[io_offset + ch];
     }
 
     // Apply small center detent to input, so it reads zero before a threshold
     int DetentedIn(int ch) {
-        return (In(ch) > (HEMISPHERE_CENTER_CV + 64) || In(ch) < (HEMISPHERE_CENTER_CV - 64)) ? In(ch) : HEMISPHERE_CENTER_CV;
+        return (In(ch) > (HEMISPHERE_CENTER_CV + HEMISPHERE_CENTER_DETENT) || In(ch) < (HEMISPHERE_CENTER_CV - HEMISPHERE_CENTER_DETENT))
+            ? In(ch) : HEMISPHERE_CENTER_CV;
+    }
+
+    int SmoothedIn(int ch) {
+        ADC_CHANNEL channel = (ADC_CHANNEL)(ch + io_offset);
+        return OC::ADC::value(channel);
     }
 
     void Out(int ch, int value, int octave = 0) {
         DAC_CHANNEL channel = (DAC_CHANNEL)(ch + io_offset);
         OC::DAC::set_pitch(channel, value, octave);
-        outputs[ch] = value + (octave * (12 << 7));
+        outputs[channel] = value + (octave * (12 << 7));
+    }
+
+    void SmoothedOut(int ch, int value, int kSmoothing) {
+        DAC_CHANNEL channel = (DAC_CHANNEL)(ch + io_offset);
+        value = (outputs_smooth[channel] * (kSmoothing - 1) + value) / kSmoothing;
+        OC::DAC::set_pitch(channel, value, 0);
+        outputs[channel] = outputs_smooth[channel] = value;
     }
 
     /*
@@ -357,14 +383,17 @@ public:
 
         if (ch == 0) { // clock triggers
             if (hemisphere == LEFT_HEMISPHERE) {
-                if (!physical && clock_m->IsRunning()) clocked = clock_m->Tock(hemisphere);
-                else clocked = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_1>();
+                if (!physical && clock_m->IsRunning() && clock_m->GetMultiply(hemisphere) != 0)
+                    clocked = clock_m->Tock(hemisphere);
+                else
+                    clocked = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_1>();
             } else { // right side is special
-                if (master_clock_bus) { // forwarding from left
-                    if (!physical && clock_m->IsRunning()) clocked = clock_m->Tock(hemisphere);
-                    else clocked = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_1>();
-                } 
-                else clocked = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_3>();
+                if (!physical && clock_m->IsRunning() && clock_m->GetMultiply(hemisphere) != 0)
+                    clocked = clock_m->Tock(hemisphere);
+                else if (master_clock_bus) // forwarding from left
+                    clocked = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_1>();
+                else
+                    clocked = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_3>();
             }
         } else if (ch == 1) { // simple physical trig check
             if (hemisphere == LEFT_HEMISPHERE)
@@ -373,17 +402,17 @@ public:
                 clocked = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_4>();
         }
 
-        clocked = clocked || clock_m->Beep(hemisphere*2 + ch);
+        clocked = clocked || clock_m->Beep(io_offset + ch);
 
         if (clocked) {
-            cycle_ticks[ch] = OC::CORE::ticks - last_clock[ch];
-            last_clock[ch] = OC::CORE::ticks;
+            cycle_ticks[io_offset + ch] = OC::CORE::ticks - last_clock[io_offset + ch];
+            last_clock[io_offset + ch] = OC::CORE::ticks;
         }
         return clocked;
     }
 
     void ClockOut(int ch, int ticks = HEMISPHERE_CLOCK_TICKS) {
-        clock_countdown[ch] = ticks;
+        clock_countdown[io_offset + ch] = ticks;
         Out(ch, 0, PULSE_VOLTAGE);
     }
 
@@ -405,10 +434,10 @@ public:
     }
 
     // Buffered I/O functions
-    int ViewIn(int ch) {return inputs[ch];}
-    int ViewOut(int ch) {return outputs[ch];}
-    int ClockCycleTicks(int ch) {return cycle_ticks[ch];}
-    bool Changed(int ch) {return changed_cv[ch];}
+    int ViewIn(int ch) {return inputs[io_offset + ch];}
+    int ViewOut(int ch) {return outputs[io_offset + ch];}
+    int ClockCycleTicks(int ch) {return cycle_ticks[io_offset + ch];}
+    bool Changed(int ch) {return changed_cv[io_offset + ch];}
 
 protected:
     bool hemisphere; // Which hemisphere (0, 1) this applet uses
@@ -480,33 +509,31 @@ protected:
      * }
      */
     void StartADCLag(bool ch = 0) {
-        adc_lag_countdown[ch] = HEMISPHERE_ADC_LAG;
+        adc_lag_countdown[io_offset + ch] = HEMISPHERE_ADC_LAG;
     }
 
     bool EndOfADCLag(bool ch = 0) {
-        if (adc_lag_countdown[ch] < 0) return false;
-        return (--adc_lag_countdown[ch] == 0);
+        if (adc_lag_countdown[io_offset + ch] < 0) return false;
+        return (--adc_lag_countdown[io_offset + ch] == 0);
     }
 
     /* Master Clock Forwarding is activated. This is updated with each ISR cycle by the Hemisphere Manager */
     bool MasterClockForwarded() {return master_clock_bus;}
 
 private:
-    int gfx_offset; // Graphics offset, based on the side
-    int io_offset; // Input/Output offset, based on the side
-    int inputs[2];
-    int outputs[2];
-    uint32_t last_clock[2]; // Tick number of the last clock observed by the child class
-    uint32_t cycle_ticks[2]; // Number of ticks between last two clocks
-    int clock_countdown[2];
-    int cursor_countdown;
-    int adc_lag_countdown[2]; // Time between a clock event and an ADC read event
     bool master_clock_bus; // Clock forwarding was on during the last ISR cycle
     bool applet_started; // Allow the app to maintain state during switching
-    int last_view_tick; // Tick number of the most recent view
     bool help_active;
-    bool changed_cv[2]; // Has the input changed by more than 1/8 semitone since the last read?
-    int last_cv[2]; // For change detection
 };
 
 uint8_t HemisphereApplet::modal_edit_mode = 1; // 0=old behavior, 1=modal editing, 2=modal with wraparound
+int HemisphereApplet::inputs[4];
+int HemisphereApplet::outputs[4];
+int HemisphereApplet::outputs_smooth[4];
+int HemisphereApplet::clock_countdown[4];
+int HemisphereApplet::adc_lag_countdown[4];
+uint32_t HemisphereApplet::last_clock[4];
+uint32_t HemisphereApplet::cycle_ticks[4];
+bool HemisphereApplet::changed_cv[4];
+int HemisphereApplet::last_cv[4];
+int HemisphereApplet::cursor_countdown[2];

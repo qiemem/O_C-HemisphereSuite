@@ -55,10 +55,14 @@ public:
     }
 
     void OnButtonPress() {
-        cursor = 1 - cursor;
+        CursorAction(cursor, 1);
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 1);
+            return;
+        }
         p[cursor] = constrain(p[cursor] + direction, 0, 100);
     }
         
@@ -85,7 +89,7 @@ protected:
 private:
     int16_t p[2];
     int trigger_countdown[2];
-    uint8_t cursor;
+    int cursor;
     
     void DrawSelector()
     {

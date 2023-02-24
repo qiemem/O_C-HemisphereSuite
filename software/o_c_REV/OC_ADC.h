@@ -55,11 +55,19 @@ public:
 
   template <ADC_CHANNEL channel>
   static int32_t value() {
+#ifdef FLIP_180
+    return calibration_data_->offset[ADC_CHANNEL_LAST-1 - channel] - (smoothed_[channel] >> kAdcValueShift);
+#else
     return calibration_data_->offset[channel] - (smoothed_[channel] >> kAdcValueShift);
+#endif
   }
 
   static int32_t value(ADC_CHANNEL channel) {
+#ifdef FLIP_180
+    return calibration_data_->offset[ADC_CHANNEL_LAST-1 - channel] - (smoothed_[channel] >> kAdcValueShift);
+#else
     return calibration_data_->offset[channel] - (smoothed_[channel] >> kAdcValueShift);
+#endif
   }
 
   static uint32_t raw_value(ADC_CHANNEL channel) {
@@ -75,7 +83,11 @@ public:
   }
 
   static int32_t raw_pitch_value(ADC_CHANNEL channel) {
+#ifdef FLIP_180
+    int32_t value = calibration_data_->offset[ADC_CHANNEL_LAST-1 - channel] - raw_value(channel);
+#else
     int32_t value = calibration_data_->offset[channel] - raw_value(channel);
+#endif
     return (value * calibration_data_->pitch_cv_scale) >> 12;
   }
 

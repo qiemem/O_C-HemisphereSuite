@@ -49,11 +49,9 @@ public:
             if (mod + freq[0] > 10) osc[0].SetFrequency(freq[0] + mod);
         }
 
-        // Input 2 determines signal 1's attenuation on the B/D output mix; at 0V, signal 1
-        // accounts for 50% of the B/D output. At 5V, signal 1 accounts for none of the
-        // B/D output.
-        int atten1 = DetentedIn(1);
-        atten1 = constrain(atten1, 0, HEMISPHERE_MAX_CV);
+        // Input 2 determines signal 1's level on the B/D output mix
+        int mix_level = DetentedIn(1);
+        mix_level = constrain(mix_level, -HEMISPHERE_MAX_CV, HEMISPHERE_MAX_CV);
 
         int signal = 0; // Declared here because the first channel's output is used in the second channel; see below
         ForEachChannel(ch)
@@ -71,16 +69,15 @@ public:
                 // Out A is always just the first oscillator at full amplitude
                 signal = osc[ch].Next();
             } else {
-                // Out B can have channel 1 blended into it, depending on the value of atten1. At a value
-                // of 0, Out B is a 50/50 mix of channels 1 and 2. At a value of 5V, channel 1 is absent
-                // from Out B.
-                signal = Proportion(HEMISPHERE_MAX_CV - atten1, HEMISPHERE_MAX_CV, signal); // signal from channel 1's iteration
+                // Out B can have channel 1 blended into it, depending on the value of mix_level.
+                // At a value of 6V, Out B is a 50/50 mix of channels 1 and 2.
+                // At a value of 0V, channel 1 is absent from Out B.
+                signal = Proportion(mix_level, HEMISPHERE_MAX_CV, signal); // signal from channel 1's iteration
                 signal += osc[ch].Next();
 
-                // Proportionally blend the signal, depending on attenuation. If atten1 is 0, then this
-                // effectively divides the signal by 2. If atten1 is 5V, then the channel 2 signal will be
-                // output at full amplitude.
-                signal = Proportion(HEMISPHERE_MAX_CV, HEMISPHERE_MAX_CV + (HEMISPHERE_MAX_CV - atten1), signal);
+                // Proportionally blend the signal, depending on mix.
+                // If mix_level is at (+ or -) max, then this effectively divides the signal by 2.
+                signal = Proportion(HEMISPHERE_MAX_CV, HEMISPHERE_MAX_CV + abs(mix_level), signal);
             }
             Out(ch, signal);
         }
@@ -160,7 +157,7 @@ protected:
     void SetHelp() {
         //                               "------------------" <-- Size Guide
         help[HEMISPHERE_HELP_DIGITALS] = "1,2=Sync";
-        help[HEMISPHERE_HELP_CVS]      = "1=Freq1 2=Atten1@B";
+        help[HEMISPHERE_HELP_CVS]      = "1=Freq1  2=Mix 1@B";
         help[HEMISPHERE_HELP_OUTS]     = "Out A=1, B=2+1";
         help[HEMISPHERE_HELP_ENCODER]  = "Freq./Waveform";
         //                               "------------------" <-- Size Guide

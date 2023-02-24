@@ -195,7 +195,7 @@ private:
         byte p = is_cursor ? 1 : 3;
         gfxDottedLine(x, y + 4, 62, y + 4, p);
         gfxRect(x + w, y, 2, 7);
-        if (EditMode() && is_cursor) gfxInvert(x, y, 17, 8);
+        if (EditMode() && is_cursor) gfxInvert(x, y, 18, 7);
     }
 
     void SetBDFreq() {

@@ -68,10 +68,15 @@ public:
     }
 
     void OnButtonPress() {
-        cursor = 1 - cursor;
+        CursorAction(cursor, 1);
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 1);
+            return;
+        }
+
         if (cursor == 0) freq = constrain(freq + direction, 0, 255);
         if (cursor == 1) rho = constrain(rho + direction, 4, 127);
     }
