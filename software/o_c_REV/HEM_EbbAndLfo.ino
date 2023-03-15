@@ -9,10 +9,13 @@ public:
   void Controller() {
     if (Clock(1)) phase = 0;
     if (Clock(0)) {
+      clocks_received++;
       //uint32_t next_tick = predictor.Predict(ClockCycleTicks(0));
-      int new_freq = 0xffffffff / ClockCycleTicks(0);
-      pitch = ComputePitch(new_freq);
-      phase = 0;
+      if (clocks_received > 1) {
+        int new_freq = 0xffffffff / ClockCycleTicks(0);
+        pitch = ComputePitch(new_freq);
+        phase = 0;
+      }
     }
 
     // handle CV inputs
@@ -205,6 +208,7 @@ public:
   }
 
   void OnDataReceive(uint64_t data) {
+    clocks_received = 0;
     pitch = Unpack(data, PackLocation { 0, 16 }) - (1 << 15);
     slope = Unpack(data, PackLocation { 16, 7 });
     shape = Unpack(data, PackLocation { 23, 7 });
@@ -252,6 +256,8 @@ private:
   int slope_mod;
   int shape_mod;
   int fold_mod;
+  
+  int clocks_received = 0;
 
   uint8_t out = 0b0001; // Unipolar on A, bipolar on B
   uint8_t cv = 0b0001; // Freq on 1, shape on 2
