@@ -42,6 +42,12 @@
 #include "src/drivers/ADC/OC_util_ADC.h"
 #include "util/util_debugpins.h"
 #include "VBiasManager.h"
+#include "HSMIDI.h"
+
+#ifdef USB_MIDI_HOST
+USBHost thisUSB;
+MIDIDevice usbHostMIDI(thisUSB);
+#endif
 
 #if defined(ARDUINO_TEENSY41)
 #include "AudioSetup.h"
@@ -179,6 +185,10 @@ void setup() {
 #ifdef VOR
   VBiasManager *vbias_m = vbias_m->get();
   vbias_m->SetState(VBiasManager::BI);
+#endif
+
+#ifdef USB_MIDI_HOST
+  usbHostMIDI.begin();
 #endif
 
   // initialize apps

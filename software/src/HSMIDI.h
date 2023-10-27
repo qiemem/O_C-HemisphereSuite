@@ -33,6 +33,13 @@
 // Teensyduino USB MIDI Library message numbers
 // See https://www.pjrc.com/teensy/td_midi.html
 
+#if defined(__IMXRT1062__)
+#define USB_MIDI_HOST
+#include <USBHost_t36.h>
+//extern USBHost thisUSB;
+extern MIDIDevice usbHostMIDI;
+#endif
+
 #define HEM_MIDI_NOTE_ON usbMIDI.NoteOn
 #define HEM_MIDI_NOTE_OFF usbMIDI.NoteOff
 #define HEM_MIDI_CC usbMIDI.ControlChange
