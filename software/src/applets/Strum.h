@@ -32,19 +32,22 @@ public:
     //   - Reset countdown, don't advance index unless at end
     //   - Just advance index (allowing repeated notes)
     //   - Start another, overlapping strum
-    if (Clock(0))
-      inc = 1;
-    if (Clock(1))
-      inc = -1;
-    if ((Clock(0) || Clock(1)) && !dig_high) {
+    bool index_out_of_bounds = index < 0 || index >= length;
+
+    if (EndOfADCLag(0)) {
       countdown = 0;
-      if (index <= 0 && inc < 0)
-        index = length - 1;
-      if (index >= length - 1 && inc > 0)
+      inc = 1;
+      if (index_out_of_bounds)
         index = 0;
     }
+    if (EndOfADCLag(1)) {
+      countdown = 0;
+      inc = -1;
+      if (index_out_of_bounds)
+        index = length - 1;
+    }
 
-    if (countdown <= 0 && index >= 0 && index < length) {
+    if (countdown <= 0 && !index_out_of_bounds) {
       int raw_pitch = In(0);
       Quantize(0, raw_pitch, root << 7, 0);
       int note_num = GetQuantizer(0)->GetLatestNoteNumber();
@@ -53,17 +56,20 @@ public:
       Out(0, pitch);
       ClockOut(1);
 
-      int spacing_mod =
-          Proportion(In(1), HEMISPHERE_MAX_INPUT_CV, HEM_BURST_SPACING_MAX);
+      int spacing_mod = Proportion(In(1), HEMISPHERE_MAX_INPUT_CV,
+                                   17 * HEM_BURST_SPACING_MAX);
       last_note_dur =
-          17 * constrain((spacing + spacing_mod), HEM_BURST_SPACING_MIN,
-                         HEM_BURST_SPACING_MAX);
+          constrain((17 * spacing + spacing_mod), 17 * HEM_BURST_SPACING_MIN,
+                    17 * HEM_BURST_SPACING_MAX);
       countdown += last_note_dur;
       index += inc;
     } else if (countdown > 0) {
       countdown -= 1;
     }
-    dig_high = Clock(0) || Clock(1);
+    ForEachChannel(ch) {
+      if (Clock(ch))
+        StartADCLag(ch);
+    }
   }
 
   void View() {
@@ -93,7 +99,7 @@ public:
       const uint8_t *octave_mark = octave < 0 ? DOWN_ARROWS + (-octave - 1) * 6
                                               : UP_ARROWS + (octave - 1) * 6;
       int disp_offset = offset + 1;
-      gfxPrint(col * 18 + pad(10, offset), 35 + row * 10, disp_offset);
+      gfxPrint(col * 18 + pad(10, disp_offset), 35 + row * 10, disp_offset);
       if (octave != 0)
         gfxBitmap(col * 18 + 12, 35 + row * 10, 6, octave_mark);
       if (cursor == INTERVAL_START + i) {
@@ -185,7 +191,6 @@ private:
   int spacing;
   int last_note_dur;
 
-  bool dig_high = false;
   int index = 0;
   int inc = 0;
   int countdown = 0;
