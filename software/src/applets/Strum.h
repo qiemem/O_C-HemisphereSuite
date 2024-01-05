@@ -22,7 +22,7 @@ class Strum : public HemisphereApplet {
 public:
   const char *applet_name() { return "Strum"; }
 
-  void Start() { set_scale(5); }
+  void Start() { set_scale(6); }
 
   void Controller() {
 
@@ -47,7 +47,7 @@ public:
         index = length - 1;
     }
 
-    if (countdown <= 0 && !index_out_of_bounds) {
+    if (countdown <= 0 && !index_out_of_bounds && inc != 0) {
       int raw_pitch = In(0);
       Quantize(0, raw_pitch, root << 7, 0);
       int note_num = GetQuantizer(0)->GetLatestNoteNumber();
@@ -188,14 +188,14 @@ private:
 
   int8_t intervals[MAX_CHORD_LENGTH] = {0, 4, 7, 9, 11, 14};
   int length = 6;
-  int spacing;
+  int spacing = HEM_BURST_SPACING_MIN;
   int last_note_dur;
 
   int index = 0;
   int inc = 0;
   int countdown = 0;
 
-  int scale;
+  int scale = 5;
   int16_t root;
 
   int cursor = 0;
