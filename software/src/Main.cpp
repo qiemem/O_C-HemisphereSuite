@@ -240,30 +240,32 @@ void FASTRUN loop() {
     if (millis() - LAST_REDRAW_TIME > REDRAW_TIMEOUT_MS)
       MENU_REDRAW = 1;
 
+    static size_t cap_idx = 0;
     // check for request from PC to capture the screen
     if (Serial && Serial.available() > 0) {
       do { Serial.read(); } while (Serial.available() > 0);
       display::frame_buffer.capture_request();
+      cap_idx = 0;
     }
 
-    static size_t cap_idx = 0;
     // check for frame buffer to have capture data ready
     const uint8_t *capture_data = display::frame_buffer.captured();
     if (capture_data && MENU_REDRAW) {
       capture_data += cap_idx; // start where we left off
 
-      // limit to 64 bytes every 1ms
-      for (size_t i=0; i < 64; i++) {
+      // limit to n bytes every 1ms
+      const size_t chunk_size = 32;
+      for (size_t i=0; i < chunk_size; i++) {
         uint8_t n = *capture_data++;
         if (n < 16) Serial.print("0");
         Serial.print(n, HEX);
 
         if (++cap_idx >= display::frame_buffer.kFrameSize) {
           // we're done sending this one
-          cap_idx = 0;
-          display::frame_buffer.capture_retire();
           Serial.println();
           Serial.flush();
+          cap_idx = 0;
+          display::frame_buffer.capture_retire();
           break;
         }
       }
