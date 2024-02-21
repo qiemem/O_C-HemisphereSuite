@@ -18,9 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "bjorklund.h"
-#include "braids_quantizer.h"
-
 class Strum : public HemisphereApplet {
 public:
   const char *applet_name() { return "Strum"; }
@@ -170,9 +167,11 @@ public:
 
 protected:
   void SetHelp() {
-    help[HEMISPHERE_HELP_DIGITALS] = "Strum Up, Down";
-    help[HEMISPHERE_HELP_CVS] = "Root, Spacing";
-    help[HEMISPHERE_HELP_OUTS] = "Pitch, Trig";
+    //                               "------------------" <-- Size Guide
+    help[HEMISPHERE_HELP_DIGITALS] = "Strum Up,  Down";
+    help[HEMISPHERE_HELP_CVS]      = "Root    ,  Spacing";
+    help[HEMISPHERE_HELP_OUTS]     = "Pitch   ,  Trig";
+    help[HEMISPHERE_HELP_ENCODER]  = "";
   }
 
 private:
@@ -209,34 +208,3 @@ private:
   }
 };
 
-Strum Strum_instance[2];
-
-void Strum_Start(bool hemisphere) {
-  Strum_instance[hemisphere].BaseStart(hemisphere);
-}
-
-void Strum_Controller(bool hemisphere, bool forwarding) {
-  Strum_instance[hemisphere].BaseController(forwarding);
-}
-
-void Strum_View(bool hemisphere) { Strum_instance[hemisphere].BaseView(); }
-
-void Strum_OnButtonPress(bool hemisphere) {
-  Strum_instance[hemisphere].OnButtonPress();
-}
-
-void Strum_OnEncoderMove(bool hemisphere, int direction) {
-  Strum_instance[hemisphere].OnEncoderMove(direction);
-}
-
-void Strum_ToggleHelpScreen(bool hemisphere) {
-  Strum_instance[hemisphere].HelpScreen();
-}
-
-uint64_t Strum_OnDataRequest(bool hemisphere) {
-  return Strum_instance[hemisphere].OnDataRequest();
-}
-
-void Strum_OnDataReceive(bool hemisphere, uint64_t data) {
-  Strum_instance[hemisphere].OnDataReceive(data);
-}
