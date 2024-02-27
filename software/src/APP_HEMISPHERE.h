@@ -568,7 +568,7 @@ public:
     }
     void DelegateSelectButtonPush(const UI::Event &event) {
         bool down = (event.type == UI::EVENT_BUTTON_DOWN);
-        int hemisphere = (event.control == OC::CONTROL_BUTTON_UP) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
+        const int hemisphere = (event.control == OC::CONTROL_BUTTON_UP) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
 
         if (preset_cursor && !down) {
             preset_cursor = 0;
@@ -624,10 +624,18 @@ public:
 
         // -- button release
         if (!clock_setup) {
+          const int index = my_applet[hemisphere];
+          HemisphereApplet* applet = HS::available_applets[index].instance[hemisphere];
+
+          if (applet->EditMode()) {
+            // select button becomes aux button while editing a param
+            applet->AuxButton();
+          } else {
             // Select Mode
             if (hemisphere == select_mode) select_mode = -1; // Exit Select Mode if same button is pressed
             else if (help_hemisphere < 0) // Otherwise, set Select Mode - UNLESS there's a help screen
-                select_mode = hemisphere;
+              select_mode = hemisphere;
+          }
         }
     }
 
@@ -693,6 +701,7 @@ public:
                 OC::ui.SetButtonIgnoreMask(); // ignore release and long-press
                 break;
             }
+            // most button-down events fall through here
         case UI::EVENT_BUTTON_PRESS:
             if (event.control == OC::CONTROL_BUTTON_UP || event.control == OC::CONTROL_BUTTON_DOWN) {
                 DelegateSelectButtonPush(event);

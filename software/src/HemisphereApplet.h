@@ -155,6 +155,9 @@ public:
             graphics.print(help[section]);
         }
     }
+    virtual void AuxButton() {
+      isEditing = false;
+    }
 
     /* Check cursor blink cycle. */
     bool CursorBlink() { return (cursor_countdown[hemisphere] > 0); }

@@ -80,15 +80,6 @@ public:
             confirm_animation_position--;
             confirm_animation_countdown = HEM_SHREDDER_ANIMATION_SPEED;
         }
-
-        // Handle double click delay
-        if (double_click_delay > 0) {
-            // decrement delay and if it's 0, move the cursor
-            if (--double_click_delay < 1) {
-                // if we hit zero before being reset (aka no double click), move the cursor
-                CursorButton();
-            }
-        }
     }
 
     void View() {
@@ -100,21 +91,15 @@ public:
     void CursorButton() {
         CursorAction(cursor, 3);
     }
+    void AuxButton() {
+      if (cursor < 2) {
+        Shred(cursor);
+      }
+      isEditing = false;
+    }
 
     void OnButtonPress() {
-        if (cursor < 2) {
-            // first two cursor params support double-click to shred voltages
-            if (double_click_delay == 0) {
-                // first click
-                double_click_delay = HEM_SHREDDER_DOUBLE_CLICK_DELAY;    
-            } else {
-                // second click
-                double_click_delay = 0; // kill the delay
-                Shred(cursor);
-            }
-        } else {
-            CursorButton();
-        }
+      CursorButton();
     }
 
     void OnEncoderMove(int direction) {
@@ -207,8 +192,6 @@ private:
     // Variables to handle imprint confirmation animation
     int confirm_animation_countdown;
     int confirm_animation_position;
-    // Variable for double-clicking to shred voltage
-    int double_click_delay;
 
     void DrawParams() {
         // Channel 1 voltage

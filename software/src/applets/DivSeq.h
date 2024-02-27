@@ -145,6 +145,12 @@ public:
         } else
             CursorAction(cursor, LAST_SETTING);
     }
+    void AuxButton() {
+      const int ch = (cursor) / NUM_STEPS;
+      const int s = (cursor) % NUM_STEPS;
+      div_seq[ch].ToggleStep(s);
+      isEditing = false;
+    }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {

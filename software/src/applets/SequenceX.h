@@ -82,6 +82,11 @@ public:
         else
             CursorAction(cursor, SEQX_STEPS*2-1);
     }
+    void AuxButton() {
+      const int s = cursor % SEQX_STEPS;
+      muted ^= (0x01 << s);
+      isEditing = false;
+    }
 
     void OnEncoderMove(int direction) {
         if (!EditMode()) {
