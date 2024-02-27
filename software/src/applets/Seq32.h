@@ -36,8 +36,9 @@ public:
     enum Seq32Cursor {
       PATTERN,
       LENGTH,
+      WRITE_MODE,
       NOTES,
-      MAX_CURSOR = STEP_COUNT + 2
+      MAX_CURSOR = STEP_COUNT + WRITE_MODE
     };
 
     typedef struct MiniSeq {
@@ -47,6 +48,9 @@ public:
       int step = 0;
       bool reset = 1;
 
+      void Clear() {
+          for (int s = 0; s < STEP_COUNT; s++) note[s] = 0x20; // C4 == 0V
+      }
       void Randomize() {
           for (int s = 0; s < STEP_COUNT; s++) note[s] = random(0xff);
       }
@@ -79,6 +83,10 @@ public:
         // second highest bit is accent
         return (note[s_] & (0x01 << 6));
       }
+      void SetAccent(size_t s_, bool on = true) {
+        note[s_] &= ~(1 << 6); // clear
+        note[s_] |= (on << 6); // set
+      }
       bool muted(size_t s_) {
         // highest bit is mute
         return (note[s_] & (0x01 << 7));
@@ -102,6 +110,7 @@ public:
     }
 
     void Controller() {
+      /* this isn't really what I want cv2 to do...
         if (In(1) > (24 << 7) ) // 24 semitones == 2V
         {
             // new random sequence if CV2 goes high
@@ -111,6 +120,7 @@ public:
             }
         }
         else cv2_gate = 0;
+      */
 
         if (Clock(1)) { // reset
           seq.Reset();
@@ -122,10 +132,19 @@ public:
             ClockOut(1);
             current_note = seq.GetNote();
           }
+          StartADCLag();
+        }
+
+        // set flag from UI, or hold cv2 high to record
+        if (EndOfADCLag() && (write_mode || In(1) > (12 << 7) ) ) {
+          // sample and record closest semitone of cv1
+          current_note = MIDIQuantizer::NoteNumber(In(0)) - 60;
+          seq.SetNote(current_note, seq.step);
+          seq.SetAccent(seq.step, In(1) > (24 << 7)); // cv2 > 2V qualifies as accent
         }
         
         // continuously compute CV with transpose
-        int transpose = DetentedIn(0) / 128; // 128 ADC steps per semitone
+        int transpose = MIDIQuantizer::NoteNumber(DetentedIn(0)) - 60; // 128 ADC steps per semitone
         int play_note = current_note + 60 + transpose;
         play_note = constrain(play_note, 0, 127);
         // set CV output
@@ -137,10 +156,19 @@ public:
     }
 
     void OnButtonPress() {
-      CursorAction(cursor, MAX_CURSOR);
+      if (cursor == WRITE_MODE) // toggle
+        write_mode = !write_mode;
+      else
+        CursorAction(cursor, MAX_CURSOR);
     }
     void AuxButton() {
-      seq.ToggleMute(cursor - NOTES);
+      if (cursor >= NOTES)
+        seq.ToggleMute(cursor - NOTES);
+      else if (cursor == LENGTH)
+        seq.Randomize();
+      else if (cursor == PATTERN)
+        seq.Clear();
+
       isEditing = false;
     }
 
@@ -167,6 +195,7 @@ public:
         // TODO: save Global Settings data to store modified sequences
         Pack(data, PackLocation {0, 4}, pattern_index);
         Pack(data, PackLocation {4, 4}, seqmode);
+        Pack(data, PackLocation {8, 6}, seq.length);
         return data;
     }
 
@@ -180,6 +209,7 @@ public:
       muted = Unpack(data, PackLocation {STEP_COUNT * b, STEP_COUNT});
       */
       pattern_index = Unpack(data, PackLocation {0, 4});
+      seq.length = Unpack(data, PackLocation {8, 6});
       seq.Reset();
     }
 
@@ -198,30 +228,48 @@ private:
     int pattern_index;
     AccentMode seqmode;
     int current_note = 0;
+    bool write_mode = 0;
     bool cv2_gate = 0;
 
     void DrawPanel() {
       // dotted horizontal centerline
       //gfxDottedLine(0, 40, 63, 40, 3);
 
-      gfxPrint(0, 13, pattern_index);
+      gfxPrint(0, 13, "#");
+      gfxPrint(pattern_index + 1);
       if (cursor >= NOTES) {
-        gfxPrint(32, 13, seq.GetNote(cursor - NOTES));
+        int notenum = seq.GetNote(cursor - NOTES);
+        gfxPrint(33, 13, midi_note_numbers[60 + notenum]);
+      }
+      else {
+        gfxIcon(24, 13, LOOP_ICON);
+        gfxPrint(33, 13, seq.length);
+        gfxIcon(49, 13, RECORD_ICON);
+        if (cursor == WRITE_MODE)
+          gfxFrame(48, 12, 10, 10);
+        else
+          gfxCursor(6 + cursor*27, 21, 13);
+
+        if (write_mode)
+          gfxInvert(48, 12, 10, 10);
       }
 
       // Steps - 3x3 pixel little boxes
       for (int s = 0; s < seq.length; s++)
       {
         const int x = 2 + (s % 8)*8;
-        const int y = 24 + (s / 8)*10;
+        const int y = 26 + (s / 8)*10;
         if (seq.muted(s))
-          gfxFrame(x, y, 3, 3);
+          gfxFrame(x, y, 4, 4);
         else
           gfxRect(x, y, 4, 4);
+
+        if (seq.step == s)
+          gfxIcon(x-2, y-7, DOWN_BTN_ICON);
         // TODO: visualize note value
 
         if (cursor - NOTES == s) {
-          gfxFrame(x-1, y-1, 6, 6);
+          gfxFrame(x-2, y-2, 8, 8);
           if (EditMode()) gfxInvert(x-1, y-1, 6, 6);
         }
       }
