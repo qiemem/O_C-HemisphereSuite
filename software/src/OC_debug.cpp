@@ -138,9 +138,9 @@ static void debug_menu_adc() {
 #ifdef ARDUINO_TEENSY41
 static void debug_menu_audio() {
   graphics.setPrintPos(2, 12);
-  graphics.printf("Total CPU %2.f %%", AudioProcessorUsage());
+  graphics.printf("Total CPU %2d%%", (int)AudioProcessorUsage());
   graphics.setPrintPos(2, 22);
-  graphics.printf("Max CPU %2.f %%", AudioProcessorUsageMax());
+  graphics.printf("Max CPU %2d%%", (int)AudioProcessorUsageMax());
 }
 #endif
 

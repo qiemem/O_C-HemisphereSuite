@@ -442,6 +442,9 @@ void Init(bool reset_settings) {
 void draw_app_menu(const menu::ScreenCursor<5> &cursor) {
   GRAPHICS_BEGIN_FRAME(true);
 
+  if (global_settings.encoders_enable_acceleration)
+    graphics.drawBitmap8(120, 1, 4, bitmap_indicator_4x8);
+
   menu::SettingsListItem item;
   item.x = menu::kIndentDx + 8;
   item.y = (64 - (5 * menu::kMenuLineH)) / 2;
@@ -454,8 +457,6 @@ void draw_app_menu(const menu::ScreenCursor<5> &cursor) {
     graphics.movePrintPos(weegfx::Graphics::kFixedFontW, 0);
     graphics.print(available_apps[current].name);
 
-  //  if (global_settings.current_app_id == available_apps[current].id)
-  //     graphics.drawBitmap8(item.x + 2, item.y + 1, 4, bitmap_indicator_4x8);
     graphics.drawBitmap8(0, item.y + 1, 8,
         global_settings.current_app_id == available_apps[current].id ? CHECK_ON_ICON : CHECK_OFF_ICON);
     item.DrawCustom();
