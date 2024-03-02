@@ -205,7 +205,7 @@ public:
 
     bool Gate(int ch) {
         const int t = trigger_mapping[ch + io_offset];
-        return (t && t < 5) ? frame.gate_high[t - 1] : false;
+        return (t && t <= ADC_CHANNEL_LAST) ? frame.gate_high[t - 1] : false;
     }
     void Out(int ch, int value, int octave = 0) {
         frame.Out( (DAC_CHANNEL)(ch + io_offset), value + (octave * (12 << 7)));

@@ -71,7 +71,7 @@ bool HemisphereApplet::Clock(int ch, bool physical) {
     // clock triggers
     if (useTock && clock_m->GetMultiply(virt_chan) != 0)
         clocked = clock_m->Tock(virt_chan);
-    else if (trigger_mapping[ch + io_offset] > 0 && trigger_mapping[ch + io_offset] < 5)
+    else if (trigger_mapping[ch + io_offset] > 0 && trigger_mapping[ch + io_offset] <= ADC_CHANNEL_LAST)
         clocked = frame.clocked[ trigger_mapping[ch + io_offset] - 1 ];
 
     // Try to eat a boop
