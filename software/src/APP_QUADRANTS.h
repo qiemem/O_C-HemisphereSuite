@@ -664,15 +664,22 @@ public:
 
         // -- button release
         if (!clock_setup) {
+            const int index = my_applet[hemisphere];
+            HemisphereApplet* applet = HS::available_applets[index].instance[hemisphere];
+
             // switching views
             if (view_slot[hemisphere % 2] != hemisphere / 2) {
               view_slot[hemisphere % 2] = hemisphere / 2;
               select_mode = -1;
+            } else if (applet->EditMode()) {
+              // select button becomes aux button while editing a param
+              applet->AuxButton();
+            } else {
+              // Select Mode
+              if (hemisphere == select_mode) select_mode = -1; // Exit Select Mode if same button is pressed
+              else if (help_hemisphere < 0) // Otherwise, set Select Mode - UNLESS there's a help screen
+                  select_mode = hemisphere;
             }
-            // Select Mode
-            else if (hemisphere == select_mode) select_mode = -1; // Exit Select Mode if same button is pressed
-            else if (help_hemisphere < 0) // Otherwise, set Select Mode - UNLESS there's a help screen
-                select_mode = hemisphere;
         }
     }
 
