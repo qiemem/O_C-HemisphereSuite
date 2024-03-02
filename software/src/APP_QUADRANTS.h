@@ -358,23 +358,12 @@ public:
         }
     }
 
-    void CheckPresetTriggers() {
-        for (int i = 0; i < 4; ++i) {
-            if (HS::trigger_mapping[i] > 4 && HS::frame.clocked[i]) {
-                LoadFromPreset(HS::trigger_mapping[i] - 5);
-                break;
-            }
-        }
-    }
-
     void Controller() {
         // top-level MIDI-to-CV handling - alters frame outputs
-        //ProcessMIDI(usbMIDI);
+        ProcessMIDI(usbMIDI);
         #ifdef USB_MIDI_HOST
         ProcessMIDI(usbHostMIDI);
         #endif
-
-        CheckPresetTriggers();
 
         // Clock Setup applet handles internal clock duties
         ClockSetup_instance.Controller();
