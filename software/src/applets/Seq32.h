@@ -34,11 +34,17 @@ public:
     };
 
     enum Seq32Cursor {
+      // ---
       PATTERN,
       LENGTH,
       WRITE_MODE,
+      // ---
+      QUANT_SCALE,
+      QUANT_ROOT,
+      TRANSPOSE,
+      // ---
       NOTES,
-      MAX_CURSOR = STEP_COUNT + WRITE_MODE
+      MAX_CURSOR = TRANSPOSE + STEP_COUNT
     };
 
     typedef struct MiniSeq {
@@ -52,7 +58,14 @@ public:
           for (int s = 0; s < STEP_COUNT; s++) note[s] = 0x20; // C4 == 0V
       }
       void Randomize() {
-          for (int s = 0; s < STEP_COUNT; s++) note[s] = random(0xff);
+        for (int s = 0; s < STEP_COUNT; s++) {
+          note[s] = random(0xff);
+        }
+      }
+      void SowPitches(const uint8_t range = 32) {
+        for (int s = 0; s < STEP_COUNT; s++) {
+          SetNote(random(range), s);
+        }
       }
       void Advance(size_t starting_point) {
           if (reset) {
@@ -72,9 +85,10 @@ public:
         return GetNote(step);
       }
       void SetNote(int nval, size_t s_) {
+        nval += 32;
+        CONSTRAIN(nval, MIN_VALUE, MAX_VALUE);
         // keep upper 2 bits
-        note[s_] &= 0xC0;
-        note[s_] |= uint8_t(nval + 32) & 0x3f;
+        note[s_] = (note[s_] & 0xC0) | (uint8_t(nval) & 0x3f);
       }
       void SetNote(int nval) {
         SetNote(nval, step);
@@ -144,11 +158,13 @@ public:
         }
         
         // continuously compute CV with transpose
-        int transpose = MIDIQuantizer::NoteNumber(DetentedIn(0)) - 60; // 128 ADC steps per semitone
-        int play_note = current_note + 60 + transpose;
+        // I don't always want transpose here... it should be assignable.
+        //int transpose = MIDIQuantizer::NoteNumber(DetentedIn(0)) - 60; // 128 ADC steps per semitone
+
+        int play_note = current_note + 64 + transpose;
         play_note = constrain(play_note, 0, 127);
         // set CV output
-        Out(0, MIDIQuantizer::CV(play_note));
+        Out(0, QuantizerLookup(0, play_note));
     }
 
     void View() {
@@ -166,6 +182,8 @@ public:
         seq.ToggleMute(cursor - NOTES);
       else if (cursor == LENGTH)
         seq.Randomize();
+      else if (cursor == TRANSPOSE)
+        seq.SowPitches(abs(transpose));
       else if (cursor == PATTERN)
         seq.Clear();
 
@@ -174,18 +192,38 @@ public:
 
     void OnEncoderMove(int direction) {
       if (!EditMode()) {
-        MoveCursor(cursor, direction, MAX_CURSOR);
+        MoveCursor(cursor, direction, MAX_CURSOR - (STEP_COUNT - seq.length));
         return;
       }
 
-      if (cursor >= NOTES) {
-        seq.SetNote(seq.GetNote(cursor-NOTES) + direction, cursor-NOTES);
-      } else if (cursor == PATTERN) {
-        pattern_index = constrain(pattern_index + direction, 0, 7);
-        seq.note = (uint8_t*)(OC::user_patterns[pattern_index].notes);
-        seq.Reset();
-      } else if (cursor == LENGTH) {
-        seq.length = constrain(seq.length + direction, 1, STEP_COUNT);
+      switch (cursor) {
+        default: // if (cursor >= NOTES) {
+          seq.SetNote(seq.GetNote(cursor-NOTES) + direction, cursor-NOTES);
+          break;
+        case PATTERN: // } else if (cursor == PATTERN) {
+          pattern_index = constrain(pattern_index + direction, 0, 7);
+          seq.note = (uint8_t*)(OC::user_patterns[pattern_index].notes);
+          seq.Reset();
+          break;
+
+        case LENGTH: // } else if (cursor == LENGTH) {
+          seq.length = constrain(seq.length + direction, 1, STEP_COUNT);
+          break;
+
+        case QUANT_SCALE:
+          NudgeScale(0, direction);
+          break;
+
+        case QUANT_ROOT:
+        {
+          int root_note = GetRootNote(0);
+          SetRootNote(0, constrain(root_note + direction, 0, 11));
+          break;
+        }
+
+        case TRANSPOSE:
+          transpose = constrain(transpose + direction, -36, 36);
+          break;
       }
       //muted &= ~(0x01 << cursor); // unmute
     }
@@ -228,49 +266,77 @@ private:
     int pattern_index;
     AccentMode seqmode;
     int current_note = 0;
+    int transpose = 0;
+    uint8_t range_ = 32;
     bool write_mode = 0;
     bool cv2_gate = 0;
 
     void DrawPanel() {
-      // dotted horizontal centerline
-      //gfxDottedLine(0, 40, 63, 40, 3);
+      gfxDottedLine(0, 22, 63, 22, 3);
 
-      gfxPrint(0, 13, "#");
-      gfxPrint(pattern_index + 1);
-      if (cursor >= NOTES) {
-        int notenum = seq.GetNote(cursor - NOTES);
-        gfxPrint(33, 13, midi_note_numbers[60 + notenum]);
+      switch (cursor) {
+        case QUANT_SCALE:
+        case QUANT_ROOT:
+        case TRANSPOSE:
+          gfxPrint(1, 13, OC::scale_names_short[GetScale(0)]);
+          gfxPrint(31, 13, OC::Strings::note_names_unpadded[GetRootNote(0)]);
+          gfxPrint(45, 13, transpose >= 0 ? "+" : "-");
+          gfxPrint(abs(transpose));
+
+          if (cursor == TRANSPOSE)
+            gfxCursor(45, 21, 19);
+          else
+            gfxCursor(1 + (cursor-QUANT_SCALE)*30, 21, (1-(cursor-QUANT_SCALE))*12 + 13);
+          break;
+
+        default: // cursor >= NOTES
+        {
+          // XXX: probably not the most efficient approach...
+          int notenum = seq.GetNote(cursor - NOTES);
+          notenum = MIDIQuantizer::NoteNumber( QuantizerLookup(0, notenum + 64) );
+          gfxPrint(33, 13, midi_note_numbers[notenum]);
+          break;
+        }
+
+        case PATTERN:
+        case LENGTH:
+        case WRITE_MODE:
+          gfxPrint(0, 13, "#");
+          gfxPrint(pattern_index + 1);
+
+          gfxIcon(24, 13, LOOP_ICON);
+          gfxPrint(33, 13, seq.length);
+          gfxIcon(49, 13, RECORD_ICON);
+          if (cursor == WRITE_MODE)
+            gfxFrame(48, 12, 10, 10);
+          else
+            gfxCursor(6 + (cursor-PATTERN)*27, 21, 13);
+
+          if (write_mode)
+            gfxInvert(48, 12, 10, 10);
+          break;
       }
-      else {
-        gfxIcon(24, 13, LOOP_ICON);
-        gfxPrint(33, 13, seq.length);
-        gfxIcon(49, 13, RECORD_ICON);
-        if (cursor == WRITE_MODE)
-          gfxFrame(48, 12, 10, 10);
-        else
-          gfxCursor(6 + cursor*27, 21, 13);
 
-        if (write_mode)
-          gfxInvert(48, 12, 10, 10);
-      }
-
-      // Steps - 3x3 pixel little boxes
+      // Draw steps
       for (int s = 0; s < seq.length; s++)
       {
         const int x = 2 + (s % 8)*8;
         const int y = 26 + (s / 8)*10;
-        if (seq.muted(s))
-          gfxFrame(x, y, 4, 4);
-        else
-          gfxRect(x, y, 4, 4);
+        if (!seq.muted(s))
+        {
+          const int sz = seq.accent(s) ? 5 : 4;
+          gfxRect(x, y, sz, sz);
+        }
+        //else
+        //  gfxFrame(x, y, 4, 4);
 
         if (seq.step == s)
           gfxIcon(x-2, y-7, DOWN_BTN_ICON);
         // TODO: visualize note value
 
         if (cursor - NOTES == s) {
-          gfxFrame(x-2, y-2, 8, 8);
-          if (EditMode()) gfxInvert(x-1, y-1, 6, 6);
+          gfxFrame(x-2, y-2, 8, 10);
+          if (EditMode()) gfxInvert(x-1, y-1, 6, 8);
         }
       }
     }
