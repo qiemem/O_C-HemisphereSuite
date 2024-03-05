@@ -67,16 +67,14 @@ public:
           SetNote(random(range), s);
         }
       }
-      void Advance(size_t starting_point) {
+      void Advance() {
           if (reset) {
             reset = false;
             return;
           }
           if (++step >= length) step = 0;
-          // If all the steps have been muted, stay where we were
-          //if (muted(step) && step != starting_point) Advance(starting_point);
       }
-      int GetNote(size_t s_) {
+      int GetNote(const size_t s_) {
         // lower 6 bits is note value
         // bipolar -32 to +31
         return int(note[s_] & 0x3f) - 32;
@@ -84,28 +82,35 @@ public:
       int GetNote() {
         return GetNote(step);
       }
-      void SetNote(int nval, size_t s_) {
+      void SetNote(int nval, const size_t s_) {
         nval += 32;
         CONSTRAIN(nval, MIN_VALUE, MAX_VALUE);
         // keep upper 2 bits
         note[s_] = (note[s_] & 0xC0) | (uint8_t(nval) & 0x3f);
+        //note[s_] &= ~(0x01 << 7); // unmute?
       }
       void SetNote(int nval) {
         SetNote(nval, step);
       }
-      bool accent(size_t s_) {
+      bool accent(const size_t s_) {
         // second highest bit is accent
         return (note[s_] & (0x01 << 6));
       }
-      void SetAccent(size_t s_, bool on = true) {
+      void SetAccent(const size_t s_, bool on = true) {
         note[s_] &= ~(1 << 6); // clear
         note[s_] |= (on << 6); // set
       }
-      bool muted(size_t s_) {
+      bool muted(const size_t s_) {
         // highest bit is mute
         return (note[s_] & (0x01 << 7));
       }
-      void ToggleMute(size_t s_) {
+      void Unmute(const size_t s_) {
+        note[s_] &= ~(0x01 << 7);
+      }
+      void Mute(const size_t s_, bool on = true) {
+        note[s_] |= (on << 7);
+      }
+      void ToggleMute(const size_t s_) {
         note[s_] ^= (0x01 << 7);
       }
       void Reset() {
@@ -140,7 +145,7 @@ public:
           seq.Reset();
         }
         if (Clock(0)) { // clock
-          seq.Advance(seq.step);
+          seq.Advance();
           // send trigger on first step
           if (!seq.muted(seq.step)) {
             ClockOut(1);
@@ -150,11 +155,16 @@ public:
         }
 
         // set flag from UI, or hold cv2 high to record
-        if (EndOfADCLag() && (write_mode || In(1) > (12 << 7) ) ) {
-          // sample and record closest semitone of cv1
-          current_note = MIDIQuantizer::NoteNumber(In(0)) - 60;
+        if (EndOfADCLag() && (write_mode) ) {
+          // sample and record note number from cv1
+          Quantize(0, In(0), 0, 0);
+          current_note = GetLatestNoteNumber(0) - 64;
           seq.SetNote(current_note, seq.step);
           seq.SetAccent(seq.step, In(1) > (24 << 7)); // cv2 > 2V qualifies as accent
+          if (In(1) > (12 << 7)) // cv2 > 1V determines mute state
+            seq.Unmute(seq.step);
+          else
+            seq.Mute(seq.step);
         }
         
         // continuously compute CV with transpose
@@ -197,16 +207,17 @@ public:
       }
 
       switch (cursor) {
-        default: // if (cursor >= NOTES) {
+        default: // (cursor >= NOTES)
           seq.SetNote(seq.GetNote(cursor-NOTES) + direction, cursor-NOTES);
           break;
-        case PATTERN: // } else if (cursor == PATTERN) {
+        case PATTERN:
+          // TODO: queued pattern changes
           pattern_index = constrain(pattern_index + direction, 0, 7);
           seq.note = (uint8_t*)(OC::user_patterns[pattern_index].notes);
-          seq.Reset();
+          //seq.Reset();
           break;
 
-        case LENGTH: // } else if (cursor == LENGTH) {
+        case LENGTH:
           seq.length = constrain(seq.length + direction, 1, STEP_COUNT);
           break;
 
@@ -225,7 +236,6 @@ public:
           transpose = constrain(transpose + direction, -36, 36);
           break;
       }
-      //muted &= ~(0x01 << cursor); // unmute
     }
 
     uint64_t OnDataRequest() {
@@ -234,6 +244,11 @@ public:
         Pack(data, PackLocation {0, 4}, pattern_index);
         Pack(data, PackLocation {4, 4}, seqmode);
         Pack(data, PackLocation {8, 6}, seq.length);
+        Pack(data, PackLocation {14, 6}, transpose);
+
+        Pack(data, PackLocation {20, 8}, constrain(GetScale(0), 0, 255));
+        Pack(data, PackLocation {28, 4}, GetRootNote(0));
+
         return data;
     }
 
@@ -247,7 +262,16 @@ public:
       muted = Unpack(data, PackLocation {STEP_COUNT * b, STEP_COUNT});
       */
       pattern_index = Unpack(data, PackLocation {0, 4});
+      seqmode = (AccentMode)Unpack(data, PackLocation {4, 4});
       seq.length = Unpack(data, PackLocation {8, 6});
+      transpose = Unpack(data, PackLocation {14, 6});
+
+      const int scale = Unpack(data, PackLocation {20,8});
+      QuantizerConfigure(0, scale);
+
+      const int root_note = Unpack(data, PackLocation {28, 4});
+      SetRootNote(0, root_note);
+
       seq.Reset();
     }
 
@@ -291,6 +315,9 @@ private:
 
         default: // cursor >= NOTES
         {
+          gfxPrint(0, 13, "#");
+          gfxPrint(pattern_index + 1);
+
           // XXX: probably not the most efficient approach...
           int notenum = seq.GetNote(cursor - NOTES);
           notenum = MIDIQuantizer::NoteNumber( QuantizerLookup(0, notenum + 64) );
@@ -324,11 +351,11 @@ private:
         const int y = 26 + (s / 8)*10;
         if (!seq.muted(s))
         {
-          const int sz = seq.accent(s) ? 5 : 4;
-          gfxRect(x, y, sz, sz);
+          if (seq.accent(s))
+            gfxRect(x-1, y-1, 5, 5);
+          else
+            gfxFrame(x-1, y-1, 5, 5);
         }
-        //else
-        //  gfxFrame(x, y, 4, 4);
 
         if (seq.step == s)
           gfxIcon(x-2, y-7, DOWN_BTN_ICON);

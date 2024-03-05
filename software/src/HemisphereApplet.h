@@ -228,6 +228,9 @@ public:
     braids::Quantizer* GetQuantizer(int ch) {
         return &HS::quantizer[io_offset + ch];
     }
+    int GetLatestNoteNumber(int ch) {
+      return HS::quantizer[io_offset + ch].GetLatestNoteNumber();
+    }
     int Quantize(int ch, int cv, int root, int transpose) {
         return HS::quantizer[io_offset + ch].Process(cv, root, transpose);
     }
