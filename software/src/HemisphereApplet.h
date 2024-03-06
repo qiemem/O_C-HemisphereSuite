@@ -231,7 +231,8 @@ public:
     int GetLatestNoteNumber(int ch) {
       return HS::quantizer[io_offset + ch].GetLatestNoteNumber();
     }
-    int Quantize(int ch, int cv, int root, int transpose) {
+    int Quantize(int ch, int cv, int root = 0, int transpose = 0) {
+        if (root == 0) root = (HS::root_note[io_offset + ch] << 7);
         return HS::quantizer[io_offset + ch].Process(cv, root, transpose);
     }
     int QuantizerLookup(int ch, int note) {

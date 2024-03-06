@@ -97,10 +97,10 @@ class TB_3PO: public HemisphereApplet {
 
       regenerate_if_density_or_scale_changed(); // Flag to do the actual update at end of Controller()
 
-      StartADCLag();
+      //StartADCLag();
     }
 
-    if (EndOfADCLag() && !Gate(1)) // Reset not held
+    if (Clock(0) && !Gate(1)) // Reset not held
     {
       int step_pv = step;
 

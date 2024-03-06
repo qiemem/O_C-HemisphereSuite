@@ -157,14 +157,16 @@ public:
         // set flag from UI, or hold cv2 high to record
         if (EndOfADCLag() && (write_mode) ) {
           // sample and record note number from cv1
-          Quantize(0, In(0), 0, 0);
+          Quantize(0, In(0));
           current_note = GetLatestNoteNumber(0) - 64;
           seq.SetNote(current_note, seq.step);
-          seq.SetAccent(seq.step, In(1) > (24 << 7)); // cv2 > 2V qualifies as accent
-          if (In(1) > (12 << 7)) // cv2 > 1V determines mute state
+
+          if (In(1) > (6 << 7)) // cv2 > 0.5V determines mute state
             seq.Unmute(seq.step);
           else
             seq.Mute(seq.step);
+
+          seq.SetAccent(seq.step, In(1) > (24 << 7)); // cv2 > 2V qualifies as accent
         }
         
         // continuously compute CV with transpose
