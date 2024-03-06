@@ -463,16 +463,16 @@ public:
           draw_applets = false;
         }
         else if (config_menu) {
-          if (config_cursor > CONFIG_DUMMY) {
+          if (config_cursor < CONFIG_DUMMY) {
+            PokePopup(MENU_POPUP);
+            // but still draw the applets
+          } else {
+            // the popup will linger when moving onto the Config Dummy
             DrawConfigMenu();
             draw_applets = false;
           }
-          else {
-            PokePopup(MENU_POPUP);
-            // but still draw the applets
-          }
 
-          if (!draw_applets && popup_type == MENU_POPUP) popup_tick = 0; // cancel popup
+          //if (!draw_applets && popup_type == MENU_POPUP) popup_tick = 0; // cancel popup
         }
 
         if (draw_applets) {
@@ -818,7 +818,7 @@ private:
 
     void DrawConfigMenu() {
         // --- Config Selection
-        gfxHeader("Config");
+        gfxHeader("< Presets / Config");
 
         gfxPrint(1, 15, "Trig Length: ");
         gfxPrint(HS::trig_length);
@@ -848,6 +848,9 @@ private:
             break;
         case CURSOR_MODE:
             gfxIcon(43, 35, RIGHT_ICON);
+            break;
+        case CONFIG_DUMMY:
+            gfxIcon(2, 1, LEFT_ICON);
             break;
         }
     }
