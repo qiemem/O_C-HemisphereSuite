@@ -24,6 +24,7 @@ public:
     static constexpr int STEP_COUNT = 32;
     static constexpr int MIN_VALUE = 0;
     static constexpr int MAX_VALUE = 63;
+    static constexpr int MAX_TRANS = 32;
 
     // sets the function of the accent bit
     enum AccentMode {
@@ -128,62 +129,71 @@ public:
     void Start() {
     }
 
-    void Controller() {
-      /* this isn't really what I want cv2 to do...
-        if (In(1) > (24 << 7) ) // 24 semitones == 2V
-        {
-            // new random sequence if CV2 goes high
-            if (!cv2_gate) {
-                cv2_gate = 1;
-                seq.Randomize();
-            }
-        }
-        else cv2_gate = 0;
-      */
-      if (!write_mode) {
-        seq_cv = pattern_index;
-        Modulate(seq_cv, 0, 0, 7);
-        if (seq_cv != pattern_index) SetPattern(seq_cv);
+    void Controller()
+    {
+      if (Clock(1)) { // reset
+        seq.Reset();
+      }
+      if (Clock(0)) { // clock
 
-        trans_mod = transpose;
-        Modulate(trans_mod, 1, -32, 32);
+        if (!write_mode) {
+          // CV modulation of pattern and transposition
+          pattern_mod = pattern_index;
+          Modulate(pattern_mod, 0, 0, 7);
+          SetPattern(pattern_mod);
+
+          trans_mod = transpose;
+          Modulate(trans_mod, 1, -MAX_TRANS, MAX_TRANS);
+        }
+
+        seq.Advance();
+
+        if (seq.muted(seq.step)) {
+          GateOut(1, false);
+        } else {
+          target_note = seq.GetNote();
+
+          // TODO: glide instead
+          current_note = target_note;
+
+          if (seq.accent(seq.step)) {
+            GateOut(1, true);
+          } else {
+            ClockOut(1);
+          }
+        }
+        StartADCLag();
       }
 
-        if (Clock(1)) { // reset
-          seq.Reset();
-        }
-        if (Clock(0)) { // clock
-          seq.Advance();
-          // send trigger on first step
-          if (!seq.muted(seq.step)) {
-            ClockOut(1);
-            current_note = seq.GetNote();
-          }
-          StartADCLag();
-        }
+      if (EndOfADCLag() && write_mode) {
+        // sample and record note number from cv1
+        Quantize(0, In(0));
+        current_note = GetLatestNoteNumber(0) - 64;
+        seq.SetNote(current_note, seq.step);
 
-        if (EndOfADCLag() && write_mode) {
-          // sample and record note number from cv1
-          Quantize(0, In(0));
-          current_note = GetLatestNoteNumber(0) - 64;
-          seq.SetNote(current_note, seq.step);
+        if (In(1) > (6 << 7)) // cv2 > 0.5V determines mute state
+          seq.Unmute(seq.step);
+        else
+          seq.Mute(seq.step);
 
-          if (In(1) > (6 << 7)) // cv2 > 0.5V determines mute state
-            seq.Unmute(seq.step);
-          else
-            seq.Mute(seq.step);
+        seq.SetAccent(seq.step, In(1) > (24 << 7)); // cv2 > 2V qualifies as accent
+      }
+      
+      // handle accent glide - hardcoded slew
+      /* TODO: this needs to be CV, not note numbers
+      if (current_note != target_note && (OC::CORE::ticks & 0xf == 0)) {
+        current_note = (current_note * 15 + target_note) / 16;
+      }
+      */
 
-          seq.SetAccent(seq.step, In(1) > (24 << 7)); // cv2 > 2V qualifies as accent
-        }
-        
-        // I don't always want transpose here... it should be assignable.
-        //int transpose = MIDIQuantizer::NoteNumber(DetentedIn(0)) - 60; // 128 ADC steps per semitone
+      // continuously compute CV with transpose
+      int play_note = current_note + 64 + trans_mod;
+      play_note = constrain(play_note, 0, 127);
+      // set CV output
+      Out(0, QuantizerLookup(0, play_note));
 
-        // continuously compute CV with transpose
-        int play_note = current_note + 64 + trans_mod;
-        play_note = constrain(play_note, 0, 127);
-        // set CV output
-        Out(0, QuantizerLookup(0, play_note));
+      if (flash_ticker) --flash_ticker;
+      if (edit_ticker) --edit_ticker;
     }
 
     void View() {
@@ -205,6 +215,8 @@ public:
         seq.SowPitches(abs(transpose));
       else if (cursor == PATTERN)
         seq.Clear();
+      
+      if (cursor < NOTES) flash_ticker = 1000;
 
       isEditing = false;
     }
@@ -219,6 +231,7 @@ public:
         return;
       }
 
+      edit_ticker = 5000;
       switch (cursor) {
         default: // (cursor >= NOTES)
           seq.SetNote(seq.GetNote(cursor-NOTES) + direction, cursor-NOTES);
@@ -227,6 +240,7 @@ public:
           // TODO: queued pattern changes
           pattern_index += direction;
           SetPattern(pattern_index);
+          pattern_mod = pattern_index;
           break;
 
         case LENGTH:
@@ -245,7 +259,8 @@ public:
         }
 
         case TRANSPOSE:
-          transpose = constrain(transpose + direction, -36, 36);
+          // TODO: clocked transpose
+          transpose = constrain(transpose + direction, -MAX_TRANS, MAX_TRANS);
           break;
       }
     }
@@ -256,34 +271,26 @@ public:
         Pack(data, PackLocation {0, 4}, pattern_index);
         Pack(data, PackLocation {4, 4}, seqmode);
         Pack(data, PackLocation {8, 6}, seq.length);
-        Pack(data, PackLocation {14, 6}, transpose);
+        Pack(data, PackLocation {14, 6}, transpose + MAX_TRANS);
 
-        Pack(data, PackLocation {20, 8}, constrain(GetScale(0), 0, 255));
-        Pack(data, PackLocation {28, 4}, GetRootNote(0));
+        Pack(data, PackLocation {20, 8}, (uint8_t)GetScale(0));
+        Pack(data, PackLocation {28, 4}, (uint8_t)GetRootNote(0));
 
         return data;
     }
 
     void OnDataReceive(uint64_t data) {
-      /*
-      const int b = 6; // bits per step
-      for (size_t s = 0; s < STEP_COUNT; s++)
-      {
-          note[s] = Unpack(data, PackLocation {s * b, b}) + MIN_VALUE;
-      }
-      muted = Unpack(data, PackLocation {STEP_COUNT * b, STEP_COUNT});
-      */
-      pattern_index = Unpack(data, PackLocation {0, 4});
+      pattern_mod = pattern_index = Unpack(data, PackLocation {0, 4});
       seqmode = (AccentMode)Unpack(data, PackLocation {4, 4});
       seq.length = Unpack(data, PackLocation {8, 6});
-      transpose = Unpack(data, PackLocation {14, 6});
+      trans_mod = transpose = Unpack(data, PackLocation {14, 6}) - MAX_TRANS;
 
-      const int scale = Unpack(data, PackLocation {20,8});
+      const uint8_t scale = Unpack(data, PackLocation {20,8});
+      const uint8_t root_note = Unpack(data, PackLocation {28, 4});
+
+      SetPattern(pattern_index);
       QuantizerConfigure(0, scale);
-
-      const int root_note = Unpack(data, PackLocation {28, 4});
       SetRootNote(0, root_note);
-
       seq.Reset();
     }
 
@@ -302,12 +309,19 @@ private:
     int pattern_index;
     AccentMode seqmode;
     int current_note = 0;
+    int target_note = 0;
     int transpose = 0;
-    int trans_mod, seq_cv;
-    uint8_t range_ = 32;
+    int trans_mod, pattern_mod;
     bool write_mode = 0;
-    bool cv2_gate = 0;
 
+    int flash_ticker = 0;
+    int edit_ticker = 0;
+
+    void DrawSequenceNumber() {
+        gfxPrint(0, 13, "#");
+        gfxPrint(edit_ticker? pattern_index + 1 : pattern_mod + 1);
+        if (edit_ticker == 0 && pattern_mod != pattern_index) gfxIcon(11, 10, CV_ICON);
+    }
     void DrawPanel() {
       gfxDottedLine(0, 22, 63, 22, 3);
 
@@ -315,21 +329,25 @@ private:
         case QUANT_SCALE:
         case QUANT_ROOT:
         case TRANSPOSE:
+        {
           gfxPrint(1, 13, OC::scale_names_short[GetScale(0)]);
           gfxPrint(31, 13, OC::Strings::note_names_unpadded[GetRootNote(0)]);
-          gfxPrint(45, 13, transpose >= 0 ? "+" : "-");
-          gfxPrint(abs(transpose));
+
+          const int t = edit_ticker? transpose : trans_mod;
+          gfxPrint(45, 13, t >= 0 ? "+" : "-");
+          gfxPrint(abs(t));
+          if (edit_ticker == 0 && trans_mod != transpose) gfxIcon(44, 8, CV_ICON);
 
           if (cursor == TRANSPOSE)
             gfxCursor(45, 21, 19);
           else
             gfxCursor(1 + (cursor-QUANT_SCALE)*30, 21, (1-(cursor-QUANT_SCALE))*12 + 13);
           break;
+        }
 
         default: // cursor >= NOTES
         {
-          gfxPrint(0, 13, "#");
-          gfxPrint(pattern_index + 1);
+          DrawSequenceNumber();
 
           // XXX: probably not the most efficient approach...
           int notenum = seq.GetNote(cursor - NOTES);
@@ -341,8 +359,7 @@ private:
         case PATTERN:
         case LENGTH:
         case WRITE_MODE:
-          gfxPrint(0, 13, "#");
-          gfxPrint(pattern_index + 1);
+          DrawSequenceNumber();
 
           gfxIcon(24, 13, LOOP_ICON);
           gfxPrint(33, 13, seq.length);
@@ -379,6 +396,8 @@ private:
           if (EditMode()) gfxInvert(x-1, y-1, 6, 8);
         }
       }
+
+      if (flash_ticker) gfxInvert(0, 22, 63, 41);
     }
 
 };
