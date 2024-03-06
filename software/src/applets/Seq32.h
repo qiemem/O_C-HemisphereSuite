@@ -140,6 +140,14 @@ public:
         }
         else cv2_gate = 0;
       */
+      if (!write_mode) {
+        seq_cv = pattern_index;
+        Modulate(seq_cv, 0, 0, 7);
+        if (seq_cv != pattern_index) SetPattern(seq_cv);
+
+        trans_mod = transpose;
+        Modulate(trans_mod, 1, -32, 32);
+      }
 
         if (Clock(1)) { // reset
           seq.Reset();
@@ -154,8 +162,7 @@ public:
           StartADCLag();
         }
 
-        // set flag from UI, or hold cv2 high to record
-        if (EndOfADCLag() && (write_mode) ) {
+        if (EndOfADCLag() && write_mode) {
           // sample and record note number from cv1
           Quantize(0, In(0));
           current_note = GetLatestNoteNumber(0) - 64;
@@ -169,11 +176,11 @@ public:
           seq.SetAccent(seq.step, In(1) > (24 << 7)); // cv2 > 2V qualifies as accent
         }
         
-        // continuously compute CV with transpose
         // I don't always want transpose here... it should be assignable.
         //int transpose = MIDIQuantizer::NoteNumber(DetentedIn(0)) - 60; // 128 ADC steps per semitone
 
-        int play_note = current_note + 64 + transpose;
+        // continuously compute CV with transpose
+        int play_note = current_note + 64 + trans_mod;
         play_note = constrain(play_note, 0, 127);
         // set CV output
         Out(0, QuantizerLookup(0, play_note));
@@ -202,6 +209,10 @@ public:
       isEditing = false;
     }
 
+    void SetPattern(int &index) {
+      CONSTRAIN(index, 0, 7);
+      seq.note = (uint8_t*)(OC::user_patterns[index].notes);
+    }
     void OnEncoderMove(int direction) {
       if (!EditMode()) {
         MoveCursor(cursor, direction, MAX_CURSOR - (STEP_COUNT - seq.length));
@@ -214,9 +225,8 @@ public:
           break;
         case PATTERN:
           // TODO: queued pattern changes
-          pattern_index = constrain(pattern_index + direction, 0, 7);
-          seq.note = (uint8_t*)(OC::user_patterns[pattern_index].notes);
-          //seq.Reset();
+          pattern_index += direction;
+          SetPattern(pattern_index);
           break;
 
         case LENGTH:
@@ -293,6 +303,7 @@ private:
     AccentMode seqmode;
     int current_note = 0;
     int transpose = 0;
+    int trans_mod, seq_cv;
     uint8_t range_ = 32;
     bool write_mode = 0;
     bool cv2_gate = 0;
