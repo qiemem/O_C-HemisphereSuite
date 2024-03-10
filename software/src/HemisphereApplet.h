@@ -239,6 +239,7 @@ public:
         return HS::quantizer[io_offset + ch].Lookup(note) + (HS::root_note[io_offset+ch] << 7);
     }
     void QuantizerConfigure(int ch, int scale, uint16_t mask = 0xffff) {
+        CONSTRAIN(scale, 0, OC::Scales::NUM_SCALES);
         HS::quant_scale[io_offset + ch] = scale;
         HS::quantizer[io_offset + ch].Configure(OC::Scales::GetScale(scale), mask);
     }
@@ -249,6 +250,7 @@ public:
         return HS::root_note[io_offset + ch];
     }
     int SetRootNote(int ch, int root) {
+        CONSTRAIN(root, 0, 11);
         return (HS::root_note[io_offset + ch] = root);
     }
     void NudgeScale(int ch, int dir) {
