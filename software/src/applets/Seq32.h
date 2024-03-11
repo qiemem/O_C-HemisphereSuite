@@ -25,6 +25,7 @@ public:
     static constexpr int MIN_VALUE = 0;
     static constexpr int MAX_VALUE = 63;
     static constexpr int MAX_TRANS = 32;
+    static constexpr int GLIDE_FACTOR = 16;
 
     // sets the function of the accent bit
     enum AccentMode {
@@ -151,10 +152,7 @@ public:
         if (seq.muted(seq.step)) {
           GateOut(1, false);
         } else {
-          target_note = seq.GetNote();
-
-          // TODO: glide instead
-          current_note = target_note;
+          current_note = seq.GetNote();
 
           if (seq.accent(seq.step)) {
             GateOut(1, true);
@@ -179,18 +177,15 @@ public:
         seq.SetAccent(seq.step, In(1) > (24 << 7)); // cv2 > 2V qualifies as accent
       }
       
-      // handle accent glide - hardcoded slew
-      /* TODO: this needs to be CV, not note numbers
-      if (current_note != target_note && (OC::CORE::ticks & 0xf == 0)) {
-        current_note = (current_note * 15 + target_note) / 16;
-      }
-      */
-
       // continuously compute CV with transpose
       int play_note = current_note + 64 + trans_mod;
-      play_note = constrain(play_note, 0, 127);
+      CONSTRAIN(play_note, 0, 127);
       // set CV output
-      Out(0, QuantizerLookup(0, play_note));
+      int play_cv = QuantizerLookup(0, play_note);
+      if (seq.accent(seq.step)) // glide
+        SmoothedOut(0, play_cv, GLIDE_FACTOR);
+      else
+        Out(0, play_cv);
 
       if (flash_ticker) --flash_ticker;
       if (edit_ticker) --edit_ticker;
@@ -259,7 +254,6 @@ public:
         }
 
         case TRANSPOSE:
-          // TODO: clocked transpose
           transpose = constrain(transpose + direction, -MAX_TRANS, MAX_TRANS);
           break;
       }
@@ -309,7 +303,6 @@ private:
     int pattern_index;
     AccentMode seqmode;
     int current_note = 0;
-    int target_note = 0;
     int transpose = 0;
     int trans_mod, pattern_mod;
     bool write_mode = 0;

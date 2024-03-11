@@ -212,9 +212,11 @@ public:
     }
 
     void SmoothedOut(int ch, int value, int kSmoothing) {
+      if (OC::CORE::ticks % kSmoothing == 0) {
         DAC_CHANNEL channel = (DAC_CHANNEL)(ch + io_offset);
         value = (frame.outputs_smooth[channel] * (kSmoothing - 1) + value) / kSmoothing;
         frame.outputs[channel] = frame.outputs_smooth[channel] = value;
+      }
     }
     void ClockOut(const int ch, const int ticks = HEMISPHERE_CLOCK_TICKS * trig_length) {
         frame.ClockOut( (DAC_CHANNEL)(io_offset + ch), ticks);
