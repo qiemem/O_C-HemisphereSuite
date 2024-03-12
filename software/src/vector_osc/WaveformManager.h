@@ -110,7 +110,7 @@ public:
         if (waveform_number >= HS::WAVEFORM_LIBRARY_COUNT) waveform_number = HS::WAVEFORM_LIBRARY_COUNT - 1;
         VectorOscillator osc;
         byte count = 0;
-        for (byte i = 0; i < 255; i++)
+        for (byte i = 0; i < ARRAY_SIZE(HS::library_waveforms); i++)
         {
             if (HS::library_waveforms[i].IsTOC()) {
                 if (count == waveform_number) {
