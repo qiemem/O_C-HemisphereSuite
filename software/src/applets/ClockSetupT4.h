@@ -64,30 +64,30 @@ public:
         }
         if (frame.MIDIState.start_q) {
             frame.MIDIState.start_q = 0;
-            clock_m->DisableMIDIOut();
-            clock_m->Start();
+            HS::clock_m.DisableMIDIOut();
+            HS::clock_m.Start();
         }
         if (frame.MIDIState.stop_q) {
             frame.MIDIState.stop_q = 0;
-            clock_m->Stop();
-            clock_m->EnableMIDIOut();
+            HS::clock_m.Stop();
+            HS::clock_m.EnableMIDIOut();
         }
 
         // Paused means wait for clock-sync to start
-        if (clock_m->IsPaused() && clock_sync)
-            clock_m->Start();
+        if (HS::clock_m.IsPaused() && clock_sync)
+            HS::clock_m.Start();
         // TODO: automatically stop...
 
         // Advance internal clock, sync to external clock / reset
-        if (clock_m->IsRunning())
-            clock_m->SyncTrig( clock_sync );
+        if (HS::clock_m.IsRunning())
+            HS::clock_m.SyncTrig( clock_sync );
 
         // ------------ //
-        if (clock_m->IsRunning() && clock_m->MIDITock()) usbMIDI.sendRealTime(usbMIDI.Clock);
+        if (HS::clock_m.IsRunning() && HS::clock_m.MIDITock()) usbMIDI.sendRealTime(usbMIDI.Clock);
 
         // 8 internal clock flashers
         for (int i = 0; i < 8; ++i) {
-            if (clock_m->Tock(i))
+            if (HS::clock_m.Tock(i))
                 flash_ticker[i] = HEMISPHERE_PULSE_ANIMATION_TIME;
             else if (flash_ticker[i])
                 --flash_ticker[i];
@@ -117,7 +117,7 @@ public:
                     last_tap_tick = 0;
                 }
                 else if (++taps == NR_OF_TAPS)
-                    clock_m->SetTempoFromTaps(tap_time, taps);
+                    HS::clock_m.SetTempoFromTaps(tap_time, taps);
 
                 taps %= NR_OF_TAPS;
             }
@@ -154,19 +154,19 @@ public:
         case BOOP2:
         case BOOP3:
         case BOOP4:
-            clock_m->Boop(cursor-BOOP1);
+            HS::clock_m.Boop(cursor-BOOP1);
             button_ticker = HEMISPHERE_PULSE_ANIMATION_TIME_LONG;
             break;
         */
 
         case EXT_PPQN:
-            clock_m->SetClockPPQN(clock_m->GetClockPPQN() + direction);
+            HS::clock_m.SetClockPPQN(HS::clock_m.GetClockPPQN() + direction);
             break;
         case TEMPO:
-            clock_m->SetTempoBPM(clock_m->GetTempo() + direction);
+            HS::clock_m.SetTempoBPM(HS::clock_m.GetTempo() + direction);
             break;
         case SHUFFLE:
-            clock_m->SetShuffle(clock_m->GetShuffle() + direction);
+            HS::clock_m.SetShuffle(HS::clock_m.GetShuffle() + direction);
             break;
 
         case MULT1:
@@ -177,7 +177,7 @@ public:
         case MULT6:
         case MULT7:
         case MULT8:
-            clock_m->SetMultiply(clock_m->GetMultiply(cursor - MULT1) + direction, cursor - MULT1);
+            HS::clock_m.SetMultiply(HS::clock_m.GetMultiply(cursor - MULT1) + direction, cursor - MULT1);
             break;
 
         default: break;
@@ -187,20 +187,20 @@ public:
     // Same data blobs as T3 version, but different layout
     uint64_t OnDataRequest() {
         uint64_t data = 0;
-        Pack(data, PackLocation { 0, 9 }, clock_m->GetTempo());
-        Pack(data, PackLocation { 9, 7 }, clock_m->GetShuffle());
+        Pack(data, PackLocation { 0, 9 }, HS::clock_m.GetTempo());
+        Pack(data, PackLocation { 9, 7 }, HS::clock_m.GetShuffle());
         for (size_t i = 0; i < 8; ++i) {
-            Pack(data, PackLocation { 16+i*6, 6 }, clock_m->GetMultiply(i)+32);
+            Pack(data, PackLocation { 16+i*6, 6 }, HS::clock_m.GetMultiply(i)+32);
         }
 
         return data;
     }
     void OnDataReceive(uint64_t data) {
-        if (!clock_m->IsRunning())
-            clock_m->SetTempoBPM(Unpack(data, PackLocation { 0, 9 }));
-        clock_m->SetShuffle(Unpack(data, PackLocation { 9, 7 }));
+        if (!HS::clock_m.IsRunning())
+            HS::clock_m.SetTempoBPM(Unpack(data, PackLocation { 0, 9 }));
+        HS::clock_m.SetShuffle(Unpack(data, PackLocation { 9, 7 }));
         for (size_t i = 0; i < 8; ++i) {
-            clock_m->SetMultiply(Unpack(data, PackLocation { 16+i*6, 6 })-32, i);
+            HS::clock_m.SetMultiply(Unpack(data, PackLocation { 16+i*6, 6 })-32, i);
         }
     }
 
@@ -210,7 +210,7 @@ public:
         Pack(data, PackLocation { 1, 1 }, HS::cursor_wrap);
         Pack(data, PackLocation { 2, 2 }, HS::screensaver_mode);
         Pack(data, PackLocation { 4, 7 }, HS::trig_length);
-        Pack(data, PackLocation { 11, 5 }, clock_m->GetClockPPQN());
+        Pack(data, PackLocation { 11, 5 }, HS::clock_m.GetClockPPQN());
         // 48 bits free
         return data;
     }
@@ -219,7 +219,7 @@ public:
         HS::cursor_wrap = Unpack(data, PackLocation { 1, 1 });
         HS::screensaver_mode = Unpack(data, PackLocation { 2, 2 });
         HS::trig_length = constrain( Unpack(data, PackLocation { 4, 7 }), 1, 127);
-        clock_m->SetClockPPQN(Unpack(data, PackLocation { 11, 5 }));
+        HS::clock_m.SetClockPPQN(Unpack(data, PackLocation { 11, 5 }));
     }
 
 protected:
@@ -236,7 +236,6 @@ private:
     int cursor; // ClockSetupCursor
     int flash_ticker[8];
     int button_ticker;
-    ClockManager *clock_m = clock_m->get();
 
     static const int NR_OF_TAPS = 3;
 
@@ -245,11 +244,11 @@ private:
     uint32_t last_tap_tick = 0;
 
     void PlayStop() {
-        if (clock_m->IsRunning()) {
-            clock_m->Stop();
+        if (HS::clock_m.IsRunning()) {
+            HS::clock_m.Stop();
         } else {
-            bool p = clock_m->IsPaused();
-            clock_m->Start( !p ); // stop->pause->start
+            bool p = HS::clock_m.IsPaused();
+            HS::clock_m.Start( !p ); // stop->pause->start
         }
     }
 
@@ -263,28 +262,28 @@ private:
         int y = 14;
         // Clock State
         gfxIcon(1, y, CLOCK_ICON);
-        if (clock_m->IsRunning()) {
+        if (HS::clock_m.IsRunning()) {
             gfxIcon(12, y, PLAY_ICON);
-        } else if (clock_m->IsPaused()) {
+        } else if (HS::clock_m.IsPaused()) {
             gfxIcon(12, y, PAUSE_ICON);
         } else {
             gfxIcon(12, y, STOP_ICON);
         }
 
         // Tempo
-        gfxPrint(22 + pad(100, clock_m->GetTempo()), y, clock_m->GetTempo());
+        gfxPrint(22 + pad(100, HS::clock_m.GetTempo()), y, HS::clock_m.GetTempo());
         if (cursor != SHUFFLE)
             gfxPrint(" BPM");
         else {
             // Shuffle
             gfxIcon(44, y, METRO_R_ICON);
-            gfxPrint(52 + pad(10, clock_m->GetShuffle()), y, clock_m->GetShuffle());
+            gfxPrint(52 + pad(10, HS::clock_m.GetShuffle()), y, HS::clock_m.GetShuffle());
             gfxPrint("%");
         }
 
         // Input PPQN
         gfxPrint(79, y, "Sync=");
-        gfxPrint(clock_m->GetClockPPQN());
+        gfxPrint(HS::clock_m.GetClockPPQN());
 
         y += 10;
         for (int ch=0; ch<8; ++ch) {
@@ -292,7 +291,7 @@ private:
             if (ch == 4) y += 10;
 
             // Multipliers
-            int mult = clock_m->GetMultiply(ch);
+            int mult = HS::clock_m.GetMultiply(ch);
             if (0 != mult || cursor == MULT1 + ch) { // hide if 0
                 gfxPrint(1 + x, y, (mult >= 0) ? "x" : "/");
                 gfxPrint( (mult >= 0) ? mult : 1 - mult );

@@ -20,9 +20,10 @@
 
 #pragma once
 
+using HS::clock_m;
+
 class ClockSetup : public HemisphereApplet {
 public:
-
     enum ClockSetupCursor {
         PLAY_STOP,
         TEMPO,
@@ -60,30 +61,32 @@ public:
         }
         if (frame.MIDIState.start_q) {
             frame.MIDIState.start_q = 0;
-            clock_m->DisableMIDIOut();
-            clock_m->Start();
+            clock_m.DisableMIDIOut();
+            clock_m.Start();
         }
         if (frame.MIDIState.stop_q) {
             frame.MIDIState.stop_q = 0;
-            clock_m->Stop();
-            clock_m->EnableMIDIOut();
+            clock_m.Stop();
+            clock_m.EnableMIDIOut();
         }
 
         // Paused means wait for clock-sync to start
-        if (clock_m->IsPaused() && clock_sync)
-            clock_m->Start();
+        if (clock_m.IsPaused() && clock_sync)
+            clock_m.Start();
         // TODO: automatically stop...
 
         // Advance internal clock, sync to external clock / reset
-        if (clock_m->IsRunning())
-            clock_m->SyncTrig( clock_sync );
+        if (clock_m.IsRunning())
+            clock_m.SyncTrig( clock_sync );
 
         // ------------ //
-        if (clock_m->IsRunning() && clock_m->MIDITock()) usbMIDI.sendRealTime(usbMIDI.Clock);
+        if (clock_m.IsRunning() && clock_m.MIDITock()) {
+            usbMIDI.sendRealTime(usbMIDI.Clock);
+        }
 
         // 4 internal clock flashers
         for (int i = 0; i < 4; ++i) {
-            if (clock_m->Tock(i))
+            if (clock_m.Tock(i))
                 flash_ticker[i] = HEMISPHERE_PULSE_ANIMATION_TIME;
             else if (flash_ticker[i])
                 --flash_ticker[i];
@@ -100,7 +103,7 @@ public:
         if (!EditMode()) { // special cases for toggle buttons
             if (cursor == PLAY_STOP) PlayStop();
             else if (cursor >= BOOP1) {
-                clock_m->Boop(cursor-BOOP1);
+                clock_m.Boop(cursor-BOOP1);
                 button_ticker = HEMISPHERE_PULSE_ANIMATION_TIME_LONG;
             }
             else CursorAction(cursor, LAST_SETTING);
@@ -117,7 +120,7 @@ public:
                     last_tap_tick = 0;
                 }
                 else if (++taps == NR_OF_TAPS)
-                    clock_m->SetTempoFromTaps(tap_time, taps);
+                    clock_m.SetTempoFromTaps(tap_time, taps);
 
                 taps %= NR_OF_TAPS;
             }
@@ -149,25 +152,25 @@ public:
         case BOOP2:
         case BOOP3:
         case BOOP4:
-            clock_m->Boop(cursor-BOOP1);
+            clock_m.Boop(cursor-BOOP1);
             button_ticker = HEMISPHERE_PULSE_ANIMATION_TIME_LONG;
             break;
 
         case EXT_PPQN:
-            clock_m->SetClockPPQN(clock_m->GetClockPPQN() + direction);
+            clock_m.SetClockPPQN(clock_m.GetClockPPQN() + direction);
             break;
         case TEMPO:
-            clock_m->SetTempoBPM(clock_m->GetTempo() + direction);
+            clock_m.SetTempoBPM(clock_m.GetTempo() + direction);
             break;
         case SHUFFLE:
-            clock_m->SetShuffle(clock_m->GetShuffle() + direction);
+            clock_m.SetShuffle(clock_m.GetShuffle() + direction);
             break;
 
         case MULT1:
         case MULT2:
         case MULT3:
         case MULT4:
-            clock_m->SetMultiply(clock_m->GetMultiply(cursor - MULT1) + direction, cursor - MULT1);
+            clock_m.SetMultiply(clock_m.GetMultiply(cursor - MULT1) + direction, cursor - MULT1);
             break;
 
         default: break;
@@ -176,24 +179,24 @@ public:
 
     uint64_t OnDataRequest() {
         uint64_t data = 0;
-        Pack(data, PackLocation { 0, 9 }, clock_m->GetTempo());
-        Pack(data, PackLocation { 9, 7 }, clock_m->GetShuffle());
+        Pack(data, PackLocation { 0, 9 }, clock_m.GetTempo());
+        Pack(data, PackLocation { 9, 7 }, clock_m.GetShuffle());
         for (size_t i = 0; i < 4; ++i) {
-            Pack(data, PackLocation { 16+i*6, 6 }, clock_m->GetMultiply(i)+32);
+            Pack(data, PackLocation { 16+i*6, 6 }, clock_m.GetMultiply(i)+32);
         }
-        Pack(data, PackLocation { 40, 5 }, clock_m->GetClockPPQN());
+        Pack(data, PackLocation { 40, 5 }, clock_m.GetClockPPQN());
 
         return data;
     }
 
     void OnDataReceive(uint64_t data) {
-        if (!clock_m->IsRunning())
-            clock_m->SetTempoBPM(Unpack(data, PackLocation { 0, 9 }));
-        clock_m->SetShuffle(Unpack(data, PackLocation { 9, 7 }));
+        if (!clock_m.IsRunning())
+            clock_m.SetTempoBPM(Unpack(data, PackLocation { 0, 9 }));
+        clock_m.SetShuffle(Unpack(data, PackLocation { 9, 7 }));
         for (size_t i = 0; i < 4; ++i) {
-            clock_m->SetMultiply(Unpack(data, PackLocation { 16+i*6, 6 })-32, i);
+            clock_m.SetMultiply(Unpack(data, PackLocation { 16+i*6, 6 })-32, i);
         }
-        clock_m->SetClockPPQN(Unpack(data, PackLocation { 40, 5 }));
+        clock_m.SetClockPPQN(Unpack(data, PackLocation { 40, 5 }));
     }
 
     uint64_t GetGlobals() {
@@ -228,7 +231,6 @@ private:
     int cursor; // ClockSetupCursor
     int flash_ticker[4];
     int button_ticker;
-    ClockManager *clock_m = clock_m->get();
 
     static const int NR_OF_TAPS = 3;
 
@@ -237,11 +239,11 @@ private:
     uint32_t last_tap_tick = 0;
 
     void PlayStop() {
-        if (clock_m->IsRunning()) {
-            clock_m->Stop();
+        if (clock_m.IsRunning()) {
+            clock_m.Stop();
         } else {
-            bool p = clock_m->IsPaused();
-            clock_m->Start( !p ); // stop->pause->start
+            bool p = clock_m.IsPaused();
+            clock_m.Start( !p ); // stop->pause->start
         }
     }
 
@@ -255,35 +257,35 @@ private:
         int y = 14;
         // Clock State
         gfxIcon(1, y, CLOCK_ICON);
-        if (clock_m->IsRunning()) {
+        if (clock_m.IsRunning()) {
             gfxIcon(12, y, PLAY_ICON);
-        } else if (clock_m->IsPaused()) {
+        } else if (clock_m.IsPaused()) {
             gfxIcon(12, y, PAUSE_ICON);
         } else {
             gfxIcon(12, y, STOP_ICON);
         }
 
         // Tempo
-        gfxPrint(22 + pad(100, clock_m->GetTempo()), y, clock_m->GetTempo());
+        gfxPrint(22 + pad(100, clock_m.GetTempo()), y, clock_m.GetTempo());
         if (cursor != SHUFFLE)
             gfxPrint(" BPM");
         else {
             // Shuffle
             gfxIcon(44, y, METRO_R_ICON);
-            gfxPrint(52 + pad(10, clock_m->GetShuffle()), y, clock_m->GetShuffle());
+            gfxPrint(52 + pad(10, clock_m.GetShuffle()), y, clock_m.GetShuffle());
             gfxPrint("%");
         }
 
         // Input PPQN
         gfxPrint(79, y, "Sync=");
-        gfxPrint(clock_m->GetClockPPQN());
+        gfxPrint(clock_m.GetClockPPQN());
 
         y += 10;
         for (int ch=0; ch<4; ++ch) {
             const int x = ch * 32;
 
             // Multipliers
-            int mult = clock_m->GetMultiply(ch);
+            int mult = clock_m.GetMultiply(ch);
             if (0 != mult || cursor == MULT1 + ch) { // hide if 0
                 gfxPrint(1 + x, y, (mult >= 0) ? "x" : "/");
                 gfxPrint( (mult >= 0) ? mult : 1 - mult );

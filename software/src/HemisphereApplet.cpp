@@ -1,6 +1,7 @@
 #include "HemisphereApplet.h"
 
-IOFrame HS::frame;
+HS::IOFrame HS::frame;
+HS::ClockManager HS::clock_m;
 
 int HemisphereApplet::cursor_countdown[APPLET_SLOTS];
 
@@ -59,8 +60,7 @@ void HemisphereApplet::BaseView() {
  */
 bool HemisphereApplet::Clock(int ch, bool physical) {
     bool clocked = 0;
-    ClockManager *clock_m = clock_m->get();
-    bool useTock = (!physical && clock_m->IsRunning());
+    bool useTock = (!physical && HS::clock_m.IsRunning());
 
 #ifdef ARDUINO_TEENSY41
     const size_t virt_chan = (ch + io_offset) % 8;
@@ -69,13 +69,13 @@ bool HemisphereApplet::Clock(int ch, bool physical) {
 #endif
 
     // clock triggers
-    if (useTock && clock_m->GetMultiply(virt_chan) != 0)
-        clocked = clock_m->Tock(virt_chan);
+    if (useTock && HS::clock_m.GetMultiply(virt_chan) != 0)
+        clocked = HS::clock_m.Tock(virt_chan);
     else if (trigger_mapping[ch + io_offset] > 0 && trigger_mapping[ch + io_offset] <= ADC_CHANNEL_LAST)
         clocked = frame.clocked[ trigger_mapping[ch + io_offset] - 1 ];
 
     // Try to eat a boop
-    clocked = clocked || clock_m->Beep(virt_chan);
+    clocked = clocked || clock_m.Beep(virt_chan);
 
     if (clocked) {
         frame.cycle_ticks[io_offset + ch] = OC::CORE::ticks - frame.last_clock[io_offset + ch];

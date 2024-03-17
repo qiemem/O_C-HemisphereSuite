@@ -36,8 +36,6 @@
 #include "VBiasManager.h"
 #include "HSClockManager.h"
 
-ClockManager *ClockManager::instance = 0;
-
 namespace menu = OC::menu;
 
 #ifndef NO_HEMISPHERE

@@ -21,8 +21,12 @@
 // A "tick" is one ISR cycle, which happens 16666.667 times per second, or a million
 // times per minute. A "tock" is a metronome beat.
 
+#pragma once
+
 #ifndef CLOCK_MANAGER_H
 #define CLOCK_MANAGER_H
+
+namespace HS {
 
 static constexpr uint16_t CLOCK_TEMPO_MIN = 1;
 static constexpr uint16_t CLOCK_TEMPO_MAX = 300;
@@ -34,8 +38,6 @@ constexpr int CLOCK_MAX_MULTIPLE = 24;
 constexpr int CLOCK_MIN_MULTIPLE = -31; // becomes /32
 
 class ClockManager {
-    static ClockManager *instance;
-
     enum ClockOutput {
         LEFT_CLOCK1,
         LEFT_CLOCK2,
@@ -68,14 +70,9 @@ class ClockManager {
 
     bool boop[8] = {0,0,0,0,0,0,0,0}; // Manual triggers
 
+public:
     ClockManager() {
         SetTempoBPM(120);
-    }
-
-public:
-    static ClockManager *get() {
-        if (!instance) instance = new ClockManager;
-        return instance;
     }
 
     void EnableMIDIOut() { midi_out_enabled = 1; }
@@ -274,5 +271,9 @@ public:
 
     bool Cycle(int ch = 0) {return cycle;}
 };
+
+extern ClockManager clock_m;
+
+}
 
 #endif // CLOCK_MANAGER_H

@@ -33,10 +33,10 @@ public:
         Clock(0);
 
         // Outputs
-        if (clock_m->IsRunning()) {
-            if (clock_m->Tock(hemisphere*2)) {
+        if (HS::clock_m.IsRunning()) {
+            if (HS::clock_m.Tock(hemisphere*2)) {
                 ClockOut(0);
-                if (clock_m->EndOfBeat(hemisphere)) ClockOut(1);
+                if (HS::clock_m.EndOfBeat(hemisphere)) ClockOut(1);
             }
         }
     }
@@ -48,7 +48,7 @@ public:
     void OnButtonPress() { }
 
     void OnEncoderMove(int direction) {
-        clock_m->SetTempoBPM(clock_m->GetTempo() + direction);
+        HS::clock_m.SetTempoBPM(clock_m.GetTempo() + direction);
     }
         
     uint64_t OnDataRequest() {
@@ -69,12 +69,10 @@ protected:
     }
     
 private:
-    ClockManager *clock_m = clock_m->get();
-    
     void DrawInterface() {
         gfxIcon(1, 15, NOTE4_ICON);
         gfxPrint(9, 15, "= ");
-        gfxPrint(pad(100, clock_m->GetTempo()), clock_m->GetTempo());
+        gfxPrint(pad(100, HS::clock_m.GetTempo()), clock_m.GetTempo());
         gfxPrint(" BPM");
 
         DrawMetronome();
@@ -97,7 +95,7 @@ private:
         gfxCircle(40,51,1); // Winder
 
         // Pendulum arm
-        if (clock_m->Cycle(hemisphere)) gfxLine(29,50,21,31);
+        if (HS::clock_m.Cycle(hemisphere)) gfxLine(29,50,21,31);
         else gfxLine(29,50,37,32);
     }
 

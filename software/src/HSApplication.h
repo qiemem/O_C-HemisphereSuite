@@ -157,16 +157,14 @@ public:
 
     bool Clock(int ch) {
         bool clocked = 0;
-        ClockManager *clock_m = clock_m->get();
-
-        if (clock_m->IsRunning() && clock_m->GetMultiply(ch) != 0)
-            clocked = clock_m->Tock(ch);
+        if (HS::clock_m.IsRunning() && HS::clock_m.GetMultiply(ch) != 0)
+            clocked = HS::clock_m.Tock(ch);
         else {
             clocked = frame.clocked[ch];
         }
 
         // manual triggers
-        clocked = clocked || clock_m->Beep(ch);
+        clocked = clocked || HS::clock_m.Beep(ch);
 
         if (clocked) {
             frame.cycle_ticks[ch] = OC::CORE::ticks - frame.last_clock[ch];

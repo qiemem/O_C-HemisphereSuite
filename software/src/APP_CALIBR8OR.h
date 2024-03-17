@@ -315,9 +315,9 @@ public:
         gfxHeader("Calibr8or");
 
         // Metronome icon
-        if (clock_m->IsRunning()) {
-            gfxIcon(56, 1, clock_m->Cycle() ? METRO_L_ICON : METRO_R_ICON);
-        } else if (clock_m->IsPaused()) {
+        if (HS::clock_m.IsRunning()) {
+            gfxIcon(56, 1, HS::clock_m.Cycle() ? METRO_L_ICON : METRO_R_ICON);
+        } else if (HS::clock_m.IsPaused()) {
             gfxIcon(56, 1, PAUSE_ICON);
         }
 
@@ -511,8 +511,6 @@ public:
 
     SegmentDisplay segment;
     Cal8ChannelConfig channel[DAC_CHANNEL_LAST];
-
-    ClockManager *clock_m = clock_m->get();
 
     void DrawPresetSelector() {
         // index is the currently loaded preset (0-3)
