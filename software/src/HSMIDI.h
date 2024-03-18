@@ -36,7 +36,7 @@
 #if defined(__IMXRT1062__)
 #define USB_MIDI_HOST
 #include <USBHost_t36.h>
-//extern USBHost thisUSB;
+extern USBHost thisUSB;
 extern MIDIDevice usbHostMIDI;
 #endif
 

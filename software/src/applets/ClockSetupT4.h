@@ -83,7 +83,10 @@ public:
             HS::clock_m.SyncTrig( clock_sync );
 
         // ------------ //
-        if (HS::clock_m.IsRunning() && HS::clock_m.MIDITock()) usbMIDI.sendRealTime(usbMIDI.Clock);
+        if (HS::clock_m.IsRunning() && HS::clock_m.MIDITock()) {
+          usbMIDI.sendRealTime(usbMIDI.Clock);
+          usbHostMIDI.sendRealTime(usbMIDI.Clock);
+        }
 
         // 8 internal clock flashers
         for (int i = 0; i < 8; ++i) {

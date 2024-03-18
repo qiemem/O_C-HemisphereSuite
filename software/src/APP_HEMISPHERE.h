@@ -356,9 +356,10 @@ public:
     void Controller() {
         // top-level MIDI-to-CV handling - alters frame outputs
         ProcessMIDI(usbMIDI);
-        #ifdef USB_MIDI_HOST
+#if defined(__IMXRT1062__)
+        thisUSB.Task();
         ProcessMIDI(usbHostMIDI);
-        #endif
+#endif
 
         // Clock Setup applet handles internal clock duties
         ClockSetup_instance.Controller();

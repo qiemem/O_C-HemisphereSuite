@@ -26,6 +26,8 @@
 #ifndef CLOCK_MANAGER_H
 #define CLOCK_MANAGER_H
 
+#include "HSMIDI.h"
+
 namespace HS {
 
 static constexpr uint16_t CLOCK_TEMPO_MIN = 1;
@@ -232,7 +234,7 @@ public:
         paused = p;
         if (!p && midi_out_enabled) {
             usbMIDI.sendRealTime(usbMIDI.Start);
-#ifdef USB_MIDI_HOST
+#if defined(__IMXRT1062__)
             usbHostMIDI.sendRealTime(usbMIDI.Start);
 #endif
         }
@@ -243,7 +245,7 @@ public:
         paused = 0;
         if (midi_out_enabled) {
             usbMIDI.sendRealTime(usbMIDI.Stop);
-#ifdef USB_MIDI_HOST
+#if defined(__IMXRT1062__)
             usbHostMIDI.sendRealTime(usbMIDI.Stop);
 #endif
         }

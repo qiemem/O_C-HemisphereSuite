@@ -82,9 +82,6 @@ public:
         // ------------ //
         if (clock_m.IsRunning() && clock_m.MIDITock()) {
             usbMIDI.sendRealTime(usbMIDI.Clock);
-            #ifdef USB_MIDI_HOST
-            usbHostMIDI.sendRealTime(usbMIDI.Clock);
-            #endif
         }
 
         // 4 internal clock flashers
