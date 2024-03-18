@@ -44,9 +44,12 @@
 #include "VBiasManager.h"
 #include "HSMIDI.h"
 
-#ifdef USB_MIDI_HOST
+#if defined(__IMXRT1062__)
 USBHost thisUSB;
+USBHub hub1(thisUSB);
 MIDIDevice usbHostMIDI(thisUSB);
+
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial8, MIDI1);
 #endif
 
 #if defined(ARDUINO_TEENSY41)
@@ -109,6 +112,7 @@ void FASTRUN CORE_timer_ISR() {
 void setup() {
   delay(50);
   Serial.begin(9600);
+  Serial8.begin(31250);
 #if defined(__IMXRT1062__)
   if (CrashReport) {
     while (!Serial && millis() < 3000) ; // wait
@@ -187,7 +191,9 @@ void setup() {
   vbias_m->SetState(VBiasManager::BI);
 #endif
 
-#ifdef USB_MIDI_HOST
+#if defined(__IMXRT1062__)
+  MIDI1.begin(MIDI_CHANNEL_OMNI);
+  delay(1500);
   usbHostMIDI.begin();
 #endif
 

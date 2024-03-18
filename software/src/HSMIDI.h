@@ -35,9 +35,11 @@
 
 #if defined(__IMXRT1062__)
 #define USB_MIDI_HOST
+#include <MIDI.h>
 #include <USBHost_t36.h>
 extern USBHost thisUSB;
 extern MIDIDevice usbHostMIDI;
+extern midi::MidiInterface<midi::SerialMIDI<HardwareSerial> > MIDI1;
 #endif
 
 #define HEM_MIDI_NOTE_ON usbMIDI.NoteOn
