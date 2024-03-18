@@ -112,6 +112,9 @@ public:
       void Mute(const size_t s_, bool on = true) {
         note[s_] |= (on << 7);
       }
+      void ToggleAccent(const size_t s_) {
+        note[s_] ^= (0x01 << 6);
+      }
       void ToggleMute(const size_t s_) {
         note[s_] ^= (0x01 << 7);
       }
@@ -155,8 +158,14 @@ public:
           current_note = seq.GetNote();
 
           if (seq.accent(seq.step)) {
-            GateOut(1, true);
+            // - tied note
+            //GateOut(1, true);
+
+            // - 50% duty cycle gate
+            ClockOut(1, ClockCycleTicks(0)/2);
+
           } else {
+            // regular trigger
             ClockOut(1);
           }
         }
@@ -182,10 +191,12 @@ public:
       CONSTRAIN(play_note, 0, 127);
       // set CV output
       int play_cv = QuantizerLookup(0, play_note);
-      if (seq.accent(seq.step)) // glide
+      if (seq.accent(seq.step)) {
+        // glide
         SmoothedOut(0, play_cv, GLIDE_FACTOR);
-      else
+      } else {
         Out(0, play_cv);
+      }
 
       if (flash_ticker) --flash_ticker;
       if (edit_ticker) --edit_ticker;
@@ -196,10 +207,18 @@ public:
     }
 
     void OnButtonPress() {
+      CursorAction(cursor, MAX_CURSOR);
       if (cursor == WRITE_MODE) // toggle
-        write_mode = !write_mode;
-      else
-        CursorAction(cursor, MAX_CURSOR);
+        write_mode = EditMode();
+
+      // double-click toggles accent
+      if (cursor >= NOTES) {
+        if ( OC::CORE::ticks - click_tick < HEMISPHERE_DOUBLE_CLICK_TIME ) {
+          seq.ToggleAccent(cursor - NOTES);
+        } else {
+          click_tick = OC::CORE::ticks;
+        }
+      }
     }
     void AuxButton() {
       if (cursor >= NOTES)
@@ -306,6 +325,7 @@ private:
     int transpose = 0;
     int trans_mod, pattern_mod;
     bool write_mode = 0;
+    uint32_t click_tick = 0;
 
     int flash_ticker = 0;
     int edit_ticker = 0;
