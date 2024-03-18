@@ -250,7 +250,7 @@ public:
   inline static void Draw() {
     
     if (OC::DAC::get_voltage_scaling(DAC_CHANNEL_A) || OC::DAC::get_voltage_scaling(DAC_CHANNEL_B) || OC::DAC::get_voltage_scaling(DAC_CHANNEL_C) || OC::DAC::get_voltage_scaling(DAC_CHANNEL_D))
-      graphics.drawHLineDots(start_x, kMenuLineH, kDisplayWidth - start_x);
+      graphics.drawHLinePattern(start_x, kMenuLineH, kDisplayWidth - start_x, 2);
     else
       graphics.drawHLine(start_x, kMenuLineH, kDisplayWidth - start_x);
     SetColumn(0);

@@ -33,7 +33,6 @@ PagedDisplayDriver<SH1106_128x64_Driver> driver;
 void Init() {
   frame_buffer.Init();
   driver.Init();
-  graphics.Init();
 }
 
 void AdjustOffset(uint8_t offset) {

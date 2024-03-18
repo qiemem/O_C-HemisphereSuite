@@ -973,7 +973,7 @@ void ASR_menu() {
   menu::TitleBar<0, 4, 0>::Draw();
 
   int scale = asr_state.left_encoder_value;
-  graphics.movePrintPos(weegfx::Graphics::kFixedFontW, 0);
+  graphics.movePrintPos(weegfx::kFixedFontW, 0);
   graphics.print(OC::scale_names[scale]);
 
   if (asr.freeze_state())

@@ -452,7 +452,7 @@ void draw_app_menu(const menu::ScreenCursor<5> &cursor) {
        ++current, item.y += menu::kMenuLineH) {
     item.selected = current == cursor.cursor_pos();
     item.SetPrintPos();
-    graphics.movePrintPos(weegfx::Graphics::kFixedFontW, 0);
+    graphics.movePrintPos(weegfx::kFixedFontW, 0);
     graphics.print(available_apps[current].name);
 
     graphics.drawBitmap8(0, item.y + 1, 8,

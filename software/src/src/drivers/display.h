@@ -65,7 +65,7 @@ do { \
       frame = display::frame_buffer.writeable_frame(); \
   } while (!frame && wait); \
   if (frame) { \
-    graphics.Begin(frame, true); \
+    graphics.Begin(frame, weegfx::CLEAR_FRAME_ENABLE); \
     do {} while(0)
 
 #define GRAPHICS_END_FRAME() \

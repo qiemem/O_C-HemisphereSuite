@@ -549,7 +549,7 @@ void draw_grid_menu() {
   menu::TitleBar<kMenuStartX, 1, 2>::Draw();
   for (size_t i=1; i < 4; ++i) {
     graphics.print(note_name(outputs[i]));
-    graphics.movePrintPos(weegfx::Graphics::kFixedFontW/2, 0);
+    graphics.movePrintPos(weegfx::kFixedFontW/2, 0);
   }
   if (MODE_MAJOR == mode)
     graphics.print('+');
