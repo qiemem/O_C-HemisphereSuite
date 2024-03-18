@@ -107,9 +107,10 @@ public:
         // the applet can adapt to contexts that involve (1) the need to accurately interpret rapidly-
         // changing CV values or (2) the need for tight timing when Number is static-ish.
         bool number_is_changing = (OC::CORE::ticks - last_number_cv_tick < 80000);
-        if (Clock(1) && number_is_changing) StartADCLag();
+        bool btrig = Clock(1);
+        if (btrig && number_is_changing) StartADCLag();
 
-        if (EndOfADCLag() || (Clock(1) && !number_is_changing)) {
+        if (EndOfADCLag() || (btrig && !number_is_changing)) {
             ClockOut(0);
             GateOut(1, 1);
             bursts_to_go = number - 1;

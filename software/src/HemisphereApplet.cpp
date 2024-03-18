@@ -57,6 +57,9 @@ void HemisphereApplet::BaseView() {
  *
  * If physical is true, then logical clock types (master clock forwarding and metronome) will
  * not be used.
+ *
+ * You DON'T usually want to call this more than once per tick for each channel!
+ * It modifies state by eating boops and updating cycle_ticks. -NJM
  */
 bool HemisphereApplet::Clock(int ch, bool physical) {
     bool clocked = 0;
