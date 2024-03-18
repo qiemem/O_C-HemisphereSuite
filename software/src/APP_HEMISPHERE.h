@@ -329,8 +329,13 @@ public:
         return select_mode > -1;
     }
 
-    template <typename T>
-    void ProcessMIDI(T &device) {
+#if defined(__IMXRT1062__)
+    template <typename T1, typename T2>
+    void ProcessMIDI(T1 &device, T2 &next_device) {
+#else
+    template <typename T1>
+    void ProcessMIDI(T1 &device) {
+#endif
         HS::IOFrame &f = HS::frame;
 
         while (device.read()) {
@@ -350,15 +355,20 @@ public:
             }
 
             f.MIDIState.ProcessMIDIMsg(device.getChannel(), message, data1, data2);
+#if defined(__IMXRT1062__)
+            next_device.send(message, data1, data2, device.getChannel(), 0);
+#endif
         }
     }
 
     void Controller() {
         // top-level MIDI-to-CV handling - alters frame outputs
-        ProcessMIDI(usbMIDI);
 #if defined(__IMXRT1062__)
+        ProcessMIDI(usbMIDI, usbHostMIDI);
         thisUSB.Task();
-        ProcessMIDI(usbHostMIDI);
+        ProcessMIDI(usbHostMIDI, usbMIDI);
+#else
+        ProcessMIDI(usbMIDI);
 #endif
 
         // Clock Setup applet handles internal clock duties
