@@ -187,8 +187,9 @@ public:
 
     //////////////// Offset I/O methods
     ////////////////////////////////////////////////////////////////////////////////
-    int In(int ch) {
-        return frame.inputs[io_offset + ch];
+    int In(const int ch) {
+        const int c = cvmapping[ch + io_offset];
+        return (c && c <= ADC_CHANNEL_LAST) ? frame.inputs[c - 1] : 0;
     }
 
     // Apply small center detent to input, so it reads zero before a threshold
@@ -197,10 +198,15 @@ public:
             ? In(ch) : HEMISPHERE_CENTER_CV;
     }
     int SmoothedIn(int ch) {
-        ADC_CHANNEL channel = (ADC_CHANNEL)(ch + io_offset);
+      const int x = cvmapping[ch + io_offset];
+      if (x && x <= ADC_CHANNEL_LAST) {
+        ADC_CHANNEL channel = (ADC_CHANNEL)( x - 1 );
         return OC::ADC::value(channel);
+      }
+      return 0;
     }
 
+    // defined in HemisphereApplet.cpp
     bool Clock(int ch, bool physical = 0);
 
     bool Gate(int ch) {

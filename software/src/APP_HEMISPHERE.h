@@ -766,7 +766,9 @@ private:
         SCREENSAVER_MODE,
         CURSOR_MODE,
 
-        MAX_CURSOR = CURSOR_MODE
+        CVMAP1, CVMAP2, CVMAP3, CVMAP4,
+
+        MAX_CURSOR = CVMAP4
     };
 
     void ConfigEncoderAction(int h, int dir) {
@@ -778,6 +780,12 @@ private:
         }
 
         switch (config_cursor) {
+        case CVMAP1:
+        case CVMAP2:
+        case CVMAP3:
+        case CVMAP4:
+            HS::cvmapping[config_cursor-CVMAP1] = constrain( HS::cvmapping[config_cursor-CVMAP1] + dir, 0, 4);
+            break;
         case TRIG_LENGTH:
             HS::trig_length = (uint32_t) constrain( int(HS::trig_length + dir), 1, 127);
             break;
@@ -818,6 +826,10 @@ private:
             HS::auto_save_enabled = !HS::auto_save_enabled;
             break;
 
+        case CVMAP1:
+        case CVMAP2:
+        case CVMAP3:
+        case CVMAP4:
         case TRIG_LENGTH:
             isEditing = !isEditing;
             break;
@@ -853,8 +865,21 @@ private:
         const char * cursor_mode_name[3] = { "modal", "modal+wrap" };
         gfxPrint(1, 35, "Cursor:  ");
         gfxPrint(cursor_mode_name[HS::cursor_wrap]);
-        
+
+        // Physical CV input mappings
+        for (int ch=0; ch<4; ++ch) {
+          gfxPrint(1 + ch*32, 55, OC::Strings::cv_input_names_none[ HS::cvmapping[ch] ] );
+        }
+
         switch (config_cursor) {
+        case CVMAP1:
+        case CVMAP2:
+        case CVMAP3:
+        case CVMAP4:
+          if (isEditing) gfxInvert(32*(config_cursor-CVMAP1), 54, 20, 9);
+          else gfxCursor(1 + 32*(config_cursor - CVMAP1), 63, 19);
+          break;
+
         case TRIG_LENGTH:
             if (isEditing) gfxInvert(79, 14, 25, 9);
             else gfxCursor(80, 23, 24);
