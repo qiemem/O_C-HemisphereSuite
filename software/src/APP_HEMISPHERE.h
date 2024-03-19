@@ -107,13 +107,18 @@ public:
 
     // returns true if changed
     bool StoreInputMap() {
+      uint16_t cvmap = 0;
       uint16_t trigmap = 0;
       for (size_t i = 0; i < 4; ++i) {
         trigmap |= (uint16_t(HS::trigger_mapping[i] + 1) & 0x0F) << (i*4);
+        cvmap |= (uint16_t(HS::cvmapping[i] + 1) & 0x0F) << (i*4);
       }
 
-      bool changed = (uint16_t(values_[HEMISPHERE_TRIGMAP]) != trigmap);
+      bool changed = (uint16_t(values_[HEMISPHERE_TRIGMAP]) != trigmap)
+                   || (uint16_t(values_[HEMISPHERE_CVMAP]) != cvmap);
       apply_value(HEMISPHERE_TRIGMAP, trigmap);
+      apply_value(HEMISPHERE_CVMAP, cvmap);
+
       return changed;
     }
     void LoadInputMap() {
@@ -121,6 +126,10 @@ public:
         int val = (uint16_t(values_[HEMISPHERE_TRIGMAP]) >> (i*4)) & 0x0F;
         if (val != 0)
           HS::trigger_mapping[i] = constrain(val - 1, 0, 4);
+
+        val = (uint16_t(values_[HEMISPHERE_CVMAP]) >> (i*4)) & 0x0F;
+        if (val != 0)
+          HS::cvmapping[i] = constrain(val - 1, 0, 4);
       }
     }
 
