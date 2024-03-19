@@ -773,7 +773,7 @@ private:
     PopupType popup_type = PRESET_POPUP;
     HEM_SIDE first_click; // The first button pushed of a double-click set, to see if the same one is pressed
 
-    enum HEMConfigCursor {
+    enum QuadrantsConfigCursor {
         LOAD_PRESET, SAVE_PRESET,
         AUTO_SAVE,
         CONFIG_DUMMY, // past this point goes full screen
@@ -781,7 +781,10 @@ private:
         SCREENSAVER_MODE,
         CURSOR_MODE,
 
-        MAX_CURSOR = CURSOR_MODE
+        CVMAP1, CVMAP2, CVMAP3, CVMAP4,
+        CVMAP5, CVMAP6, CVMAP7, CVMAP8,
+
+        MAX_CURSOR = CVMAP8
     };
 
     void ConfigEncoderAction(int h, int dir) {
@@ -793,6 +796,16 @@ private:
         }
 
         switch (config_cursor) {
+        case CVMAP1:
+        case CVMAP2:
+        case CVMAP3:
+        case CVMAP4:
+        case CVMAP5:
+        case CVMAP6:
+        case CVMAP7:
+        case CVMAP8:
+            HS::cvmapping[config_cursor-CVMAP1] = constrain( HS::cvmapping[config_cursor-CVMAP1] + dir, 0, 8);
+            break;
         case TRIG_LENGTH:
             HS::trig_length = (uint32_t) constrain( int(HS::trig_length + dir), 1, 127);
             break;
@@ -833,6 +846,14 @@ private:
             HS::auto_save_enabled = !HS::auto_save_enabled;
             break;
 
+        case CVMAP1:
+        case CVMAP2:
+        case CVMAP3:
+        case CVMAP4:
+        case CVMAP5:
+        case CVMAP6:
+        case CVMAP7:
+        case CVMAP8:
         case TRIG_LENGTH:
             isEditing = !isEditing;
             break;
@@ -869,7 +890,30 @@ private:
         gfxPrint(1, 35, "Cursor:  ");
         gfxPrint(cursor_mode_name[HS::cursor_wrap]);
         
+        // Physical CV input mappings
+        for (int ch=0; ch<8; ++ch) {
+          const int x = (32 * ch) % 128;
+          const int y = ch > 3 ? 55 : 45;
+          gfxPrint(1 + x, y, OC::Strings::cv_input_names_none[ HS::cvmapping[ch] ] );
+        }
+
         switch (config_cursor) {
+        case CVMAP1:
+        case CVMAP2:
+        case CVMAP3:
+        case CVMAP4:
+        case CVMAP5:
+        case CVMAP6:
+        case CVMAP7:
+        case CVMAP8:
+        {
+          const int x = 32*(config_cursor-CVMAP1) % 128;
+          const int y = config_cursor > CVMAP4 ? 55 : 45;
+          if (isEditing) gfxInvert(x, y-1, 20, 9);
+          else gfxCursor(1+x, y+8, 19);
+          break;
+        }
+
         case TRIG_LENGTH:
             if (isEditing) gfxInvert(79, 14, 25, 9);
             else gfxCursor(80, 23, 24);
