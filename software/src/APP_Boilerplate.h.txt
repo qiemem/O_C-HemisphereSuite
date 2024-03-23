@@ -1,4 +1,4 @@
-// Copyright (c) 2018, __________
+// Copyright (c) 2024, __________
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,18 +23,24 @@
 
 class ClassName : public HSApplication, public SystemExclusiveHandler {
 public:
-	void Start() {
-	}
-	
-	void Resume() {
-	}
+    void Start() {
+      // initialize state here
+    }
+
+    void Resume() {
+    }
+
+    void Suspend() {
+      // maybe save some state here
+    }
 
     void Controller() {
+      // MAIN I/O LOGIC
     }
 
     void View() {
-        gfxHeader("ClassName");
-        //DrawInterface();
+      gfxHeader("ClassName");
+      //DrawInterface();
     }
 
     void OnSendSysEx() {
@@ -92,7 +98,7 @@ size_t ClassName_save(void *storage) {return 0;}
 size_t ClassName_restore(const void *storage) {return 0;}
 
 void ClassName_isr() {
-	return ClassName_instance.BaseController();
+    ClassName_instance.BaseController();
 }
 
 void ClassName_handleAppEvent(OC::AppEvent event) {
@@ -110,25 +116,48 @@ void ClassName_menu() {
     ClassName_instance.BaseView();
 }
 
-void ClassName_screensaver() {} // Deprecated
+void ClassName_screensaver() {
+    ClassName_instance.BaseScreensaver(true);
+}
 
 void ClassName_handleButtonEvent(const UI::Event &event) {
     // For left encoder, handle press and long press
-    if (event.control == OC::CONTROL_BUTTON_L) {
-        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) ClassName_instance.OnLeftButtonLongPress();
-        else ClassName_instance.OnLeftButtonPress();
-    }
-
     // For right encoder, only handle press (long press is reserved)
-    if (event.control == OC::CONTROL_BUTTON_R && event.type == UI::EVENT_BUTTON_PRESS) ClassName_instance.OnRightButtonPress();
-
     // For up button, handle only press (long press is reserved)
-    if (event.control == OC::CONTROL_BUTTON_UP) ClassName_instance.OnUpButtonPress();
-
     // For down button, handle press and long press
-    if (event.control == OC::CONTROL_BUTTON_DOWN) {
-        if (event.type == UI::EVENT_BUTTON_PRESS) ClassName_instance.OnDownButtonPress();
-        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) ClassName_instance.OnDownButtonLongPress();
+    switch (event.type) {
+    case UI::EVENT_BUTTON_DOWN: // when button is first pressed
+        //ClassName_instance.OnButtonDown(event);
+        break;
+
+    case UI::EVENT_BUTTON_PRESS: { // when button is released
+        switch (event.control) {
+        case OC::CONTROL_BUTTON_L:
+          ClassName_instance.OnLeftButtonPress();
+          break;
+        case OC::CONTROL_BUTTON_R:
+          ClassName_instance.OnRightButtonPress();
+          break;
+        case OC::CONTROL_BUTTON_DOWN:
+          ClassName_instance.OnDownButtonPress();
+          break;
+        case OC::CONTROL_BUTTON_UP:
+          ClassName_instance.OnUpButtonPress();
+          break;
+        default: break;
+        }
+    } break;
+
+    case UI::EVENT_BUTTON_LONG_PRESS:
+        if (event.control == OC::CONTROL_BUTTON_L) {
+            ClassName_instance.OnLeftButtonLongPress();
+        }
+        if (event.control == OC::CONTROL_BUTTON_DOWN) {
+            ClassName_instance.OnDownButtonLongPress();
+        }
+        break;
+
+    default: break;
     }
 }
 
