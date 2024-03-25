@@ -41,13 +41,13 @@ typedef struct IOFrame {
 
     /* MIDI message queue/cache */
     struct {
-        int channel[4]; // MIDI channel number
-        int function[4]; // Function for each channel
-        int function_cc[4]; // CC# for each channel
+        int channel[ADC_CHANNEL_LAST]; // MIDI channel number
+        int function[ADC_CHANNEL_LAST]; // Function for each channel
+        int function_cc[ADC_CHANNEL_LAST]; // CC# for each channel
 
         // Output values and ClockOut triggers, handled by MIDIIn applet
-        int outputs[4];
-        bool trigout_q[4];
+        int outputs[DAC_CHANNEL_LAST];
+        bool trigout_q[DAC_CHANNEL_LAST];
 
         int8_t notes_on[16]; // attempts to track how many notes are on, per MIDI channel
         int last_msg_tick; // Tick of last received message

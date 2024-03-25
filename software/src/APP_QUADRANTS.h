@@ -336,8 +336,8 @@ public:
         return select_mode > -1;
     }
 
-    template <typename T>
-    void ProcessMIDI(T device) {
+    template <typename T1, typename T2>
+    void ProcessMIDI(T1 &device, T2 &next_device) {
         while (device.read()) {
             const int message = device.getType();
             const int data1 = device.getData1();
@@ -355,16 +355,15 @@ public:
             }
 
             HS::frame.MIDIState.ProcessMIDIMsg(device.getChannel(), message, data1, data2);
+            next_device.send(message, data1, data2, device.getChannel(), 0);
         }
     }
 
     void Controller() {
         // top-level MIDI-to-CV handling - alters frame outputs
-        ProcessMIDI(usbMIDI);
-#if defined(__IMXRT1062__)
+        ProcessMIDI(usbMIDI, usbHostMIDI);
         thisUSB.Task();
-        ProcessMIDI(usbHostMIDI);
-#endif
+        ProcessMIDI(usbHostMIDI, usbMIDI);
 
         // Clock Setup applet handles internal clock duties
         ClockSetup_instance.Controller();
@@ -378,7 +377,6 @@ public:
             int index = my_applet[h];
 
             // MIDI signals mixed with inputs to applets
-            /* TODO:
             if (HS::available_applets[index].id != 150) // not MIDI In
             {
                 ForEachChannel(ch) {
@@ -404,7 +402,6 @@ public:
                     }
                 }
             }
-            */
             HS::available_applets[index].instance[h]->BaseController();
         }
     }
