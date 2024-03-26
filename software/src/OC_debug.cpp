@@ -60,25 +60,25 @@ namespace DEBUG {
 static void debug_menu_core() {
 
   graphics.setPrintPos(2, 12);
-  graphics.printf("%uMHz %uus+%uus", F_CPU / 1000 / 1000, OC_CORE_TIMER_RATE, OC_UI_TIMER_RATE);
+  graphics.printf("%uMHz %luus+%luus", F_CPU / 1000 / 1000, OC_CORE_TIMER_RATE, OC_UI_TIMER_RATE);
   
   graphics.setPrintPos(2, 22);
   uint32_t isr_us = debug::cycles_to_us(DEBUG::ISR_cycles.value());
-  graphics.printf("CORE%3u/%3u/%3u %2u%%",
+  graphics.printf("CORE%3lu/%3lu/%3lu %2lu%%",
                   debug::cycles_to_us(DEBUG::ISR_cycles.min_value()),
                   isr_us,
                   debug::cycles_to_us(DEBUG::ISR_cycles.max_value()),
                   (isr_us * 100) /  OC_CORE_TIMER_RATE);
 
   graphics.setPrintPos(2, 32);
-  graphics.printf("POLL%3u/%3u/%3u",
+  graphics.printf("POLL%3lu/%3lu/%3lu",
                   debug::cycles_to_us(DEBUG::UI_cycles.min_value()),
                   debug::cycles_to_us(DEBUG::UI_cycles.value()),
                   debug::cycles_to_us(DEBUG::UI_cycles.max_value()));
 
 #ifdef OC_UI_DEBUG
   graphics.setPrintPos(2, 42);
-  graphics.printf("UI   !%u #%u", DEBUG::UI_queue_overflow, DEBUG::UI_event_count);
+  graphics.printf("UI   !%lu #%lu", DEBUG::UI_queue_overflow, DEBUG::UI_event_count);
   graphics.setPrintPos(2, 52);
 #endif
 }
@@ -110,7 +110,7 @@ static void debug_menu_gfx() {
   graphics.print("W");
 
   graphics.setPrintPos(2, 22);
-  graphics.printf("MENU %3u/%3u/%3u",
+  graphics.printf("MENU %3lu/%3lu/%3lu",
                   debug::cycles_to_us(DEBUG::MENU_draw_cycles.min_value()),
                   debug::cycles_to_us(DEBUG::MENU_draw_cycles.value()),
                   debug::cycles_to_us(DEBUG::MENU_draw_cycles.max_value()));
@@ -118,16 +118,16 @@ static void debug_menu_gfx() {
 
 static void debug_menu_adc() {
   graphics.setPrintPos(2, 12);
-  graphics.printf("CV1 %5d %5u", ADC::value<ADC_CHANNEL_1>(), ADC::raw_value(ADC_CHANNEL_1));
+  graphics.printf("CV1 %5ld %5lu", ADC::value<ADC_CHANNEL_1>(), ADC::raw_value(ADC_CHANNEL_1));
 
   graphics.setPrintPos(2, 22);
-  graphics.printf("CV2 %5d %5u", ADC::value<ADC_CHANNEL_2>(), ADC::raw_value(ADC_CHANNEL_2));
+  graphics.printf("CV2 %5ld %5lu", ADC::value<ADC_CHANNEL_2>(), ADC::raw_value(ADC_CHANNEL_2));
 
   graphics.setPrintPos(2, 32);
-  graphics.printf("CV3 %5d %5u", ADC::value<ADC_CHANNEL_3>(), ADC::raw_value(ADC_CHANNEL_3));
+  graphics.printf("CV3 %5ld %5lu", ADC::value<ADC_CHANNEL_3>(), ADC::raw_value(ADC_CHANNEL_3));
 
   graphics.setPrintPos(2, 42);
-  graphics.printf("CV4 %5d %5u", ADC::value<ADC_CHANNEL_4>(), ADC::raw_value(ADC_CHANNEL_4));
+  graphics.printf("CV4 %5ld %5lu", ADC::value<ADC_CHANNEL_4>(), ADC::raw_value(ADC_CHANNEL_4));
 
 //      graphics.setPrintPos(2, 42);
 //      graphics.print((long)ADC::busy_waits());
@@ -137,10 +137,15 @@ static void debug_menu_adc() {
 
 #ifdef ARDUINO_TEENSY41
 static void debug_menu_audio() {
+  float whole = AudioProcessorUsage();
+  int part = int(whole * 100) % 100;
   graphics.setPrintPos(2, 12);
-  graphics.printf("Total CPU %2d%%", (int)AudioProcessorUsage());
+  graphics.printf("Total CPU %2d.%2d%%", int(whole), part);
+
+  whole = AudioProcessorUsageMax();
+  part = int(whole * 100) % 100;
   graphics.setPrintPos(2, 22);
-  graphics.printf("Max CPU %2d%%", (int)AudioProcessorUsageMax());
+  graphics.printf("Max CPU %2d.%2d%%", int(whole), part);
 }
 #endif
 

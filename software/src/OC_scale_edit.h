@@ -200,7 +200,7 @@ void ScaleEditor<Owner>::Draw() {
         // justify left ...  
         if (! mutable_scale_)
           graphics.movePrintPos(weegfx::kFixedFontW * -1, 0);
-        graphics.printf("%4u.%02uc", cents, (frac_cents + 5) / 10);
+        graphics.printf("%4lu.%02luc", cents, (frac_cents + 5) / 10);
     
       } else {
         graphics.print((int)num_notes);

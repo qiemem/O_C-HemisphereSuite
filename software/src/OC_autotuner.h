@@ -577,7 +577,7 @@ private:
         {
           const uint32_t value = _freq / 1000;
           const uint32_t cents = _freq % 1000;
-          graphics.printf("%4u.%03u", value, cents);
+          graphics.printf("%4lu.%03lu", value, cents);
         }
         }
         break;
@@ -603,7 +603,7 @@ private:
               const uint32_t f = auto_frequency_;
               const uint32_t value = f / 1000;
               const uint32_t cents = f % 1000;
-              graphics.printf(" > %4u.%03u", value, cents);
+              graphics.printf(" > %4lu.%03lu", value, cents);
             }
           }
         }

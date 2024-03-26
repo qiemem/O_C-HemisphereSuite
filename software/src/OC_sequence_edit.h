@@ -136,9 +136,9 @@ void PatternEditor<Owner>::Draw() {
       if (frac < -127) {
         octave--;
       }
-      graphics.printf(": %s%d %dc (%d)", OC::Strings::note_names_unpadded[pClass], octave, cents, frac%128); //, (float)frac / 128.0f);
+      graphics.printf(": %s%ld %ldc (%ld)", OC::Strings::note_names_unpadded[pClass], octave, cents, frac%128); //, (float)frac / 128.0f);
     } else {
-      graphics.printf(": %s%d +%dc (%d)", OC::Strings::note_names_unpadded[pClass], octave, cents, frac%128); //, (float)frac / 128.0f);
+      graphics.printf(": %s%ld +%ldc (%ld)", OC::Strings::note_names_unpadded[pClass], octave, cents, frac%128); //, (float)frac / 128.0f);
     }
   }
 
