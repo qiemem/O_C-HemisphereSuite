@@ -236,6 +236,7 @@ public:
             usbMIDI.sendRealTime(usbMIDI.Start);
 #if defined(__IMXRT1062__)
             usbHostMIDI.sendRealTime(usbMIDI.Start);
+            MIDI1.sendRealTime(midi::MidiType(usbMIDI.Start));
 #endif
         }
     }
@@ -247,6 +248,7 @@ public:
             usbMIDI.sendRealTime(usbMIDI.Stop);
 #if defined(__IMXRT1062__)
             usbHostMIDI.sendRealTime(usbMIDI.Stop);
+            MIDI1.sendRealTime(midi::MidiType(usbMIDI.Stop));
 #endif
         }
     }
