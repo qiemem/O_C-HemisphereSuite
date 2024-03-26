@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "OC_core.h"
 #include "HemisphereApplet.h"
+#include "HSUtils.h"
 
 namespace HS {
 
