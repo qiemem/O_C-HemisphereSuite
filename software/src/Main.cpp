@@ -112,13 +112,19 @@ void FASTRUN CORE_timer_ISR() {
 void setup() {
   delay(50);
   Serial.begin(9600);
-  Serial8.begin(31250);
+
 #if defined(__IMXRT1062__)
+  Serial8.begin(31250);
+  MIDI1.begin(MIDI_CHANNEL_OMNI);
+  //delay(1500);
+  usbHostMIDI.begin();
+
   if (CrashReport) {
     while (!Serial && millis() < 3000) ; // wait
     Serial.println(CrashReport);
     delay(1500);
   }
+
   #if defined(ARDUINO_TEENSY41)
   OC::AudioInit();
   OC::Pinout_Detect();
@@ -189,12 +195,6 @@ void setup() {
 #ifdef VOR
   VBiasManager *vbias_m = vbias_m->get();
   vbias_m->SetState(VBiasManager::BI);
-#endif
-
-#if defined(__IMXRT1062__)
-  MIDI1.begin(MIDI_CHANNEL_OMNI);
-  delay(1500);
-  usbHostMIDI.begin();
 #endif
 
   // initialize apps
