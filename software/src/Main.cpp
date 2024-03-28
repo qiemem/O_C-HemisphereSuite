@@ -49,12 +49,12 @@ USBHost thisUSB;
 USBHub hub1(thisUSB);
 MIDIDevice usbHostMIDI(thisUSB);
 
-MIDI_CREATE_INSTANCE(HardwareSerial, Serial8, MIDI1);
-#endif
-
 #if defined(ARDUINO_TEENSY41)
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial8, MIDI1);
 #include "AudioSetup.h"
 #endif
+
+#endif // __IMXRT1062__
 
 unsigned long LAST_REDRAW_TIME = 0;
 uint_fast8_t MENU_REDRAW = true;
@@ -114,11 +114,6 @@ void setup() {
   Serial.begin(9600);
 
 #if defined(__IMXRT1062__)
-  Serial8.begin(31250);
-  MIDI1.begin(MIDI_CHANNEL_OMNI);
-  //delay(1500);
-  usbHostMIDI.begin();
-
   if (CrashReport) {
     while (!Serial && millis() < 3000) ; // wait
     Serial.println(CrashReport);
@@ -126,9 +121,17 @@ void setup() {
   }
 
   #if defined(ARDUINO_TEENSY41)
-  OC::AudioInit();
   OC::Pinout_Detect();
+
+  // Standard MIDI I/O on Serial8, only for Teensy 4.1
+  Serial8.begin(31250);
+  MIDI1.begin(MIDI_CHANNEL_OMNI);
+
+  OC::AudioInit();
   #endif
+
+  // USB Host support for both 4.0 and 4.1
+  usbHostMIDI.begin();
 #endif
 #if defined(__MK20DX256__)
   NVIC_SET_PRIORITY(IRQ_PORTB, 0); // TR1 = 0 = PTB16

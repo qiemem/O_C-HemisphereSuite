@@ -339,10 +339,13 @@ public:
     }
 
 #if defined(__IMXRT1062__)
-    //template <typename T1, typename T2>
-    //void ProcessMIDI(T1 &device, T2 &next_device) {
+  #if defined(ARDUINO_TEENSY41)
     template <typename T1, typename T2, typename T3>
     void ProcessMIDI(T1 &device, T2 &next_device, T3 &dev3) {
+  #else
+    template <typename T1, typename T2>
+    void ProcessMIDI(T1 &device, T2 &next_device) {
+  #endif
 #else
     template <typename T1>
     void ProcessMIDI(T1 &device) {
@@ -368,7 +371,9 @@ public:
             f.MIDIState.ProcessMIDIMsg(device.getChannel(), message, data1, data2);
 #if defined(__IMXRT1062__)
             next_device.send(message, data1, data2, device.getChannel(), 0);
+  #if defined(ARDUINO_TEENSY41)
             dev3.send((midi::MidiType)message, data1, data2, device.getChannel());
+  #endif
 #endif
         }
     }
@@ -376,10 +381,16 @@ public:
     void Controller() {
         // top-level MIDI-to-CV handling - alters frame outputs
 #if defined(__IMXRT1062__)
+  #if defined(ARDUINO_TEENSY41)
         ProcessMIDI(usbMIDI, usbHostMIDI, MIDI1);
         thisUSB.Task();
         ProcessMIDI(usbHostMIDI, usbMIDI, MIDI1);
         ProcessMIDI(MIDI1, usbMIDI, usbHostMIDI);
+  #else
+        ProcessMIDI(usbMIDI, usbHostMIDI);
+        thisUSB.Task();
+        ProcessMIDI(usbHostMIDI, usbMIDI);
+  #endif
 #else
         ProcessMIDI(usbMIDI);
 #endif
