@@ -117,18 +117,31 @@ static void debug_menu_gfx() {
 }
 
 static void debug_menu_adc() {
+#ifdef ARDUINO_TEENSY41
   graphics.setPrintPos(2, 12);
-  graphics.printf("CV1 %5ld %5lu", ADC::value<ADC_CHANNEL_1>(), ADC::raw_value(ADC_CHANNEL_1));
+  graphics.printf("C1 %5lu C5 %5lu", ADC::raw_value(ADC_CHANNEL_1), ADC::raw_value(ADC_CHANNEL_5));
 
   graphics.setPrintPos(2, 22);
-  graphics.printf("CV2 %5ld %5lu", ADC::value<ADC_CHANNEL_2>(), ADC::raw_value(ADC_CHANNEL_2));
+  graphics.printf("C2 %5lu C6 %5lu", ADC::raw_value(ADC_CHANNEL_2), ADC::raw_value(ADC_CHANNEL_6));
 
   graphics.setPrintPos(2, 32);
-  graphics.printf("CV3 %5ld %5lu", ADC::value<ADC_CHANNEL_3>(), ADC::raw_value(ADC_CHANNEL_3));
+  graphics.printf("C3 %5lu C7 %5lu", ADC::raw_value(ADC_CHANNEL_3), ADC::raw_value(ADC_CHANNEL_7));
 
   graphics.setPrintPos(2, 42);
-  graphics.printf("CV4 %5ld %5lu", ADC::value<ADC_CHANNEL_4>(), ADC::raw_value(ADC_CHANNEL_4));
+  graphics.printf("C4 %5lu C8 %5lu", ADC::raw_value(ADC_CHANNEL_4), ADC::raw_value(ADC_CHANNEL_8));
+#else
+  graphics.setPrintPos(2, 12);
+  graphics.printf("C1 %5ld %5lu", ADC::value<ADC_CHANNEL_1>(), ADC::raw_value(ADC_CHANNEL_1));
 
+  graphics.setPrintPos(2, 22);
+  graphics.printf("C2 %5ld %5lu", ADC::value<ADC_CHANNEL_2>(), ADC::raw_value(ADC_CHANNEL_2));
+
+  graphics.setPrintPos(2, 32);
+  graphics.printf("C3 %5ld %5lu", ADC::value<ADC_CHANNEL_3>(), ADC::raw_value(ADC_CHANNEL_3));
+
+  graphics.setPrintPos(2, 42);
+  graphics.printf("C4 %5ld %5lu", ADC::value<ADC_CHANNEL_4>(), ADC::raw_value(ADC_CHANNEL_4));
+#endif
 //      graphics.setPrintPos(2, 42);
 //      graphics.print((long)ADC::busy_waits());
 //      graphics.setPrintPos(2, 42); graphics.print(ADC::fail_flag0());
@@ -136,6 +149,20 @@ static void debug_menu_adc() {
 }
 
 #ifdef ARDUINO_TEENSY41
+static void debug_menu_adc_value() {
+  graphics.setPrintPos(2, 12);
+  graphics.printf("C1 %5ld C5 %5ld", ADC::value(ADC_CHANNEL_1), ADC::value(ADC_CHANNEL_5));
+
+  graphics.setPrintPos(2, 22);
+  graphics.printf("C2 %5ld C6 %5ld", ADC::value(ADC_CHANNEL_2), ADC::value(ADC_CHANNEL_6));
+
+  graphics.setPrintPos(2, 32);
+  graphics.printf("C3 %5ld C7 %5ld", ADC::value(ADC_CHANNEL_3), ADC::value(ADC_CHANNEL_7));
+
+  graphics.setPrintPos(2, 42);
+  graphics.printf("C4 %5ld C8 %5ld", ADC::value(ADC_CHANNEL_4), ADC::value(ADC_CHANNEL_8));
+}
+
 static void debug_menu_audio() {
   float whole = AudioProcessorUsage();
   int part = int(whole * 100) % 100;
@@ -158,8 +185,9 @@ static const DebugMenu debug_menus[] = {
   { " CORE", debug_menu_core },
   { " VERS", debug_menu_version },
   { " GFX", debug_menu_gfx },
-  { " ADC", debug_menu_adc },
+  { " ADC (raw)", debug_menu_adc },
 #ifdef ARDUINO_TEENSY41
+  { " ADC (value)", debug_menu_adc_value },
   { " AUDIO", debug_menu_audio },
 #endif
 #ifdef POLYLFO_DEBUG  
