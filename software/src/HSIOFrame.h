@@ -221,9 +221,9 @@ typedef struct IOFrame {
             inputs[i] = OC::ADC::raw_pitch_value(ADC_CHANNEL(i));
 #ifdef ARDUINO_TEENSY41
             // T41: calculate gates/clocks for inputs 4-7 as well
-            if (i<4) {
-              gate_high[i+4] = inputs[i] > (12 << 7);
-              clocked[i+4] = (gate_high[i+4] && last_cv[i] < (12 << 7));
+            if (i>3) {
+              gate_high[i] = inputs[i] > (12 << 7);
+              clocked[i] = (gate_high[i] && last_cv[i] < (12 << 7));
             }
 #endif
             if (abs(inputs[i] - last_cv[i]) > HEMISPHERE_CHANGE_THRESHOLD) {

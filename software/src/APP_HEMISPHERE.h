@@ -125,11 +125,11 @@ public:
       for (size_t i = 0; i < 4; ++i) {
         int val = (uint16_t(values_[HEMISPHERE_TRIGMAP]) >> (i*4)) & 0x0F;
         if (val != 0)
-          HS::trigger_mapping[i] = constrain(val - 1, 0, 4);
+          HS::trigger_mapping[i] = constrain(val - 1, 0, ADC_CHANNEL_LAST);
 
         val = (uint16_t(values_[HEMISPHERE_CVMAP]) >> (i*4)) & 0x0F;
         if (val != 0)
-          HS::cvmapping[i] = constrain(val - 1, 0, 4);
+          HS::cvmapping[i] = constrain(val - 1, 0, ADC_CHANNEL_LAST);
       }
     }
 
@@ -811,7 +811,7 @@ private:
         case CVMAP2:
         case CVMAP3:
         case CVMAP4:
-            HS::cvmapping[config_cursor-CVMAP1] = constrain( HS::cvmapping[config_cursor-CVMAP1] + dir, 0, 4);
+            HS::cvmapping[config_cursor-CVMAP1] = constrain( HS::cvmapping[config_cursor-CVMAP1] + dir, 0, ADC_CHANNEL_LAST);
             break;
         case TRIG_LENGTH:
             HS::trig_length = (uint32_t) constrain( int(HS::trig_length + dir), 1, 127);
