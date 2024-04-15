@@ -28,7 +28,7 @@ public:
     void Start() {
         ForEachChannel(ch)
         {
-            p[ch] = 100 - (25 * ch);
+            p_mod[ch] = p[ch] = 100 - (25 * ch);
             trigger_countdown[ch] = 0;
         }
     }
@@ -37,8 +37,9 @@ public:
         ForEachChannel(ch)
         {
             if (Clock(ch)) {
-                int prob = p[ch] + Proportion(DetentedIn(ch), HEMISPHERE_MAX_INPUT_CV, 100);
-                if (random(1, 100) <= prob) {
+                p_mod[ch] = p[ch]; // + Proportion(DetentedIn(ch), HEMISPHERE_MAX_INPUT_CV, 100);
+                Modulate(p_mod[ch], ch, 0, 100);
+                if (random(1, 100) <= p_mod[ch]) {
                     ClockOut(ch);
                     trigger_countdown[ch] = 1667;
                 }
@@ -62,7 +63,7 @@ public:
             MoveCursor(cursor, direction, 1);
             return;
         }
-        p[cursor] = constrain(p[cursor] + direction, 0, 100);
+        p_mod[cursor] = p[cursor] = constrain(p[cursor] + direction, 0, 100);
     }
         
     uint64_t OnDataRequest() {
@@ -73,8 +74,8 @@ public:
     }
 
     void OnDataReceive(uint64_t data) {
-        p[0] = Unpack(data, PackLocation {0,7});
-        p[1] = Unpack(data, PackLocation {7,7});
+        p_mod[0] = p[0] = Unpack(data, PackLocation {0,7});
+        p_mod[1] = p[1] = Unpack(data, PackLocation {7,7});
     }
 
 protected:
@@ -87,6 +88,7 @@ protected:
     
 private:
     int16_t p[2];
+    int16_t p_mod[2];
     int trigger_countdown[2];
     int cursor;
     
@@ -94,8 +96,9 @@ private:
     {
         ForEachChannel(ch)
         {
-            gfxPrint(0 + (31 * ch), 15, p[ch]);
+            gfxPrint(0 + (31 * ch), 15, p_mod[ch]);
             gfxPrint("%");
+            if (p[ch] != p_mod[ch]) gfxIcon(31*ch, 22, CV_ICON);
             if (ch == cursor) gfxCursor(0 + (31 * ch), 23, 30);
         }
     }    
