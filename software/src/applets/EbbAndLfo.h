@@ -2,12 +2,28 @@
 
 class EbbAndLfo : public HemisphereApplet {
 public:
+  enum EbbAndLfoCursor {
+    FREQUENCY,
+    SLOPE_VAL,
+    SHAPE_VAL,
+    FOLD_VAL,
+    OUTPUT_MODES,
+    INPUT_MODES,
+    ONESHOT_MODE,
+
+    MAX_CURSOR = ONESHOT_MODE
+  };
+
   const char *applet_name() { return "Ebb & LFO"; }
 
   void Start() { phase = 0; }
 
   void Controller() {
-    if (Clock(1)) phase = 0;
+    if (Clock(1)) { // reset/retrigger
+      phase = 0;
+      oneshot_active = true;
+    }
+
     if (Clock(0)) {
       clocks_received++;
       //uint32_t next_tick = predictor.Predict(ClockCycleTicks(0));
@@ -16,7 +32,10 @@ public:
         pitch = ComputePitch(new_freq);
         phase = 0;
       }
+      oneshot_active = true;
     }
+
+    if (oneshot_mode && !oneshot_active) return;
 
     // handle CV inputs
     pitch_mod = pitch;
@@ -43,8 +62,18 @@ public:
         }
     }
 
+    uint32_t oldphase = phase;
     uint32_t phase_increment = ComputePhaseIncrement(pitch_mod);
     phase += phase_increment;
+
+    // check for rollover and stop for one-shot mode
+    if (phase < oldphase && oneshot_mode) {
+      phase = 0;
+      oneshot_active = false;
+      Out(0, 0);
+      Out(1, 0);
+      return;
+    }
 
     // COMPUTE
     int s = constrain(slope_mod * 65535 / 127, 0, 65535);
@@ -107,52 +136,59 @@ public:
     gfxLine(p, 15, p, 50);
 
     switch (cursor) {
-    case 0:
+    case FREQUENCY:
       // gfxPrint(0, 55, "Frq:");
       gfxPos(0, 56);
       gfxPrintFreq(pitch);
       break;
-    case 1:
+    case SLOPE_VAL:
       gfxPrint(0, 56, "Slope: ");
       gfxPrint(slope);
       break;
-    case 2:
+    case SHAPE_VAL:
       gfxPrint(0, 56, "Shape: ");
       gfxPrint(shape);
       break;
-    case 3:
+    case FOLD_VAL:
       gfxPrint(0, 56, "Fold: ");
       gfxPrint(fold);
       break;
-    case 4:
+    case OUTPUT_MODES:
       gfxPrint(0, 56, hemisphere == 0 ? "A:" : "C:");
       gfxPrint(out_labels[output(0)]);
       gfxPrint(hemisphere == 0 ? " B:" : " D:");
       gfxPrint(out_labels[output(1)]);
       break;
-    case 5:
+    case INPUT_MODES:
       ForEachChannel(ch) {
           gfxIcon(0 + ch*32, 56, CV_ICON);
           gfxBitmap(8 + ch*32, 56, 3, ch ? SUB_TWO : SUP_ONE);
           gfxPrint(13 + ch*32, 56, cv_labels[cv_type(ch)]);
       }
       break;
+    case ONESHOT_MODE:
+      gfxPrint(0, 56, "Oneshot:");
+      gfxIcon(54, 56, oneshot_mode ? CHECK_ON_ICON : CHECK_OFF_ICON);
+      break;
     }
     if (EditMode()) gfxInvert(0, 55, 64, 9);
   }
 
   void OnButtonPress() {
-    CursorAction(cursor, 5);
+    if (cursor == ONESHOT_MODE)
+      oneshot_mode = !oneshot_mode;
+    else
+      CursorAction(cursor, MAX_CURSOR);
   }
 
   void OnEncoderMove(int direction) {
     if (!EditMode()) {
-        MoveCursor(cursor, direction, 5);
+        MoveCursor(cursor, direction, MAX_CURSOR);
         return;
     }
 
     switch (cursor) {
-    case 0: {
+    case FREQUENCY: {
       uint32_t old_pi = ComputePhaseIncrement(pitch);
       pitch += (knob_accel >> 8) * direction;
       while (ComputePhaseIncrement(pitch) == old_pi) {
@@ -160,29 +196,33 @@ public:
       }
       break;
     }
-    case 1: {
+    case SLOPE_VAL: {
       // slope += (knob_accel >> 4) * direction;
       slope = constrain(slope + direction, 0, 127);
       break;
     }
-    case 2: {
+    case SHAPE_VAL: {
       shape += direction;
       while (shape < 0) shape += 128;
       while (shape > 127) shape -= 128;
       break;
     }
-    case 3: {
+    case FOLD_VAL: {
       fold = constrain(fold + direction, 0, 127);
       break;
     }
-    case 4: {
+    case OUTPUT_MODES: {
       out += direction;
       out %= 0b10000;
       break;
     }
-    case 5:
+    case INPUT_MODES:
       cv += direction;
       cv %= 0b10000;
+      break;
+
+    case ONESHOT_MODE:
+      oneshot_mode = !oneshot_mode;
       break;
     }
 
@@ -251,6 +291,9 @@ private:
   int shape_mod;
   int fold_mod;
   
+  bool oneshot_mode = 0;
+  bool oneshot_active = 0;
+
   int clocks_received = 0;
 
   uint8_t out = 0b0001; // Unipolar on A, bipolar on B

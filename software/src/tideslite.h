@@ -1,9 +1,9 @@
+#pragma once
 #include <stdint.h>
 
-#define LUT_INCREMENTS_SIZE 97
-
-const int16_t kOctave = 12 * 128;
-const uint16_t kSlopeBits = 12;
+static constexpr int LUT_INCREMENTS_SIZE = 97;
+static constexpr int16_t kOctave = 12 * 128;
+static constexpr uint16_t kSlopeBits = 12;
 
 enum TidesLiteFlagBitMask { FLAG_EOA = 1, FLAG_EOR = 2 };
 
