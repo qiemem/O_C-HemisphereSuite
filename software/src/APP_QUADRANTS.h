@@ -336,8 +336,8 @@ public:
         return select_mode > -1;
     }
 
-    template <typename T1, typename T2>
-    void ProcessMIDI(T1 &device, T2 &next_device) {
+    template <typename T1, typename T2, typename T3>
+    void ProcessMIDI(T1 &device, T2 &next_device, T3 &dev3) {
         while (device.read()) {
             const int message = device.getType();
             const int data1 = device.getData1();
@@ -356,14 +356,16 @@ public:
 
             HS::frame.MIDIState.ProcessMIDIMsg(device.getChannel(), message, data1, data2);
             next_device.send(message, data1, data2, device.getChannel(), 0);
+            dev3.send((midi::MidiType)message, data1, data2, device.getChannel());
         }
     }
 
     void Controller() {
         // top-level MIDI-to-CV handling - alters frame outputs
-        ProcessMIDI(usbMIDI, usbHostMIDI);
+        ProcessMIDI(usbMIDI, usbHostMIDI, MIDI1);
         thisUSB.Task();
-        ProcessMIDI(usbHostMIDI, usbMIDI);
+        ProcessMIDI(usbHostMIDI, usbMIDI, MIDI1);
+        ProcessMIDI(MIDI1, usbMIDI, usbHostMIDI);
 
         // Clock Setup applet handles internal clock duties
         ClockSetup_instance.Controller();
