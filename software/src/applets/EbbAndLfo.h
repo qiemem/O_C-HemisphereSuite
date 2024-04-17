@@ -238,6 +238,7 @@ public:
     Pack(data, PackLocation { 30, 7 }, fold);
     Pack(data, PackLocation { 37, 4 }, out);
     Pack(data, PackLocation { 41, 4 }, cv);
+    Pack(data, PackLocation { 45, 1 }, oneshot_mode);
     return data;
   }
 
@@ -249,6 +250,7 @@ public:
     fold = Unpack(data, PackLocation { 30, 7 });
     out = Unpack(data, PackLocation { 37, 4 });
     cv = Unpack(data, PackLocation { 41, 4 });
+    oneshot_mode = Unpack(data, PackLocation { 45, 1 });
   }
 
 protected:
