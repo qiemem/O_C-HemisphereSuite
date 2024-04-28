@@ -18,6 +18,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include "HSicons.h"
+#include "HemisphereApplet.h"
+
 class Strum : public HemisphereApplet {
 public:
   const char *applet_name() { return "Strum"; }
@@ -87,37 +90,50 @@ public:
       gfxCursor(0, 33, 28);
 
     int num_notes = OC::Scales::GetScale(scale).num_notes;
+    const int cursor_width = 9;
+    const int col_width = cursor_width + 2;
+    const int top = 35;
+    const int num_top = top + 10;
     for (int i = 0; i < length; i++) {
-      int row = i / 3;
-      int col = i % 3;
+      int col = i;
       int offset = intervals[i] % num_notes;
       int octave = intervals[i] / num_notes;
       if (offset < 0) {
         offset += num_notes;
         octave -= 1;
       }
-      const uint8_t *octave_mark = octave < 0 ? DOWN_ARROWS + (-octave - 1) * 6
-                                              : UP_ARROWS + (octave - 1) * 6;
+      const uint8_t *octave_mark = octave < 0
+        ? DOWN_ARROWS_BTT + (-octave - 1) * 6
+        : UP_ARROWS_BTT + (octave - 1) * 6;
       int disp_offset = offset + 1;
-      gfxPrint(col * 18 + pad(10, disp_offset), 35 + row * 10, disp_offset);
+      gfxBitmap(col * col_width, num_top, 8, TEENS_8X8 + disp_offset * 8);
+
       if (octave != 0)
-        gfxBitmap(col * 18 + 12, 35 + row * 10, 6, octave_mark);
+        gfxBitmap(col * col_width + 1, top + 2, 6, octave_mark);
       if (cursor == INTERVAL_START + i) {
-        gfxCursor(col * 18, 43 + row * 10, 18);
+        gfxCursor(col * col_width, num_top + 8, cursor_width);
       }
-      if (index - inc == i) {
+      // TODO: Flip indicator on reverse strums, though tbh it looks fine as is
+      if (index - inc == i && inc != 0) {
         int c = inc < 0 ? countdown : last_note_dur - countdown;
-        int x = col * 18 + Proportion(c, last_note_dur, 18);
-        int y = 35 + row * 10;
-        gfxLine(x, y, x, y + 10);
-        if (ViewOut(1))
-          gfxRect(col * 18, 35 + row * 10, 18, 10);
+        int p = Proportion(c, last_note_dur, col_width);
+        int x = col * col_width + p;
+        CONSTRAIN(x, 0, 63);
+        int w = col_width - p;
+        CONSTRAIN(w, 0, 63 - x);
+        int y = top;
+        gfxInvert(x, y, w, 28);
       }
     }
     if (cursor == LENGTH) {
-      gfxCursor(0, 43 + 10 * ((length - 1) / 3), 3 * 18);
+      gfxCursor(0, num_top + 8, min(6 * col_width, 63));
     }
-    gfxPrint(0, 55, disp);
+    for (int i=0; i<length; i++) {
+      int quant_note = disp + (intervals[i] % num_notes);
+      int32_t pitch = quantizer->Lookup(quant_note);
+      int semitone = (MIDIQuantizer::NoteNumber(pitch) + root) % 12;
+      gfxBitmap(col_width * i, 55, 8, NOTE_NAMES + semitone * 8);
+    }
   }
 
   void OnButtonPress() { CursorAction(cursor, 3); }
@@ -197,10 +213,11 @@ private:
 
   int scale = 5;
   int16_t root;
+  int16_t semitones;
 
   int cursor = 0;
 
-  int disp = 0;
+  int disp = 64;
 
   void set_scale(int value) {
     if (value < 0)
