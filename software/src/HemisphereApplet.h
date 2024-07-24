@@ -379,12 +379,14 @@ public:
         int i = static_cast<int>(num);
         float dec = num - i;
         gfxPrint(i);
-        gfxPrint(".");
-        while (digits--) {
-            dec *= 10;
-            i = static_cast<int>(dec);
-            gfxPrint(i);
-            dec -= i;
+        if (digits > 0) {
+            gfxPrint(".");
+            while (digits--) {
+                dec *= 10;
+                i = static_cast<int>(dec);
+                gfxPrint(i);
+                dec -= i;
+            }
         }
     }
 

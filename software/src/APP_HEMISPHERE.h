@@ -1059,7 +1059,7 @@ private:
             break;
 
         case SCREENSAVER_MODE:
-            ++HS::screensaver_mode %= 4;
+            ++HS::screensaver_mode %= 5;
             break;
 
         case CURSOR_MODE:
@@ -1191,12 +1191,18 @@ private:
         gfxPrint(HS::trig_length);
         gfxPrint("ms");
 
-        const char * const ssmodes[4] = { "[blank]", "Meters", "Scope",
+        const char * const ssmodes[5] = { "[blank]", "Meters", "Scope",
         #if defined(__IMXRT1062__)
         "Stars"
         #else
         "Zips"
         #endif
+        #ifdef ARDUINO_TEENSY41
+        , "AuDebug"
+        #else
+        , "[blank]"
+        #endif
+
         };
         gfxPrint(1, 25, "Screensaver:  ");
         gfxPrint( ssmodes[HS::screensaver_mode] );
@@ -1357,6 +1363,11 @@ void HEMISPHERE_menu() {
 
 void HEMISPHERE_screensaver() {
     switch (HS::screensaver_mode) {
+    case 0x4:
+        #ifdef ARDUINO_TEENSY41
+        AudioDebugScreensaver();
+        #endif
+        break;
     case 0x3: // Zips or Stars
         ZapScreensaver(true);
         break;
