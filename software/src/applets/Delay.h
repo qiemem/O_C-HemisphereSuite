@@ -28,10 +28,11 @@ public:
       taps_mixer2.gain(i, j < taps ? 1.0f : 0.0f);
     }
 
-    float w = wet + InF(1);
+    float w = 0.01f * wet + InF(1);
     CONSTRAIN(w, 0.0f, 1.0f);
-    feedback_mixer.gain(FB_WET_CH_1, feedback / taps);
-    feedback_mixer.gain(FB_WET_CH_2, feedback / taps);
+    float f = 0.01f * feedback / taps;
+    feedback_mixer.gain(FB_WET_CH_1, f);
+    feedback_mixer.gain(FB_WET_CH_2, f);
     wet_dry_mixer.gain(WD_WET_CH_1, w);
     wet_dry_mixer.gain(WD_WET_CH_2, w);
     wet_dry_mixer.gain(WD_DRY_CH, 1.0f - w);
@@ -42,12 +43,12 @@ public:
     if (cursor == TIME)
       gfxCursor(0, 23, 6 * 7);
     gfxPrint(0, 25, "FB: ");
-    gfxPrint(100 * feedback, 0);
+    gfxPrint(feedback);
     gfxPrint("%");
     if (cursor == FEEDBACK)
       gfxCursor(0, 32, 6 * 8);
     gfxPrint(0, 35, "Wet: ");
-    gfxPrint(100 * wet, 0);
+    gfxPrint(wet);
     gfxPrint("%");
     if (cursor == WET)
       gfxCursor(0, 42, 6 * 9);
@@ -69,12 +70,12 @@ public:
       CONSTRAIN(delaySecs, 0.0f, MAX_DELAY_SECS);
       break;
     case FEEDBACK:
-      feedback += 0.01f * direction;
-      CONSTRAIN(feedback, 0.0f, 1.0f);
+      feedback += direction;
+      CONSTRAIN(feedback, 0, 100);
       break;
     case WET:
-      wet += 0.01f * direction;
-      CONSTRAIN(wet, 0.0f, 1.0f);
+      wet += direction;
+      CONSTRAIN(wet, 0, 100);
       break;
     case TAPS:
       taps += direction;
@@ -83,8 +84,24 @@ public:
       break;
     }
   }
-  uint64_t OnDataRequest() { return 0; }
-  void OnDataReceive(uint64_t data) {}
+
+  uint64_t OnDataRequest() {
+    uint64_t data = 0;
+    Pack(data, delayLoc, FloatToBits(delaySecs));
+    Pack(data, wetLoc, wet);
+    Pack(data, fbLoc, feedback);
+    Pack(data, tapsLoc, taps - 1);
+    return data;
+  }
+
+  void OnDataReceive(uint64_t data) {
+    if (data != 0) {
+      delaySecs = BitsToFloat(Unpack(data, delayLoc));
+      wet = Unpack(data, wetLoc);
+      feedback = Unpack(data, fbLoc);
+      taps = Unpack(data, tapsLoc) + 1;
+    }
+  }
 
 protected:
   void SetHelp() {}
@@ -100,10 +117,15 @@ private:
 
   int cursor = TIME;
 
-  float delaySecs = 0.1f;
-  float wet = 1.0f;
-  float feedback = 0.0f;
+  float delaySecs = 0.5f;
+  // Only need 7 bits on these but the sign makes CONSTRAIN work
+  int8_t wet = 50;
+  int8_t feedback = 0;
   int taps = 1;
+  PackLocation delayLoc{0, 32};
+  PackLocation wetLoc{32, 7};
+  PackLocation fbLoc{39, 7};
+  PackLocation tapsLoc{46, 3};
 
   const uint8_t FB_DRY_CH = 0;
   const uint8_t FB_WET_CH_1 = 1;

@@ -113,8 +113,9 @@ class_name class_name ## _instance[2]
 #include "applets/hMIDIIn.h"
 #include "applets/hMIDIOut.h"
 #ifdef ARDUINO_TEENSY41
-#include "applets/Freeverb.h"
+// #include "applets/Freeverb.h"
 #include "applets/Delay.h"
+// #include "applets/Polyform.h"
 #endif
 
 //
@@ -203,7 +204,8 @@ static std::tuple<
     StaticApplet<Voltage, 43, 0x10>
     #ifdef ARDUINO_TEENSY41
     , StaticApplet<Delay, 76, 0x00>
-    , StaticApplet<Freeverb, 75, 0x00>
+    // , StaticApplet<Polyform, 76, 0x00>
+    // , StaticApplet<Freeverb, 75, 0x00>
     #endif
 > applet_tuple;
 
