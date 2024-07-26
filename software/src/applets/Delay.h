@@ -56,6 +56,9 @@ public:
     gfxPrint(taps);
     if (cursor == TAPS)
       gfxCursor(0, 52, 6 * 7);
+    gfxPos(0, 55);
+    graphics.printf("%3d%%/%3d%%", static_cast<int>(delay.processorUsage()),
+                    static_cast<int>(delay.processorUsageMax()));
   }
   void OnButtonPress() { CursorToggle(); }
   void OnEncoderMove(int direction) {

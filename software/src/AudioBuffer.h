@@ -3,14 +3,20 @@
 #include <Audio.h>
 #include <smalloc.h>
 
-template <typename T> inline T InterpHermite(T x0, T x1, T x2, T x3, float t) {
-  float a = -0.5f * x0 + 1.5f * x1 - 1.5f * x2 + 0.5f * x3;
-  float b = x0 - 2.5f * x1 + 2.0f * x2 - 0.5f * x3;
-  float c = -0.5f * x0 + 0.5f * x2;
-  float d = x1;
-  return static_cast<T>(a * t * t * t + b * t * t + c * t + d);
+template <typename T>
+constexpr inline T InterpHermite(T xm1, T x0, T x1, T x2, float t) {
+  // https://github.com/pichenettes/stmlib/blob/d18def816c51d1da0c108236928b2bbd25c17481/dsp/dsp.h#L52
+  const float c = (x1 - xm1) * 0.5f;
+  const float v = x0 - x1;
+  const float w = c + v;
+  const float a = w + v + (x2 - x0) * 0.5f;
+  const float b_neg = w + a;
+  return ((((a * t) - b_neg) * t + c) * t + x0);
 }
 
+// TODO: this should be backed by an ordinary ring buffer. I don't think the
+// std::copy helps performance much, so extracting and simplifying the ring
+// logic would both make this easier to work with and simplify things.
 template <size_t NumSamples, typename T = int16_t> class AudioBuffer {
 public:
   /**
@@ -22,6 +28,11 @@ public:
     buffer[write_ix++] = sample;
     if (write_ix >= NumSamples)
       write_ix = 0;
+  }
+
+  T ReadSample(size_t samples_back) {
+    int read_ix = (NumSamples + write_ix - samples_back) % NumSamples;
+    return buffer[read_ix];
   }
 
   void Write(const audio_block_t *block) { Write(block->data); }
@@ -76,14 +87,16 @@ public:
   // TODO:: This is prett innefficient for reading sequences. We should read
   // based on an array of ts instead, reducing dup reads and calcs
   int16_t ReadInterp(float seconds_ago) {
-    int16_t x[4];
+    // int16_t x[4];
     float samples_back = seconds_ago * AUDIO_SAMPLE_RATE;
     size_t samples_back_int = static_cast<size_t>(samples_back);
     // Need point from before target point and we're between samples_back_int
     // and +1, so + 2
-    ReadFromSamplesAgo(samples_back_int + 2, x);
     float t = 1.0f - (samples_back - samples_back_int);
-    return InterpHermite(x[0], x[1], x[2], x[3], t);
+    // Faster to read individual samples than copy block of 4
+    return InterpHermite(
+        ReadSample(samples_back_int + 2), ReadSample(samples_back_int + 1),
+        ReadSample(samples_back_int), ReadSample(samples_back_int - 1), t);
   }
 
 protected:
