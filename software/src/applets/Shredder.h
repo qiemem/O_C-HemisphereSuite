@@ -90,7 +90,8 @@ public:
       if (cursor < 2) {
         Shred(cursor);
       }
-      isEditing = false;
+      else
+        isEditing = false;
     }
 
     void OnButtonPress() {

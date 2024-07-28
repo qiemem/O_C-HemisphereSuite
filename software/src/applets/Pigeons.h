@@ -101,7 +101,7 @@ public:
     }
 
     void AuxButton() {
-      if (EditMode() && (cursor == QUANT_A || cursor == QUANT_B)) {
+      if (cursor == QUANT_A || cursor == QUANT_B) {
         HS::QuantizerEdit( qselect[(cursor == QUANT_B)] );
       }
       isEditing = false;

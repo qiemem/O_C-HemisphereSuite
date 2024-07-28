@@ -264,20 +264,26 @@ public:
     // void OnButtonPress() { }
 
     void AuxButton() {
-      if (cursor == QUANT_A || cursor == QUANT_B) {
+      switch (cursor) {
+      case QUANT_A:
+      case QUANT_B:
         HS::QuantizerEdit(qselect[cursor - QUANT_A]);
-      }
-      if (cursor == PROB) {
+      default:
+        isEditing = false;
+        break;
+
+      case PROB:
         reset_active = !reset_active;
         if (reset_active) {
           // grab snapshots of the registers
           ForEachChannel(ch) reg_snap[ch] = reg[ch];
         }
-      }
-      if (cursor == LENGTH) {
+        break;
+
+      case LENGTH:
         rotate_right = !rotate_right;
+        break;
       }
-      isEditing = false;
     }
 
     void OnEncoderMove(int direction) {
