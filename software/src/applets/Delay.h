@@ -1,8 +1,10 @@
 #pragma once
 
+#include "HSicons.h"
 #include "HemisphereAudioApplet.h"
+#include "dsputils.h"
 #include <Audio.h>
-#include <AudioDelayExt.h>
+#include "AudioDelayExt.h"
 
 class Delay : public HemisphereAudioApplet<Mono> {
 public:
@@ -17,9 +19,14 @@ public:
   void Start() {}
 
   void Controller() {
-    float d = delaySecs + InF(0) * MAX_DELAY_SECS * 0.25f;
-    CONSTRAIN(d, 0.0f, MAX_DELAY_SECS);
+    clock_count++;
+    if (Clock(0)) {
+      clock_base_secs = clock_count / 16666.0f;
+      clock_count = 0;
+    }
+    float d = DelaySecs(delay_exp + In(0));
     for (int tap = 0; tap < taps; tap++) {
+      CONSTRAIN(d, 0.0f, MAX_DELAY_SECS);
       delay.delay(tap, d * (tap + 1) / taps);
     }
     for (int i = 0; i < 4; i++) {
@@ -38,10 +45,33 @@ public:
     wet_dry_mixer.gain(WD_DRY_CH, 1.0f - w);
   }
   void View() {
-    gfxPrint(0, 15, delaySecs * 1000.0f, 0);
-    gfxPrint("ms");
+    // gfxPrint(0, 15, delaySecs * 1000.0f, 0);
+    switch (time_rep) {
+    case SECS:
+      gfxPrint(0, 15, DelaySecs(delay_exp) * 1000.0f, 0);
+      gfxPrint(6 * 6, 15, "ms");
+      break;
+    case HZ:
+      gfxPrint(0, 15, 1.0f / DelaySecs(delay_exp), 2);
+      gfxPrint(6 * 6, 15, "Hz");
+      break;
+    case CLOCK:
+      float r = DelayRatio(delay_exp);
+      if (r < 1.0f) {
+        gfxPrint(0, 15, "/ ");
+        gfxPrint(roundf(1.0f / r), 0);
+      } else {
+        gfxPrint(0, 15, "X ");
+        gfxPrint(roundf(r), 0);
+      }
+      gfxIcon(6 * 6, 15, CLOCK_ICON);
+      break;
+    }
     if (cursor == TIME)
-      gfxCursor(0, 23, 6 * 7);
+      gfxCursor(0, 23, 6 * 6);
+    if (cursor == TIME_REP)
+      gfxCursor(6 * 6, 23, 2 * 6);
+
     gfxPrint(0, 25, "FB: ");
     gfxPrint(feedback);
     gfxPrint("%");
@@ -63,14 +93,30 @@ public:
   void OnButtonPress() { CursorToggle(); }
   void OnEncoderMove(int direction) {
     if (!EditMode()) {
-      MoveCursor(cursor, direction, MAX_CURSOR);
+      MoveCursor(cursor, direction, CURSOR_LENGTH - 1);
       return;
     }
 
+    float cur_delay;
+
     switch (cursor) {
     case TIME:
-      delaySecs += direction * 128 / AUDIO_SAMPLE_RATE;
-      CONSTRAIN(delaySecs, 0.0f, MAX_DELAY_SECS);
+      if (time_rep == CLOCK) {
+        cur_delay = DelayRatio(delay_exp);
+        if (cur_delay < 1.0f || (roundf(cur_delay) == 1.0f && direction > 0)) {
+          delay_exp = -RatioToPitch(1.0f / cur_delay + direction);
+        } else {
+          delay_exp = RatioToPitch(cur_delay - direction);
+        }
+      } else {
+        cur_delay = DelaySecs(delay_exp);
+        while (DelaySecs(delay_exp) == cur_delay)
+          delay_exp += direction;
+      }
+      break;
+    case TIME_REP:
+      time_rep += direction;
+      CONSTRAIN(time_rep, 0, TIME_REP_LENGTH - 1);
       break;
     case FEEDBACK:
       feedback += direction;
@@ -83,26 +129,58 @@ public:
     case TAPS:
       taps += direction;
       CONSTRAIN(taps, 1, 8);
-    case MAX_CURSOR:
+    case CURSOR_LENGTH:
       break;
     }
   }
 
   uint64_t OnDataRequest() {
     uint64_t data = 0;
-    Pack(data, delayLoc, FloatToBits(delaySecs));
-    Pack(data, wetLoc, wet);
-    Pack(data, fbLoc, feedback);
-    Pack(data, tapsLoc, taps - 1);
+    Pack(data, delay_loc, delay_exp);
+    Pack(data, time_rep_loc, time_rep);
+    Pack(data, wet_loc, wet);
+    Pack(data, fb_loc, feedback);
+    Pack(data, taps_loc, taps - 1);
     return data;
   }
 
   void OnDataReceive(uint64_t data) {
     if (data != 0) {
-      delaySecs = BitsToFloat(Unpack(data, delayLoc));
-      wet = Unpack(data, wetLoc);
-      feedback = Unpack(data, fbLoc);
-      taps = Unpack(data, tapsLoc) + 1;
+      delay_exp = Unpack(data, delay_loc);
+      time_rep = Unpack(data, time_rep_loc);
+      wet = Unpack(data, wet_loc);
+      feedback = Unpack(data, fb_loc);
+      taps = Unpack(data, taps_loc) + 1;
+    }
+  }
+
+  float DelaySecs(int16_t exp) {
+    // we need duration, not frequency: negating pitch gets that faster than
+    // `1.0f /`
+    float s;
+    switch (time_rep) {
+    case HZ:
+      // This should keep the number of ms and hz the same, which should be
+      // asthetically pleasing at least.
+      s = (PitchToRatio(-exp)) / 500.0f;
+      break;
+    case CLOCK:
+      s = clock_base_secs / (DelayRatio(exp));
+      break;
+    default:
+    case SECS:
+      s = 0.5f * (PitchToRatio(exp));
+      break;
+    }
+    CONSTRAIN(s, 0.0f, MAX_DELAY_SECS);
+    return s;
+  }
+
+  float DelayRatio(int16_t exp) {
+    if (exp < 0) {
+      return 1.0f / roundf(PitchToRatio(-exp));
+    } else {
+      return roundf(PitchToRatio(exp));
     }
   }
 
@@ -112,23 +190,36 @@ protected:
 private:
   enum Cursor {
     TIME,
+    TIME_REP,
     FEEDBACK,
     WET,
     TAPS,
-    MAX_CURSOR,
+    CURSOR_LENGTH,
+  };
+
+  enum TimeRep {
+    SECS,
+    CLOCK,
+    HZ,
+    TIME_REP_LENGTH,
   };
 
   int cursor = TIME;
 
-  float delaySecs = 0.5f;
+  int16_t delay_exp = 0;
+  uint8_t time_rep = 0;
   // Only need 7 bits on these but the sign makes CONSTRAIN work
   int8_t wet = 50;
   int8_t feedback = 0;
-  int taps = 1;
-  PackLocation delayLoc{0, 32};
-  PackLocation wetLoc{32, 7};
-  PackLocation fbLoc{39, 7};
-  PackLocation tapsLoc{46, 3};
+  int8_t taps = 1;
+  PackLocation delay_loc{0, 16};
+  PackLocation time_rep_loc{16, 4};
+  PackLocation wet_loc{32, 7};
+  PackLocation fb_loc{39, 7};
+  PackLocation taps_loc{46, 3};
+
+  uint32_t clock_count = 0;
+  float clock_base_secs = 0.0f;
 
   const uint8_t FB_DRY_CH = 0;
   const uint8_t FB_WET_CH_1 = 1;
