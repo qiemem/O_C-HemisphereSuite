@@ -1,10 +1,10 @@
 #pragma once
 
+#include "AudioDelayExt.h"
 #include "HSicons.h"
 #include "HemisphereAudioApplet.h"
 #include "dsputils.h"
 #include <Audio.h>
-#include "AudioDelayExt.h"
 
 class Delay : public HemisphereAudioApplet<Mono> {
 public:
@@ -25,9 +25,14 @@ public:
       clock_count = 0;
     }
     float d = DelaySecs(delay_exp + In(0));
+    float f = 0.01f * feedback / taps;
     for (int tap = 0; tap < taps; tap++) {
       CONSTRAIN(d, 0.0f, MAX_DELAY_SECS);
       delay.delay(tap, d * (tap + 1) / taps);
+      delay.feedback(tap, f);
+    }
+    for (int tap = taps; tap < 8; tap++) {
+      delay.feedback(tap, 0);
     }
     for (int i = 0; i < 4; i++) {
       taps_mixer1.gain(i, i < taps ? 1.0f : 0.0f);
@@ -37,9 +42,6 @@ public:
 
     float w = 0.01f * wet + InF(1);
     CONSTRAIN(w, 0.0f, 1.0f);
-    float f = 0.01f * feedback / taps;
-    feedback_mixer.gain(FB_WET_CH_1, f);
-    feedback_mixer.gain(FB_WET_CH_2, f);
     wet_dry_mixer.gain(WD_WET_CH_1, w);
     wet_dry_mixer.gain(WD_WET_CH_2, w);
     wet_dry_mixer.gain(WD_DRY_CH, 1.0f - w);
@@ -221,9 +223,6 @@ private:
   uint32_t clock_count = 0;
   float clock_base_secs = 0.0f;
 
-  const uint8_t FB_DRY_CH = 0;
-  const uint8_t FB_WET_CH_1 = 1;
-  const uint8_t FB_WET_CH_2 = 2;
   const uint8_t WD_DRY_CH = 0;
   const uint8_t WD_WET_CH_1 = 1;
   const uint8_t WD_WET_CH_2 = 2;
@@ -233,15 +232,10 @@ private:
   static constexpr float MAX_DELAY_SECS = DELAY_LENGTH / AUDIO_SAMPLE_RATE;
 
   AudioDelayExt<DELAY_LENGTH, 8> delay;
-  AudioMixer4 feedback_mixer;
-  AudioConnection input_conn{input_stream, 0, feedback_mixer, FB_DRY_CH};
-  AudioConnection delay_in{feedback_mixer, 0, delay, 0};
+  AudioConnection input_conn{input_stream, delay};
   AudioConnection taps_conns[8];
   AudioMixer4 taps_mixer1;
   AudioMixer4 taps_mixer2;
-
-  AudioConnection feedback_out1{taps_mixer1, 0, feedback_mixer, FB_WET_CH_1};
-  AudioConnection feedback_out2{taps_mixer2, 0, feedback_mixer, FB_WET_CH_2};
 
   AudioMixer4 wet_dry_mixer;
   AudioConnection wet_conn1{taps_mixer1, 0, wet_dry_mixer, WD_WET_CH_1};
