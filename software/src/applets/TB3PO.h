@@ -35,7 +35,9 @@ class TB_3PO: public HemisphereApplet {
 
     enum TB3POCursor {
       LOCK_SEED, DIGIT1, DIGIT2, DIGIT3, DIGIT4,
-      DENSITY, SCALE, ROOT, LENGTH,
+      DENSITY, QSELECT, LENGTH,
+
+      MAX_CURSOR = LENGTH
     };
 
     const char * applet_name() { // Maximum 10 characters
@@ -47,7 +49,8 @@ class TB_3PO: public HemisphereApplet {
     rand_apply_anim = 0;
     curr_step_semitone = 0;
 
-    set_quantizer_scale(GetScale(0));
+    qselect = io_offset;
+    set_quantizer_scale();
 
     density = 12;
     density_encoder_display = 0;
@@ -85,7 +88,7 @@ class TB_3PO: public HemisphereApplet {
 
     transpose_cv = 0;
     if (DetentedIn(0)) {
-      transpose_cv = Quantize(0, In(0), 0, 0); // Use root == 0 to start at c
+      transpose_cv = HS::Quantize(qselect, In(0), 0, 0); // Use root == 0 to start at c
     }
 
     if (EditMode() && cursor == 5) density_auto[step] = density_encoder;
@@ -178,15 +181,15 @@ class TB_3PO: public HemisphereApplet {
     if (cursor == DENSITY) {
       density_auto_enabled = !density_auto_enabled;
     }
-    if (cursor == SCALE || cursor == ROOT) {
-      HS::QuantizerEdit(io_offset);
+    if (cursor == QSELECT) {
+      HS::QuantizerEdit(qselect);
     }
     isEditing = false;
   }
 
   void OnEncoderMove(int direction) {
     if (!EditMode()) { // move cursor
-      MoveCursor(cursor, direction, 8);
+      MoveCursor(cursor, direction, MAX_CURSOR);
 
       if (!lock_seed && cursor == 1) cursor = 5; // skip from 1 to 5 if not locked
       if (!lock_seed && cursor == 4) cursor = 0; // skip from 4 to 0 if not locked
@@ -225,30 +228,12 @@ class TB_3PO: public HemisphereApplet {
       density_encoder_display = 400; // How long to show the encoder version of density in the number display for
 
       break;
-    case SCALE: { // Scale selection
-      NudgeScale(0, direction);
-      set_quantizer_scale(GetScale(0));
+    case QSELECT:
+      qselect = constrain(qselect + direction, 0, QUANT_CHANNEL_COUNT - 1);
+      set_quantizer_scale();
+      HS::qview = qselect;
+      HS::PokePopup(QUANTIZER_POPUP);
       break;
-    }
-    case ROOT: { // Root note selection
-
-      int r = GetRootNote(0) + direction;
-      int8_t &q_oct = HS::q_octave[io_offset];
-      const int max_root = 12;
-
-      if (direction > 0 && r >= max_root && q_oct < 3) {
-        ++q_oct; // Go up to next octave
-        r = 0; // Roll around root note
-      } else if (direction < 0 && r < 0 && q_oct > -3) {
-        --q_oct;
-
-        r = max_root - 1;
-      }
-
-      SetRootNote(0, r);
-
-      break;
-    }
     case LENGTH: // pattern length
       num_steps = constrain(num_steps + direction, 1, 32);
       break;
@@ -258,29 +243,33 @@ class TB_3PO: public HemisphereApplet {
   uint64_t OnDataRequest() {
     uint64_t data = 0;
 
-    Pack(data, PackLocation { 0, 8 }, GetScale(0));
-    Pack(data, PackLocation { 8, 4 }, GetRootNote(0));
+    // old scale and root settings were here:
+    //Pack(data, PackLocation { 0, 8 }, GetScale(0));
+    //Pack(data, PackLocation { 8, 4 }, GetRootNote(0));
+
     Pack(data, PackLocation { 12, 4 }, density_encoder);
     Pack(data, PackLocation { 16, 16 }, seed);
-    Pack(data, PackLocation { 32, 8 }, HS::q_octave[io_offset]);
+    // old octave setting was here:
+    //Pack(data, PackLocation { 32, 8 }, HS::q_octave[io_offset]);
     Pack(data, PackLocation { 40, 5 }, num_steps - 1);
+
+    Pack(data, PackLocation { 48, 4 }, qselect);
+
     return data;
   }
 
   void OnDataReceive(uint64_t data) {
 
-    int scale = Unpack(data, PackLocation { 0, 8 });
-    SetRootNote(0, Unpack(data, PackLocation { 8, 4 }));
     density_encoder = Unpack(data, PackLocation { 12, 4 });
     seed = Unpack(data, PackLocation { 16, 16 });
-    HS::q_octave[io_offset] = Unpack(data, PackLocation { 32, 8 });
-    CONSTRAIN(HS::q_octave[io_offset], -3, 3);
+
     num_steps = Unpack(data, PackLocation { 40, 5 }) + 1;
+    qselect = Unpack(data, PackLocation { 48, 4 });
+    CONSTRAIN(qselect, 0, QUANT_CHANNEL_COUNT - 1);
 
-    SetScale(0, scale);
-    set_quantizer_scale(scale);
+    set_quantizer_scale();
 
-    density_encoder = constrain(density_encoder, 0, 14); // Internally just positive
+    CONSTRAIN(density_encoder, 0, 14); // Internally just positive
     density = density_encoder;
 
     // Restore all seed-derived settings!
@@ -345,6 +334,7 @@ private:
   uint32_t oct_downs = 0; // Bitfield of octave downs
   uint8_t notes[ACID_MAX_STEPS]; // Note values
 
+  int qselect = io_offset;
   uint8_t scale_size; // The size of the currently set quantizer scale (for octave detection, etc)
   uint8_t current_pattern_scale_size; // Track what size scale was used to render the current pattern (for change detection)
 
@@ -383,14 +373,14 @@ private:
     quant_note = constrain(quant_note, 0, 127);
 
     // root note is the semitone offset after quantization
-    return QuantizerLookup(0, quant_note);
+    return HS::QuantizerLookup(qselect, quant_note);
     //return QuantizerLookup(0, 64 );  // Test: note 64 is definitely 0v=c4 if output directly, on ALL scales
   }
 
   int get_semitone_for_step(int step_num) {
     // Don't add in octaves-- use the current quantizer limited to the base octave
     int quant_note = 64 + notes[step_num]; // + transpose_note_in;
-    int32_t cv_note = QuantizerLookup(0, constrain(quant_note, 0, 127));
+    int32_t cv_note = HS::QuantizerLookup(qselect, constrain(quant_note, 0, 127));
     return (MIDIQuantizer::NoteNumber(cv_note)) % 12;
   }
 
@@ -579,7 +569,8 @@ private:
   }
 
   // deprecated - only used to cache num_notes
-  void set_quantizer_scale(int new_scale) {
+  void set_quantizer_scale() {
+    const int new_scale = HS::GetScale(qselect);
     const braids::Scale &quant_scale = OC::Scales::GetScale(new_scale);
     scale_size = quant_scale.num_notes; // Track this scale size for octaves and display
   }
@@ -660,13 +651,18 @@ private:
     gfxPrint(14, 37, dens_display);
     if (density_auto_enabled) gfxFrame(8, 35, 16, 11, true);
 
-    // Scale and root note select
-    gfxPrint(38, 26, OC::scale_names_short[GetScale(0)]);
+    if (cursor == QSELECT) {
+      const char txt[] = { 'Q', char('1' + qselect), '\0' };
+      gfxPrint(44, 31, txt);
+    } else {
+      // Show scale and root note like old times
+      gfxPrint(38, 26, OC::scale_names_short[HS::GetScale(qselect)]);
 
-    int8_t &q_oct = HS::q_octave[io_offset];
-    gfxPrint((q_oct == 0 ? 44 : 38), 36, OC::Strings::note_names_unpadded[GetRootNote(0)]);
-    if (q_oct != 0) {
-      gfxPrint(50, 36, q_oct);
+      int8_t &q_oct = HS::q_octave[io_offset];
+      gfxPrint((q_oct == 0 ? 44 : 38), 36, OC::Strings::note_names_unpadded[HS::GetRootNote(qselect)]);
+      if (q_oct != 0) {
+        gfxPrint(50, 36, q_oct);
+      }
     }
 
     // Current / total steps
@@ -722,7 +718,6 @@ private:
     // Draw edit cursor
     switch (cursor) {
     case LOCK_SEED:
-      // Set length to indicate length
       gfxCursor(14, 23, lock_seed ? 11 : 36); // Seed = auto-randomize / locked-manual
       break;
     case DIGIT1:
@@ -732,16 +727,13 @@ private:
       gfxCursor(25 + 6 * (cursor - 1), 23, 7);
       break;
     case DENSITY:
-      gfxSpicyCursor(9, 45, 14); // density
+      gfxSpicyCursor(9, 45, 14);
       break;
-    case SCALE:
-      gfxSpicyCursor(38, 34, 25); // scale
-      break;
-    case ROOT:
-      gfxSpicyCursor(38, 44, 24); // root note
+    case QSELECT:
+      gfxSpicyCursor(44, 39, 13);
       break;
     case LENGTH:
-      gfxCursor(20, 54, 12, 8); // step
+      gfxCursor(20, 54, 12, 8);
       break;
     }
   }
