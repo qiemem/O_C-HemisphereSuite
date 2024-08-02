@@ -24,11 +24,19 @@ public:
       clock_base_secs = clock_count / 16666.0f;
       clock_count = 0;
     }
-    float d = DelaySecs(delay_exp + In(0));
+    float d = DelaySecs(delay_exp + delay_cv.Process(In(0)));
     float f = 0.01f * feedback / taps;
     for (int tap = 0; tap < taps; tap++) {
+      float t = d * (tap + 1.0f) / taps;
       CONSTRAIN(d, 0.0f, MAX_DELAY_SECS);
-      delay.delay(tap, d * (tap + 1) / taps);
+      switch (delay_mod_type) {
+      case CROSSFADE:
+        delay.cf_delay(tap, t);
+        break;
+      case STRETCH:
+        delay.delay(tap, t);
+        break;
+      }
       delay.feedback(tap, f);
     }
     for (int tap = taps; tap < 8; tap++) {
@@ -46,6 +54,7 @@ public:
     wet_dry_mixer.gain(WD_WET_CH_2, w);
     wet_dry_mixer.gain(WD_DRY_CH, 1.0f - w);
   }
+
   void View() {
     // gfxPrint(0, 15, delaySecs * 1000.0f, 0);
     switch (time_rep) {
@@ -69,10 +78,16 @@ public:
       gfxIcon(6 * 6, 15, CLOCK_ICON);
       break;
     }
+    if (delay_mod_type == CROSSFADE)
+      gfxIcon(6 * 8, 15, CHECK_OFF_ICON);
+    else
+      gfxIcon(6 * 8, 15, CHECK_ON_ICON);
     if (cursor == TIME)
       gfxCursor(0, 23, 6 * 6);
     if (cursor == TIME_REP)
       gfxCursor(6 * 6, 23, 2 * 6);
+    if (cursor == TIME_MOD)
+      gfxCursor(6 * 8, 23, 8);
 
     gfxPrint(0, 25, "FB: ");
     gfxPrint(feedback);
@@ -119,6 +134,10 @@ public:
     case TIME_REP:
       time_rep += direction;
       CONSTRAIN(time_rep, 0, TIME_REP_LENGTH - 1);
+      break;
+    case TIME_MOD:
+      delay_mod_type += direction;
+      CONSTRAIN(delay_mod_type, 0, 1);
       break;
     case FEEDBACK:
       feedback += direction;
@@ -193,6 +212,7 @@ private:
   enum Cursor {
     TIME,
     TIME_REP,
+    TIME_MOD,
     FEEDBACK,
     WET,
     TAPS,
@@ -206,6 +226,11 @@ private:
     TIME_REP_LENGTH,
   };
 
+  enum TimeMod {
+    CROSSFADE,
+    STRETCH,
+  };
+
   int cursor = TIME;
 
   int16_t delay_exp = 0;
@@ -214,11 +239,21 @@ private:
   int8_t wet = 50;
   int8_t feedback = 0;
   int8_t taps = 1;
+  int8_t delay_mod_type = CROSSFADE;
   PackLocation delay_loc{0, 16};
   PackLocation time_rep_loc{16, 4};
   PackLocation wet_loc{32, 7};
   PackLocation fb_loc{39, 7};
   PackLocation taps_loc{46, 3};
+
+  NoiseSuppressor delay_cv{
+      0.0f,
+      0.05f, // This needs checking against various sequencers and such
+      // 16 determined empirically by checking typical range with static
+      // voltages
+      16.0f,
+      64, // a little less than 4ms
+  };
 
   uint32_t clock_count = 0;
   float clock_base_secs = 0.0f;
