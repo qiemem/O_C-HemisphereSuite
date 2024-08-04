@@ -107,6 +107,7 @@ public:
       break;
     case 1:
       SetRootNote(0, GetRootNote(0) + direction);
+      SetRootNote(1, GetRootNote(0));
       break;
     default:
       // shouldn't happen...
@@ -126,6 +127,7 @@ public:
   void OnDataReceive(uint64_t data) {
     SetScale(0, Unpack(data, PackLocation{0, 8}));
     SetRootNote(0, Unpack(data, PackLocation{8, 4}));
+    SetRootNote(1, GetRootNote(0));
     chord_mask = Unpack(data, PackLocation{12, 16});
     update_chord_quantizer();
   }
