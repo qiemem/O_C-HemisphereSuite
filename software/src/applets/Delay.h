@@ -114,6 +114,11 @@ public:
       return;
     }
 
+    knob_accel += direction - direction * (millis_since_turn / 10);
+    if (direction * knob_accel <= 0)
+      knob_accel = direction;
+    CONSTRAIN(knob_accel, -100, 100);
+
     float cur_delay;
 
     switch (cursor) {
@@ -128,7 +133,7 @@ public:
       } else {
         cur_delay = DelaySecs(delay_exp);
         while (DelaySecs(delay_exp) == cur_delay)
-          delay_exp += direction;
+          delay_exp += knob_accel;
       }
       break;
     case TIME_REP:
@@ -153,6 +158,7 @@ public:
     case CURSOR_LENGTH:
       break;
     }
+    millis_since_turn = 0;
   }
 
   uint64_t OnDataRequest() {
@@ -257,6 +263,9 @@ private:
 
   uint32_t clock_count = 0;
   float clock_base_secs = 0.0f;
+
+  int16_t knob_accel = 0;
+  elapsedMillis millis_since_turn;
 
   const uint8_t WD_DRY_CH = 0;
   const uint8_t WD_WET_CH_1 = 1;
