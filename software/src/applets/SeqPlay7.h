@@ -124,12 +124,15 @@ public:
         }
       }
 
-      // continuously output pitch for glides
+      int transpose_cv = DetentedIn(0);
+      int play_cv = HS::Quantize(seq_player[player_index].qselect, play_cv_ + transpose_cv);
+
+      // continuously output pitch for glides and transpose (aka input quantizer with sequenced shifting and scale selection, etc.)
       if (play_accent_) {
         // glide
-        SmoothedOut(0, play_cv_, GLIDE_FACTOR);
+        SmoothedOut(0, play_cv, GLIDE_FACTOR);
       } else {
-        Out(0, play_cv_);
+        Out(0, play_cv);
       }
 
       if (flash_ticker) --flash_ticker;
@@ -204,7 +207,7 @@ protected:
         //                    "-------" <-- Label size guide
         help[HELP_DIGITAL1] = "Clock";
         help[HELP_DIGITAL2] = "Reset";
-        help[HELP_CV1]      = "";
+        help[HELP_CV1]      = "Transp";
         help[HELP_CV2]      = "";
         help[HELP_OUT1]     = "Pitch";
         help[HELP_OUT2]     = "Gate";
