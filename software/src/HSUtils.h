@@ -191,14 +191,16 @@ namespace HS {
   extern uint32_t popup_tick; // for button feedback
   extern PopupType popup_type;
   extern uint8_t qview; // which quantizer's setting is shown in popup
-  extern bool q_edit;
+  extern int q_edit;
 
   // input quantizers, because sometimes we need hysteresis
   extern OC::SemitoneQuantizer input_quant[ADC_CHANNEL_LAST];
+
   extern braids::Quantizer quantizer[QUANT_CHANNEL_COUNT]; // global shared quantizers
   extern int quant_scale[QUANT_CHANNEL_COUNT];
   extern int8_t root_note[QUANT_CHANNEL_COUNT];
   extern int8_t q_octave[QUANT_CHANNEL_COUNT];
+  extern uint16_t q_mask[QUANT_CHANNEL_COUNT];
 
   extern int octave_max;
 
@@ -225,6 +227,7 @@ namespace HS {
   void NudgeOctave(int ch, int dir);
   void NudgeScale(int ch, int dir);
   void QuantizerEdit(int ch);
+  void QEditEncoderMove(bool rightenc, int dir);
   void DrawPopup(const int config_cursor = 0, const int preset_id = 0, const bool blink = 0);
   void ToggleClockRun();
   void PokePopup(PopupType pop);

@@ -614,11 +614,7 @@ public:
         int h = (event.control == OC::CONTROL_ENCODER_L) ? LEFT_HEMISPHERE : RIGHT_HEMISPHERE;
         HEM_SIDE slot = HEM_SIDE(view_slot[h]*2 + h);
         if (HS::q_edit) {
-          if (h == LEFT_HEMISPHERE) {
-            HS::NudgeScale(HS::qview, event.value);
-          } else {
-            HS::NudgeRootNote(HS::qview, event.value);
-          }
+          HS::QEditEncoderMove(h, event.value);
           return;
         }
 

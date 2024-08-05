@@ -12,13 +12,16 @@ namespace HS {
   uint32_t popup_tick; // for button feedback
   PopupType popup_type = MENU_POPUP;
   uint8_t qview = 0; // which quantizer's setting is shown in popup
-  bool q_edit = false; // flag to edit current quantizer
+  int q_edit = 0; // edit cursor for quantizer popup, 0 = not editing
 
   OC::SemitoneQuantizer input_quant[ADC_CHANNEL_LAST];
+
   braids::Quantizer quantizer[QUANT_CHANNEL_COUNT]; // global shared quantizers
   int quant_scale[QUANT_CHANNEL_COUNT];
   int8_t root_note[QUANT_CHANNEL_COUNT];
   int8_t q_octave[QUANT_CHANNEL_COUNT];
+  uint16_t q_mask[QUANT_CHANNEL_COUNT];
+
   // for Beat Sync'd octave or key switching
   int next_ch = -1;
   int8_t next_octave, next_root_note;
@@ -79,6 +82,7 @@ namespace HS {
   void QuantizerConfigure(int ch, int scale, uint16_t mask) {
     CONSTRAIN(scale, 0, OC::Scales::NUM_SCALES - 1);
     quant_scale[ch] = scale;
+    q_mask[ch] = mask;
     quantizer[ch].Configure(OC::Scales::GetScale(scale), mask);
   }
   int GetScale(int ch) {
@@ -129,11 +133,46 @@ namespace HS {
     s+= dir;
     if (s >= max) s = 0;
     if (s < 0) s = max - 1;
-    QuantizerConfigure(ch, s);
+    QuantizerConfigure(ch, s, q_mask[ch]);
+  }
+  void RotateMask(int ch, int dir) {
+    const size_t scale_size = OC::Scales::GetScale( quant_scale[ch] ).num_notes;
+    uint16_t &mask = q_mask[ch];
+    uint16_t used_bits = ~(0xffffU << scale_size);
+    mask &= used_bits;
+
+    if (dir < 0) {
+      dir = -dir;
+      mask = (mask >> dir) | (mask << (scale_size - dir));
+    } else {
+      mask = (mask << dir) | (mask >> (scale_size - dir));
+    }
+    // mask |= ~used_bits; // fill upper bits
+    quantizer[ch].Configure(OC::Scales::GetScale(quant_scale[ch]), mask);
   }
   void QuantizerEdit(int ch) {
     qview = constrain(ch, 0, QUANT_CHANNEL_COUNT - 1);
-    q_edit = true;
+    q_edit = 1;
+  }
+  void QEditEncoderMove(bool rightenc, int dir) {
+    if (!rightenc) {
+      // left encoder moves q_edit cursor
+      const int scale_size = OC::Scales::GetScale( quant_scale[qview] ).num_notes;
+      q_edit = constrain(q_edit + dir, 1, 3 + scale_size);
+    } else {
+      // right encoder is delegated
+      if (q_edit == 1) // scale
+        NudgeScale(qview, dir);
+      else if (q_edit == 2) // root
+        NudgeRootNote(qview, dir);
+      else if (q_edit == 3) { // mask rotate
+        RotateMask(qview, dir);
+      } else { // edit mask bits
+        const int idx = q_edit - 4;
+        uint16_t mask = dir>0 ? (q_mask[qview] | (1u << idx)) : (q_mask[qview] & ~(1u << idx));
+        QuantizerConfigure(qview, quant_scale[qview], mask);
+      }
+    }
   }
 
   void DrawPopup(const int config_cursor, const int preset_id, const bool blink) {
@@ -147,6 +186,10 @@ namespace HS {
     if (popup_type == MENU_POPUP) {
       graphics.clearRect(73, 25, 54, 38);
       graphics.drawFrame(74, 26, 52, 36);
+    } else if (popup_type == QUANTIZER_POPUP) {
+      graphics.clearRect(20, 23, 88, 28);
+      graphics.drawFrame(21, 24, 86, 26);
+      graphics.setPrintPos(26, 28);
     } else {
       graphics.clearRect(23, 23, 82, 18);
       graphics.drawFrame(24, 24, 80, 16);
@@ -199,8 +242,27 @@ namespace HS {
         graphics.print(OC::Strings::note_names[ root ]);
         if (octave >= 0) graphics.print("+");
         graphics.print(octave);
+
+        // scale mask
+        const size_t scale_size = OC::Scales::GetScale( quant_scale[qview] ).num_notes;
+        for (size_t i = 0; i < scale_size; ++i) {
+          const int x = 24 + i*5;
+
+          if (q_mask[qview] >> i & 1)
+            gfxRect(x, 40, 4, 4);
+          else
+            gfxFrame(x, 40, 4, 4);
+        }
+
         if (q_edit) {
-          gfxInvert(23, 23, 82, 18);
+          if (q_edit < 3) // scale or root
+            gfxIcon(26 + 26*q_edit, 35, UP_BTN_ICON);
+          else if (q_edit == 3) // mask rotate
+            gfxFrame(23, 39, 81, 6, true);
+          else
+            gfxIcon(22 + (q_edit-4)*5, 44, UP_BTN_ICON);
+
+          gfxInvert(20, 23, 88, 28);
         }
         break;
       }
