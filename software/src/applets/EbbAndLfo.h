@@ -20,12 +20,15 @@ public:
   void Start() { phase = 0; }
 
   void Controller() {
+    if (knob_accel > (1 << 8))
+      knob_accel--;
+
     if (Clock(1)) { // reset/retrigger
       phase = 0;
       oneshot_active = true;
     }
 
-    if (Clock(0)) {
+    if (!freqlock && Clock(0)) {
       clocks_received++;
       //uint32_t next_tick = predictor.Predict(ClockCycleTicks(0));
       if (clocks_received > 1) {
@@ -35,8 +38,6 @@ public:
       }
       oneshot_active = true;
     }
-
-    if (oneshot_mode && !oneshot_active) return;
 
     // handle CV inputs
     pitch_mod = pitch;
@@ -67,6 +68,8 @@ public:
             break;
         }
     }
+
+    if (oneshot_mode && !oneshot_active) return;
 
     uint32_t oldphase = phase;
     uint32_t phase_increment = ComputePhaseIncrement(pitch_mod);
@@ -105,9 +108,6 @@ public:
         break;
       }
     }
-
-    if (knob_accel > (1 << 8))
-      knob_accel--;
   }
 
   void View() {
@@ -148,8 +148,9 @@ public:
       break;
     case FREQUENCY:
       // gfxPrint(0, 55, "Frq:");
-      gfxPos(0, 56);
+      gfxPos(2, 56);
       gfxPrintFreq(pitch);
+      if (freqlock) gfxIcon(56, 56, LOCK_ICON);
       break;
     case SLOPE_VAL:
       gfxPrint(0, 56, "Slope: ");
@@ -193,6 +194,12 @@ public:
     else
       CursorToggle();
   }
+  void AuxButton() {
+    if (cursor == FREQUENCY) {
+      freqlock = !freqlock;
+    }
+    isEditing = false;
+  }
 
   void OnEncoderMove(int direction) {
     if (!EditMode()) {
@@ -211,6 +218,7 @@ public:
       while (ComputePhaseIncrement(pitch) == old_pi) {
         pitch += direction;
       }
+      freqlock = true;
       break;
     }
     case SLOPE_VAL: {
@@ -320,6 +328,7 @@ private:
   
   bool oneshot_mode = 0;
   bool oneshot_active = 0;
+  bool freqlock = 0;
 
   int clocks_received = 0;
 
