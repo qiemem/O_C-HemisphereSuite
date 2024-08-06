@@ -57,14 +57,15 @@ public:
 
   void View() {
     // gfxPrint(0, 15, delaySecs * 1000.0f, 0);
+    int unit_x = 6 * 8;
     switch (time_units) {
     case SECS:
       gfxPrint(0, 15, DelaySecs(delay_time) * 1000.0f, 0);
-      gfxPrint(6 * 6, 15, "ms");
+      gfxPrint(unit_x, 15, "ms");
       break;
     case HZ:
       gfxPrint(0, 15, 1.0f / DelaySecs(delay_time), 2);
-      gfxPrint(6 * 6, 15, "Hz");
+      gfxPrint(unit_x, 15, "Hz");
       break;
     case CLOCK:
       float r = DelayRatio(delay_time);
@@ -75,37 +76,44 @@ public:
         gfxPrint(0, 15, "X ");
         gfxPrint(roundf(r), 0);
       }
-      gfxIcon(6 * 6, 15, CLOCK_ICON);
+      gfxIcon(unit_x, 15, CLOCK_ICON);
       break;
     }
-    if (delay_mod_type == CROSSFADE)
-      gfxIcon(6 * 8, 15, CHECK_OFF_ICON);
-    else
-      gfxIcon(6 * 8, 15, CHECK_ON_ICON);
     if (cursor == TIME)
       gfxCursor(0, 23, 6 * 6);
-    if (cursor == TIME_REP)
-      gfxCursor(6 * 6, 23, 2 * 6);
-    if (cursor == TIME_MOD)
-      gfxCursor(6 * 8, 23, 8);
+    if (cursor == TIME_UNITS)
+      gfxCursor(unit_x, 23, 2 * 6);
 
     gfxPrint(0, 25, "FB: ");
-    gfxPrint(feedback);
-    gfxPrint("%");
+    gfxPos(60 - 4 * 6, 25);
+    graphics.printf("%3d%%", feedback);
     if (cursor == FEEDBACK)
-      gfxCursor(0, 32, 6 * 8);
+      gfxCursor(60 - 4 * 6, 32, 4 * 6);
+
     gfxPrint(0, 35, "Wet: ");
-    gfxPrint(wet);
-    gfxPrint("%");
+    gfxPos(60 - 4 * 6, 35);
+    graphics.printf("%3d%%", wet);
     if (cursor == WET)
-      gfxCursor(0, 42, 6 * 9);
+      gfxCursor(60 - 4 * 6, 42, 4 * 6);
+
     gfxPrint(0, 45, "Taps: ");
-    gfxPrint(taps);
+    gfxPrint(54, 45, taps);
     if (cursor == TAPS)
-      gfxCursor(0, 52, 6 * 7);
-    gfxPos(0, 55);
-    graphics.printf("%3d%%/%3d%%", static_cast<int>(delay.processorUsage()),
-                    static_cast<int>(delay.processorUsageMax()));
+      gfxCursor(54, 52, 6);
+
+    switch (delay_mod_type) {
+    case CROSSFADE:
+      gfxPrint(0, 55, "Crossfade");
+      break;
+    case STRETCH:
+      gfxPrint(0, 55, "Stretch");
+      break;
+    }
+    if (cursor == TIME_MOD)
+      gfxCursor(0, 62, 9 * 6);
+    // gfxPos(0, 55);
+    // graphics.printf("%3d%%/%3d%%", static_cast<int>(delay.processorUsage()),
+    //                 static_cast<int>(delay.processorUsageMax()));
   }
   void OnButtonPress() { CursorToggle(); }
   void OnEncoderMove(int direction) {
@@ -128,8 +136,9 @@ public:
         while (DelaySecs(delay_time) == cur_delay)
           delay_time += knob_accel;
       }
+      CONSTRAIN(delay_time, INT16_MIN, INT16_MAX);
       break;
-    case TIME_REP:
+    case TIME_UNITS:
       time_units += direction;
       CONSTRAIN(time_units, 0, TIME_REP_LENGTH - 1);
       break;
@@ -220,11 +229,11 @@ protected:
 private:
   enum Cursor {
     TIME,
-    TIME_REP,
-    TIME_MOD,
+    TIME_UNITS,
     FEEDBACK,
     WET,
     TAPS,
+    TIME_MOD,
     CURSOR_LENGTH,
   };
 
@@ -242,7 +251,8 @@ private:
 
   int cursor = TIME;
 
-  int16_t delay_time = 0;
+  // only uses 16 bits, but do 32 to make CONSTRAIN easier
+  int32_t delay_time = 0;
   uint8_t time_units = 0;
   // Only need 7 bits on these but the sign makes CONSTRAIN work
   int8_t wet = 50;
@@ -275,7 +285,7 @@ private:
   const uint8_t WD_WET_CH_2 = 2;
 
   // Uses 1MB of psram and gives just under 12 secs of delay time.
-  static const size_t DELAY_LENGTH = 1024 * 512; // 1024 * 512;
+  static const size_t DELAY_LENGTH = 1024 * 512;
   static constexpr float MAX_DELAY_SECS = DELAY_LENGTH / AUDIO_SAMPLE_RATE;
 
   AudioDelayExt<DELAY_LENGTH, 8> delay;
