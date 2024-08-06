@@ -3,7 +3,6 @@
 #include "AudioBuffer.h"
 #include "AudioParam.h"
 #include "dsputils.h"
-#include "stmlib_utils_dsp.h"
 #include <Audio.h>
 
 template <size_t BufferLength = static_cast<size_t>(AUDIO_SAMPLE_RATE),
@@ -44,7 +43,6 @@ public:
     for (size_t i = 0; i < AUDIO_BLOCK_SAMPLES; i++) {
       int32_t in = in_block->data[i];
       for (size_t tap = 0; tap < Taps; tap++) {
-        // outs[tap]->data[i] = buffer.ReadInterp(delay_secs[tap].ReadNext());
         outs[tap]->data[i] = ReadNext(tap);
         in += fb[tap].ReadNext() * outs[tap]->data[i];
       }

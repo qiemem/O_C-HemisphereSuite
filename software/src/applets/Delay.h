@@ -24,7 +24,7 @@ public:
       clock_base_secs = clock_count / 16666.0f;
       clock_count = 0;
     }
-    float d = DelaySecs(delay_exp + delay_cv.Process(In(0)));
+    float d = DelaySecs(delay_time + delay_cv.Process(In(0)));
     float f = 0.01f * feedback / taps;
     for (int tap = 0; tap < taps; tap++) {
       float t = d * (tap + 1.0f) / taps;
@@ -57,17 +57,17 @@ public:
 
   void View() {
     // gfxPrint(0, 15, delaySecs * 1000.0f, 0);
-    switch (time_rep) {
+    switch (time_units) {
     case SECS:
-      gfxPrint(0, 15, DelaySecs(delay_exp) * 1000.0f, 0);
+      gfxPrint(0, 15, DelaySecs(delay_time) * 1000.0f, 0);
       gfxPrint(6 * 6, 15, "ms");
       break;
     case HZ:
-      gfxPrint(0, 15, 1.0f / DelaySecs(delay_exp), 2);
+      gfxPrint(0, 15, 1.0f / DelaySecs(delay_time), 2);
       gfxPrint(6 * 6, 15, "Hz");
       break;
     case CLOCK:
-      float r = DelayRatio(delay_exp);
+      float r = DelayRatio(delay_time);
       if (r < 1.0f) {
         gfxPrint(0, 15, "/ ");
         gfxPrint(roundf(1.0f / r), 0);
@@ -119,26 +119,19 @@ public:
       knob_accel = direction;
     CONSTRAIN(knob_accel, -100, 100);
 
-    float cur_delay;
-
     switch (cursor) {
     case TIME:
-      if (time_rep == CLOCK) {
-        cur_delay = DelayRatio(delay_exp);
-        if (cur_delay < 1.0f || (roundf(cur_delay) == 1.0f && direction > 0)) {
-          delay_exp = -RatioToPitch(1.0f / cur_delay + direction);
-        } else {
-          delay_exp = RatioToPitch(cur_delay - direction);
-        }
+      if (time_units == CLOCK) {
+        delay_time += static_cast<float>(direction) / RATIO_SCALAR;
       } else {
-        cur_delay = DelaySecs(delay_exp);
-        while (DelaySecs(delay_exp) == cur_delay)
-          delay_exp += knob_accel;
+        float cur_delay = DelaySecs(delay_time);
+        while (DelaySecs(delay_time) == cur_delay)
+          delay_time += knob_accel;
       }
       break;
     case TIME_REP:
-      time_rep += direction;
-      CONSTRAIN(time_rep, 0, TIME_REP_LENGTH - 1);
+      time_units += direction;
+      CONSTRAIN(time_units, 0, TIME_REP_LENGTH - 1);
       break;
     case TIME_MOD:
       delay_mod_type += direction;
@@ -163,8 +156,8 @@ public:
 
   uint64_t OnDataRequest() {
     uint64_t data = 0;
-    Pack(data, delay_loc, delay_exp);
-    Pack(data, time_rep_loc, time_rep);
+    Pack(data, delay_loc, delay_time);
+    Pack(data, time_rep_loc, time_units);
     Pack(data, wet_loc, wet);
     Pack(data, fb_loc, feedback);
     Pack(data, taps_loc, taps - 1);
@@ -173,41 +166,51 @@ public:
 
   void OnDataReceive(uint64_t data) {
     if (data != 0) {
-      delay_exp = Unpack(data, delay_loc);
-      time_rep = Unpack(data, time_rep_loc);
+      delay_time = Unpack(data, delay_loc);
+      time_units = Unpack(data, time_rep_loc);
       wet = Unpack(data, wet_loc);
       feedback = Unpack(data, fb_loc);
       taps = Unpack(data, taps_loc) + 1;
     }
   }
 
-  float DelaySecs(int16_t exp) {
+  float DelaySecs(int16_t raw) {
     // we need duration, not frequency: negating pitch gets that faster than
     // `1.0f /`
     float s;
-    switch (time_rep) {
+    switch (time_units) {
     case HZ:
-      // This should keep the number of ms and hz the same, which should be
-      // asthetically pleasing at least.
-      s = (PitchToRatio(-exp)) / 500.0f;
+      s = (PitchToRatio(-raw)) / 220.0f;
       break;
     case CLOCK:
-      s = clock_base_secs / (DelayRatio(exp));
+      s = clock_base_secs / (DelayRatio(raw));
       break;
     default:
     case SECS:
-      s = 0.5f * (PitchToRatio(exp));
+      s = 0.500f + raw / 1000.0f; // default to 500ms
       break;
     }
     CONSTRAIN(s, 0.0f, MAX_DELAY_SECS);
     return s;
   }
 
-  float DelayRatio(int16_t exp) {
-    if (exp < 0) {
-      return 1.0f / roundf(PitchToRatio(-exp));
+  // /4 per v
+  static constexpr float RATIO_SCALAR = 4.0f / (HEMISPHERE_3V_CV / 3.0f);
+  float DelayRatio(int16_t raw) {
+    float ratio = roundf(raw * RATIO_SCALAR);
+    if (ratio == 0.0f)
+      return 1.0f;
+    else if (ratio > 0.0f)
+      return 1.0f / (1.0f + ratio);
+    else
+      return 1.0f - ratio;
+  }
+
+  int16_t RatioToDelay(float ratio) {
+    if (ratio < 1.0f) {
+      return static_cast<int16_t>((1.0f / ratio - 1.0f) / RATIO_SCALAR);
     } else {
-      return roundf(PitchToRatio(exp));
+      return static_cast<int16_t>((1.0f - ratio) / RATIO_SCALAR);
     }
   }
 
@@ -225,7 +228,7 @@ private:
     CURSOR_LENGTH,
   };
 
-  enum TimeRep {
+  enum TimeUnits {
     SECS,
     CLOCK,
     HZ,
@@ -239,8 +242,8 @@ private:
 
   int cursor = TIME;
 
-  int16_t delay_exp = 0;
-  uint8_t time_rep = 0;
+  int16_t delay_time = 0;
+  uint8_t time_units = 0;
   // Only need 7 bits on these but the sign makes CONSTRAIN work
   int8_t wet = 50;
   int8_t feedback = 0;
