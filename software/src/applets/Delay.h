@@ -259,11 +259,11 @@ private:
   int8_t feedback = 0;
   int8_t taps = 1;
   int8_t delay_mod_type = CROSSFADE;
-  PackLocation delay_loc{0, 16};
-  PackLocation time_rep_loc{16, 4};
-  PackLocation wet_loc{32, 7};
-  PackLocation fb_loc{39, 7};
-  PackLocation taps_loc{46, 3};
+  static constexpr PackLocation delay_loc{0, 16};
+  static constexpr PackLocation time_rep_loc{16, 4};
+  static constexpr PackLocation wet_loc{32, 7};
+  static constexpr PackLocation fb_loc{39, 7};
+  static constexpr PackLocation taps_loc{46, 3};
 
   NoiseSuppressor delay_cv{
       0.0f,
