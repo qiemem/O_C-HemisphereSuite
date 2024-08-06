@@ -63,7 +63,11 @@ public:
       int16_t source_val = buffer.ReadSample(d * AUDIO_SAMPLE_RATE);
       float t = target.phase;
       int16_t val = t * target_val + (1.0f - t) * source_val;
-      target.phase += crossfade_dt;
+      // crossfade length being longer than delay time screws up, e.g.,
+      // karplus-strong. Also, delay times that short will produce higher
+      // harmonics that crossfades of that length (that's kinda the point).
+      // Just maxing here seems to work pretty well for KS.
+      target.phase += max(crossfade_dt, 1.0f / target.target);
       if (target.phase >= 1.0f) {
         target.phase = 0.0f;
         delay_secs[tap] = target.target;
