@@ -22,6 +22,7 @@
 /* Used ProbDiv applet from benirose as a template */
 
 #include "../HSProbLoopLinker.h" // singleton for linking ProbDiv and ProbMelo
+#include "../util/clkdivmult.h"
 
 class DivSeq : public HemisphereApplet {
 public:
@@ -38,12 +39,15 @@ public:
     };
 
     struct DivSequence {
-      int step_index;
-      int clock_count;
-      // duration as number of clock pulses
-      uint8_t steps[NUM_STEPS];
+      int step_index = -1;
+      int clock_count = 0;
+      ClkDivMult divmult[NUM_STEPS]; // separate DividerMultiplier for each step
       uint8_t muted = 0x0; // bitmask
+      uint32_t last_clock = 0;
 
+      void Set(int s, int div) {
+        divmult[s].Set(div);
+      }
       void ToggleStep(int idx) {
         muted ^= (0x01 << idx);
       }
@@ -51,17 +55,24 @@ public:
         return (muted >> idx) & 0x01;
       }
       bool StepActive(int idx) {
-        return steps[idx] != 0 && !Muted(idx);
+        return divmult[idx].steps != 0 && !Muted(idx);
       }
-      bool Poke() {
+      bool Poke(bool clocked = 0) {
+        bool trigout = false;
         // reset case
-        if (step_index < 0) {
+        if (clocked && step_index < 0) {
             step_index = 0;
-            return StepActive(step_index);
+            last_clock = OC::CORE::ticks;
+            return StepActive(step_index) && divmult[step_index].Tick(true);
         }
 
-        // quota achieved, advance to next enabled step
-        if (++clock_count >= steps[step_index]) {
+        trigout = divmult[step_index].Tick(clocked);
+
+        if (clocked)
+        {
+          if (divmult[step_index].steps < 0 || ++clock_count >= divmult[step_index].steps)
+          {
+            // special case to proceed to next step
             clock_count = 0;
 
             int i = 0;
@@ -70,31 +81,39 @@ public:
                 ++i;
             } while (!StepActive(step_index) && i < NUM_STEPS);
 
-            return StepActive(step_index);
+            if (StepActive(step_index)) {
+              divmult[step_index].Reset();
+              divmult[step_index].last_clock = last_clock;
+              trigout = divmult[step_index].Tick(true);
+            }
+          }
+
+          last_clock = OC::CORE::ticks;
         }
-        return false;
+
+
+        return trigout;
       }
       void Reset() {
         step_index = -1;
         clock_count = 0;
+        for (auto &d : divmult) d.Reset();
       }
 
-    } div_seq[2] = {
-      { -1, 0, { 4, 0, 0, 0, 0 } },
-      { -1, 0, { 8, 3, 3, 2, 0 } },
-    };
+    } div_seq[2];
 
     const char* applet_name() {
         return "DivSeq";
     }
 
     void Start() {
+      Reset();
     }
 
     void Reset() {
-        ForEachChannel(ch) {
-          div_seq[ch].Reset();
-        }
+      ForEachChannel(ch) {
+        div_seq[ch].Reset();
+      }
     }
     void TrigOut(int ch) {
         ClockOut(ch);
@@ -112,7 +131,7 @@ public:
 
         if (Clock(0)) {
           // sequence advance, get trigger bits
-          bool trig_q[2] = { div_seq[0].Poke(), div_seq[1].Poke() };
+          bool trig_q[2] = { div_seq[0].Poke(true), div_seq[1].Poke(true) };
 
           ForEachChannel(ch) {
             // XOR with positive CV gate
@@ -123,6 +142,11 @@ public:
                 trig = (trig != trig_q[1-ch]);
 
             if (trig) TrigOut(ch);
+          }
+        } else {
+          ForEachChannel(ch) {
+            // gotta keep it ticking for the multipliers
+            if (div_seq[ch].Poke(false)) TrigOut(ch);
           }
         }
 
@@ -163,8 +187,8 @@ public:
         if (ch > 1) // mutes
             div_seq[ch-2].ToggleStep(s);
         else {
-            const int div = div_seq[ch].steps[s] + direction;
-            div_seq[ch].steps[s] = constrain(div, 0, MAX_DIV);
+            const int div = div_seq[ch].divmult[s].steps + direction;
+            div_seq[ch].Set(s, div);
         }
     }
 
@@ -172,10 +196,16 @@ public:
         uint64_t data = 0;
         const size_t b = 6; // bitsize
         ForEachChannel(ch) {
+          int offset = 0;
           for (size_t i = 0; i < NUM_STEPS; i++) {
-            const uint8_t val = div_seq[ch].steps[i];
+            if (div_seq[ch].divmult[i].steps < 0) offset = 16;
+          }
+          for (size_t i = 0; i < NUM_STEPS; i++) {
+            const uint8_t val = constrain(div_seq[ch].divmult[i].steps + offset, 0, 63);
             Pack(data, PackLocation {ch*NUM_STEPS*b + i*b, b}, val);
           }
+          if (offset)
+            Pack(data, PackLocation { size_t(60 + ch*2), 2 }, 1);
         }
         return data;
     }
@@ -183,12 +213,13 @@ public:
     void OnDataReceive(uint64_t data) {
         const size_t b = 6; // bitsize
         ForEachChannel(ch) {
+            int offset = Unpack(data, PackLocation { size_t(60 + ch*2), 2 }) ? 16 : 0;
             for (size_t i = 0; i < NUM_STEPS; i++) {
-                div_seq[ch].steps[i] = Unpack(data, PackLocation {ch*NUM_STEPS*b + i*b, b});
-                div_seq[ch].steps[i] = constrain(div_seq[ch].steps[i], 0, MAX_DIV);
+                div_seq[ch].divmult[i].steps = Unpack(data, PackLocation {ch*NUM_STEPS*b + i*b, b}) - offset;
+                div_seq[ch].divmult[i].steps = constrain(div_seq[ch].divmult[i].steps, -MAX_DIV, MAX_DIV);
             }
             // step 1 cannot be zero
-            if (div_seq[ch].steps[0] == 0) ++div_seq[ch].steps[0];
+            if (div_seq[ch].divmult[0].steps == 0) ++div_seq[ch].divmult[0].steps;
         }
         Reset();
     }
@@ -227,13 +258,23 @@ private:
               continue;
           }
 
-          gfxPrint(1 + x, y, div_seq[ch].steps[i]);
+          const auto steps = div_seq[ch].divmult[i].steps;
+          if (steps >= 0) {
+            gfxPrint(1 + x, y, steps);
+          } else {
+            gfxPrint(1 + x, y, "x");
+            gfxPrint( -steps );
+          }
 
           if (cursor >= MUTE1A) {
             gfxIcon(16 + x, y, div_seq[ch].Muted(i) ? CHECK_OFF_ICON : CHECK_ON_ICON);
             if (cursor - MUTE1A == i+ch*NUM_STEPS) gfxFrame(15+x, y-1, 10, 10);
-          } else
-            DrawSlider(14 + x, y, 14, div_seq[ch].steps[i], MAX_DIV, cursor == i+ch*NUM_STEPS);
+          } else if (steps >= 0) {
+            DrawSlider(14 + x, y, 14, steps, MAX_DIV, cursor == i+ch*NUM_STEPS);
+          } else {
+            gfxIcon(22 + x, y, PULSES_ICON);
+            if (cursor == i+ch*NUM_STEPS) gfxSpicyCursor(20 + x, y + 7, 10, 7);
+          }
 
           if (div_seq[ch].step_index == i)
             gfxIcon(28 + x, y, LEFT_BTN_ICON);
