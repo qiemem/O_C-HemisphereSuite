@@ -56,6 +56,7 @@ public:
 
     void Controller() {
         bool read_gate = Gate(0);
+        auto &hMIDI = HS::frame.MIDIState;
 
         // Handle MIDI notes
 
@@ -70,7 +71,7 @@ public:
 
             if (legato_on && midi_note != last_note) {
                 // Send note off if the note has changed
-                usbMIDI.sendNoteOff(last_note, 0, last_channel + 1);
+                hMIDI.SendNoteOff(last_channel, last_note, 0);
                 UpdateLog(HEM_MIDI_NOTE_OFF, midi_note, 0);
                 note_on = 1;
             }
@@ -82,8 +83,7 @@ public:
                 }
                 last_velocity = velocity;
 
-                usbMIDI.sendNoteOn(midi_note, velocity, channel + 1);
-                usbMIDI.send_now();
+                hMIDI.SendNoteOn(channel, midi_note, velocity);
                 last_note = midi_note;
                 last_channel = channel;
                 last_tick = OC::CORE::ticks;
@@ -94,8 +94,7 @@ public:
         }
 
         if (!read_gate && gated) { // A note off message should be sent
-            usbMIDI.sendNoteOff(last_note, 0, last_channel + 1);
-            usbMIDI.send_now();
+            hMIDI.SendNoteOff(last_channel, last_note, 0);
             UpdateLog(HEM_MIDI_NOTE_OFF, last_note, 0);
             last_tick = OC::CORE::ticks;
         }
@@ -110,8 +109,7 @@ public:
                 if (function == HEM_MIDI_CC_IN) {
                     int value = ProportionCV(In(1), 127);
                     if (value != last_cc) {
-                      usbMIDI.sendControlChange(1, value, channel + 1);
-                      usbMIDI.send_now();
+                      hMIDI.SendCC(channel, 1, value);
                       last_cc = value;
                       UpdateLog(HEM_MIDI_CC, value, 0);
                       last_tick = OC::CORE::ticks;
@@ -122,8 +120,7 @@ public:
                 if (function == HEM_MIDI_AT_IN) {
                     int value = ProportionCV(In(1), 127);
                     if (value != last_at) {
-                      usbMIDI.sendAfterTouch(value, channel + 1);
-                      usbMIDI.send_now();
+                      hMIDI.SendAfterTouch(channel, value);
                       last_at = value;
                       UpdateLog(HEM_MIDI_AFTERTOUCH, value, 0);
                       last_tick = OC::CORE::ticks;
@@ -135,8 +132,7 @@ public:
                     uint16_t bend = Proportion(In(1) + HEMISPHERE_3V_CV, HEMISPHERE_3V_CV * 2, 16383);
                     bend = constrain(bend, 0, 16383);
                     if (bend != last_bend) {
-                      usbMIDI.sendPitchBend(bend, channel + 1);
-                      usbMIDI.send_now();
+                      hMIDI.SendPitchBend(channel, bend);
                       last_bend = bend;
                       UpdateLog(HEM_MIDI_PITCHBEND, bend - 8192, 0);
                       last_tick = OC::CORE::ticks;

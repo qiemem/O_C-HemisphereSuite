@@ -312,14 +312,46 @@ typedef struct IOFrame {
           // I think this can cause the UI to lag and miss input
           //usbMIDI.send_now();
         }
-        void SendCC(int midi_ch, int ccnum, uint8_t val) {
+
+        void SendAfterTouch(const int midi_ch, uint8_t val) {
+          usbMIDI.sendAfterTouch(val, midi_ch + 1);
+#ifdef ARDUINO_TEENSY41
+          usbHostMIDI.sendAfterTouch(val, midi_ch + 1);
+          MIDI1.sendAfterTouch(val, midi_ch + 1);
+#endif
+        }
+        void SendPitchBend(const int midi_ch, uint16_t bend) {
+          usbMIDI.sendPitchBend(bend, midi_ch + 1);
+#ifdef ARDUINO_TEENSY41
+          usbHostMIDI.sendPitchBend(bend, midi_ch + 1);
+          MIDI1.sendPitchBend(bend, midi_ch + 1);
+#endif
+        }
+
+        void SendCC(const int midi_ch, int ccnum, uint8_t val) {
           usbMIDI.sendControlChange(ccnum, val, midi_ch + 1);
+#ifdef ARDUINO_TEENSY41
+          usbHostMIDI.sendControlChange(ccnum, val, midi_ch + 1);
+          MIDI1.sendControlChange(ccnum, val, midi_ch + 1);
+#endif
         }
-        void SendNoteOn(int midi_ch) {
-          usbMIDI.sendNoteOn(current_note[ midi_ch ], 100, midi_ch + 1);
+        void SendNoteOn(const int midi_ch, int note = -1, uint8_t vel = 100) {
+          if (note < 0) note = current_note[midi_ch];
+          else current_note[midi_ch] = note;
+
+          usbMIDI.sendNoteOn(note, vel, midi_ch + 1);
+#ifdef ARDUINO_TEENSY41
+          usbHostMIDI.sendNoteOn(note, vel, midi_ch + 1);
+          MIDI1.sendNoteOn(note, vel, midi_ch + 1);
+#endif
         }
-        void SendNoteOff(int midi_ch) {
-          usbMIDI.sendNoteOff(current_note[ midi_ch ], 0, midi_ch + 1);
+        void SendNoteOff(const int midi_ch, int note = -1, uint8_t vel = 0) {
+          if (note < 0) note = current_note[midi_ch];
+          usbMIDI.sendNoteOff(note, vel, midi_ch + 1);
+#ifdef ARDUINO_TEENSY41
+          usbHostMIDI.sendNoteOff(note, vel, midi_ch + 1);
+          MIDI1.sendNoteOff(note, vel, midi_ch + 1);
+#endif
         }
 
     } MIDIState;
