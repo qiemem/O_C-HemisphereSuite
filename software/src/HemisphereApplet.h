@@ -51,12 +51,11 @@ namespace HS {
 typedef struct Applet {
   const int id;
   const uint8_t categories;
-  HemisphereApplet* instance[APPLET_SLOTS];
+  std::array<HemisphereApplet *, APPLET_SLOTS> instance;
 } Applet;
 
 extern IOFrame frame;
-
-}
+} // namespace HS
 
 using namespace HS;
 
