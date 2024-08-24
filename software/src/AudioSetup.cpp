@@ -1,19 +1,15 @@
 #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
 
+#include "extern/dspinst.h"
 #include "AudioSetup.h"
 #include "OC_ADC.h"
 #include "OC_DAC.h"
 #include "HSUtils.h"
 #include "HSicons.h"
 #include "OC_strings.h"
+#include "HSClockManager.h"
 
 // Use the web GUI tool as a guide: https://www.pjrc.com/teensy/gui/
-
-#include <Audio.h>
-#include <Wire.h>
-#include <SPI.h>
-#include <SD.h>
-#include <SerialFlash.h>
 
 // GUItool: begin automatically generated code
 AudioPlaySdWav           wavplayer1;     //xy=108,191
@@ -174,6 +170,18 @@ namespace OC {
         mixer4.gain(0, amplevel[ch] * (1.0 - abs(foldamt[ch])));
     }
 
+    bool FileIsPlaying() {
+      return wavplayer1.isPlaying();
+    }
+    void ToggleFilePlayer() {
+      if (wavplayer1.isPlaying())
+        wavplayer1.stop();
+      else if (wavplayer_available)
+        wavplayer1.play("DEFAULT.WAV");
+
+      // TODO: file selection
+    }
+
     // Designated Integration Functions
     // ----- called from setup() in Main.cpp
     void Init() {
@@ -277,8 +285,6 @@ namespace OC {
             //BypassFilter(ch);
             break;
           case WAV_PLAYER:
-            if (wavplayer_available && !wavplayer1.isPlaying())
-              wavplayer1.play("DEFAULT.WAV");
             break;
           default: break;
       }
@@ -295,11 +301,10 @@ namespace OC {
             mod_target = WAVEFOLD_MOD;
             break;
           case WAV_PLAYER:
-            if (wavplayer1.isPlaying())
-              wavplayer1.stop();
-            else if (wavplayer_available)
-              wavplayer1.play("DEFAULT.WAV");
-              // TODO: beat-sync start
+            if (HS::clock_m.IsRunning()) {
+              HS::clock_m.BeatSync( &ToggleFilePlayer );
+            } else
+              ToggleFilePlayer();
 
             return; // no other mapping to change
             break;
@@ -313,10 +318,6 @@ namespace OC {
         CONSTRAIN(newmode, 0, MODE_COUNT - 1);
         SwitchMode(ch, ChannelMode(newmode));
       }
-    }
-
-    bool FileIsPlaying() {
-      return wavplayer1.isPlaying();
     }
 
   } // AudioDSP namespace
