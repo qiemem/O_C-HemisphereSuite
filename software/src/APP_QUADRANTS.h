@@ -590,6 +590,16 @@ public:
           return true;
         }
 
+        if (event.mask & (OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_Y)) {
+          if (AUDIO_SETUP == view_state) {
+            const int h = (OC::CONTROL_BUTTON_Y == event.control);
+            if (OC::AudioDSP::isEditing[h]) {
+              OC::AudioDSP::AudioSetupAuxButton(h);
+              return true;
+            }
+          }
+        }
+
         // cancel other view layers
         if (view_state != APPLETS && view_state != APPLET_FULLSCREEN) {
           view_state = APPLETS;

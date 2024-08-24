@@ -87,8 +87,8 @@ AudioConnection          patchCord25(mixer5, 0, i2s2, 0);
 namespace OC {
   namespace AudioDSP {
 
-    const char * const mode_names[] = {
-      "Off", "VCA", "LPG", "VCF", "FOLD", "File"
+    const char * const mode_names[MODE_COUNT] = {
+      "Off", "VCA", "VCF", "FOLD", "File"
     };
 
     /* Mod Targets:
@@ -100,37 +100,49 @@ namespace OC {
       REVERB_SIZE,
       REVERB_DAMP,
      */
-    ChannelMode mode[2] = { PASSTHRU, PASSTHRU };
     int mod_map[2][TARGET_COUNT] = {
-      { 8, 8, -1, 8, -1, -1, -1 },
-      { 10, 10, -1, 10, -1, -1, -1 },
+      { -1, -1, -1, -1, -1, -1, -1 },
+      { -1, -1, -1, -1, -1, -1, -1 },
     };
     float bias[2][TARGET_COUNT];
-    uint8_t audio_cursor[2] = { 0, 0 };
+    ChannelMode audio_cursor[2] = { PASSTHRU, PASSTHRU };
+    bool isEditing[2] = { false, false };
 
     float amplevel[2] = { 1.0, 1.0 };
     float foldamt[2] = { 0.0, 0.0 };
 
+    bool filter_enabled[2];
     bool wavplayer_available = false;
+    uint8_t wavplayer_select[2] = { 1, 2 };
 
     void BypassFilter(int ch) {
       if (ch == 0) {
         mixer5.gain(0, 0.0); // VCF
+        mixer6.gain(1, 0.0); // VCF
+
         mixer5.gain(3, 1.0); // Dry
       } else {
         mixer6.gain(0, 0.0); // VCF
+        mixer5.gain(1, 0.0); // VCF
+
         mixer6.gain(3, 1.0); // Dry
       }
+      filter_enabled[ch] = false;
     }
 
     void EnableFilter(int ch) {
       if (ch == 0) {
         mixer5.gain(0, 1.0); // VCF
+        mixer6.gain(1, 1.0); // VCF
+
         mixer5.gain(3, 0.0); // Dry
       } else {
         mixer6.gain(0, 1.0); // VCF
+        mixer5.gain(1, 1.0); // VCF
+
         mixer6.gain(3, 0.0); // Dry
       }
+      filter_enabled[ch] = true;
     }
 
     void ModFilter(int ch, int cv) {
@@ -173,13 +185,30 @@ namespace OC {
     bool FileIsPlaying() {
       return wavplayer1.isPlaying();
     }
-    void ToggleFilePlayer() {
-      if (wavplayer1.isPlaying())
+    void ToggleFilePlayer(int ch = 0) {
+      if (wavplayer1.isPlaying()) {
         wavplayer1.stop();
-      else if (wavplayer_available)
-        wavplayer1.play("DEFAULT.WAV");
-
-      // TODO: file selection
+      } else if (wavplayer_available) {
+        char filename[] = "000.WAV";
+        filename[2] += wavplayer_select[ch];
+        wavplayer1.play(filename);
+      }
+    }
+    void PlayFile1() { ToggleFilePlayer(0); }
+    void PlayFile2() { ToggleFilePlayer(1); }
+    void ChangeToFile(int ch, int select) {
+      wavplayer_select[ch] = (uint8_t)constrain(select, 0, 9);
+      if (wavplayer1.isPlaying()) {
+        char filename[] = "000.WAV";
+        filename[2] += wavplayer_select[ch];
+        wavplayer1.play(filename);
+      }
+    }
+    uint8_t GetFileNum(int ch) {
+      return wavplayer_select[ch];
+    }
+    uint32_t GetFileTime(int ch) {
+      return wavplayer1.positionMillis();
     }
 
     // Designated Integration Functions
@@ -200,10 +229,6 @@ namespace OC {
       ladder1.resonance(0.65);
       BypassFilter(0);
       BypassFilter(1);
-
-      // mono-to-stereo from the filters
-      mixer5.gain(1, 1.0);
-      mixer6.gain(1, 1.0);
 
       // -- SD card WAV player
       mixer5.gain(2, 1.0);
@@ -232,92 +257,76 @@ namespace OC {
     void Process(const int *values) {
       for (int i = 0; i < 2; ++i) {
 
-        // some things depend on mode
-        switch(mode[i]) {
-          default:
-          case PASSTHRU:
-            break;
+        if (mod_map[i][AMP_LEVEL] >= 0)
+          AmpLevel(i, values[mod_map[i][AMP_LEVEL]]);
 
-          case LPG_MODE:
-            if (mod_map[i][AMP_LEVEL] < 0) continue;
-            ModFilter(i, values[mod_map[i][AMP_LEVEL]]);
-          case VCA_MODE:
-            if (mod_map[i][AMP_LEVEL] < 0) continue;
-            AmpLevel(i, values[mod_map[i][AMP_LEVEL]]);
-            break;
+        if (mod_map[i][WAVEFOLD_MOD] >= 0)
+          Wavefold(i, values[mod_map[i][WAVEFOLD_MOD]]);
 
-          case WAVEFOLDER:
-            if (mod_map[i][WAVEFOLD_MOD] < 0) continue;
-            Wavefold(i, values[mod_map[i][WAVEFOLD_MOD]]);
-            //break;
-            // wavefolder + filter
-          case VCF_MODE:
-            if (mod_map[i][FILTER_CUTOFF] < 0) continue;
-            ModFilter(i, values[mod_map[i][FILTER_CUTOFF]]);
-            break;
+        if (mod_map[i][FILTER_CUTOFF] >= 0)
+          ModFilter(i, values[mod_map[i][FILTER_CUTOFF]]);
 
-        }
-
-        // other modulation happens regardless of mode
-
-      }
-    }
-
-    void SwitchMode(int ch, ChannelMode newmode) {
-      mode[ch] = newmode;
-      switch(newmode) {
-          case PASSTHRU:
-          case VCA_MODE:
-            Wavefold(ch, 0);
-            AmpLevel(ch, MAX_CV);
-            BypassFilter(ch);
-            break;
-
-          case VCF_MODE:
-          case LPG_MODE:
-            Wavefold(ch, 0);
-            AmpLevel(ch, MAX_CV);
-            EnableFilter(ch);
-            break;
-
-          case WAVEFOLDER:
-            AmpLevel(ch, MAX_CV);
-            //BypassFilter(ch);
-            break;
-          case WAV_PLAYER:
-            break;
-          default: break;
       }
     }
 
     void AudioMenuAdjust(int ch, int direction) {
-      if (audio_cursor[ch]) {
-        int mod_target = AMP_LEVEL;
-        switch (mode[ch]) {
-          case VCF_MODE:
-            mod_target = FILTER_CUTOFF;
-            break;
-          case WAVEFOLDER:
-            mod_target = WAVEFOLD_MOD;
-            break;
-          case WAV_PLAYER:
-            if (HS::clock_m.IsRunning()) {
-              HS::clock_m.BeatSync( &ToggleFilePlayer );
-            } else
-              ToggleFilePlayer();
-
-            return; // no other mapping to change
-            break;
-          default: break;
-        }
-
-        int &targ = mod_map[ch][mod_target];
-        targ = constrain(targ + direction + 1, 0, ADC_CHANNEL_LAST + DAC_CHANNEL_LAST) - 1;
-      } else {
-        int newmode = mode[ch] + direction;
-        CONSTRAIN(newmode, 0, MODE_COUNT - 1);
-        SwitchMode(ch, ChannelMode(newmode));
+      if (!isEditing[ch]) {
+        audio_cursor[ch] = (ChannelMode)constrain(audio_cursor[ch] + direction, 0, MODE_COUNT - 1);
+        return;
       }
+
+      int mod_target = AMP_LEVEL;
+      switch (audio_cursor[ch]) {
+        case PASSTHRU: {
+          return;
+          break;
+        }
+        case VCF_MODE:
+          mod_target = FILTER_CUTOFF;
+          break;
+        case WAVEFOLDER:
+          mod_target = WAVEFOLD_MOD;
+          break;
+        case WAV_PLAYER:
+          ChangeToFile(ch, wavplayer_select[ch] + direction);
+
+          return; // no other mapping to change
+          break;
+        default: break;
+      }
+
+      // congrats you get to switch one of the input map mod sources
+      int &targ = mod_map[ch][mod_target];
+      targ = constrain(targ + direction + 1, 0, ADC_CHANNEL_LAST + DAC_CHANNEL_LAST) - 1;
+
+      if (audio_cursor[ch] == VCA_MODE && targ < 0)
+        AmpLevel(ch, MAX_CV);
+    }
+
+    void AudioSetupAuxButton(int ch) {
+      switch (audio_cursor[ch]) {
+        case PASSTHRU:
+          Wavefold(ch, 0);
+          AmpLevel(ch, MAX_CV);
+          BypassFilter(ch);
+          break;
+
+        case WAV_PLAYER:
+          if (HS::clock_m.IsRunning()) {
+            HS::clock_m.BeatSync( ch ? &PlayFile2 : &PlayFile1 );
+          } else
+            ToggleFilePlayer(ch);
+          break;
+
+        case VCF_MODE:
+          Wavefold(ch, 0);
+          AmpLevel(ch, MAX_CV);
+          filter_enabled[ch] ? BypassFilter(ch) : EnableFilter(ch);
+          break;
+
+        default: break;
+      }
+      //isEditing[ch] = false;
     }
 
   } // AudioDSP namespace

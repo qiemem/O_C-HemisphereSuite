@@ -22,7 +22,6 @@ namespace OC {
     enum ChannelMode {
       PASSTHRU,
       VCA_MODE,
-      LPG_MODE,
       VCF_MODE,
       WAVEFOLDER,
       WAV_PLAYER,
@@ -38,8 +37,9 @@ namespace OC {
     extern ChannelMode mode[2]; // mode for each channel
     extern int mod_map[2][TARGET_COUNT]; // CV modulation sources (as channel indexes for [inputs..outputs])
     extern float bias[2][TARGET_COUNT]; // baseline settings
-    extern uint8_t audio_cursor[2];
-    static constexpr int CURSOR_MAX = 2;
+    extern ChannelMode audio_cursor[2];
+    extern bool isEditing[2];
+    extern bool filter_enabled[2];
 
     void Init();
     void Process(const int *values);
@@ -47,9 +47,12 @@ namespace OC {
     void AudioMenuAdjust(int ch, int direction);
     void DrawAudioSetup();
     bool FileIsPlaying();
+    uint8_t GetFileNum(int ch);
+    uint32_t GetFileTime(int ch);
+    void AudioSetupAuxButton(int ch);
 
     static inline void AudioSetupButtonAction(int ch) {
-      ++audio_cursor[ch] %= CURSOR_MAX;
+      isEditing[ch] = !isEditing[ch];
     }
   } // AudioDSP namespace
 } // OC namespace

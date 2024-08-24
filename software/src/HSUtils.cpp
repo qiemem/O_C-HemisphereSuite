@@ -286,37 +286,47 @@ namespace HS {
 void OC::AudioDSP::DrawAudioSetup() {
   for (int ch = 0; ch < 2; ++ch)
   {
+    const int x = 8 + 82*ch;
+
+    // Channel mode
+    gfxPrint(x, 15, "Mod");
+    gfxPrint(x, 25, mode_names[ audio_cursor[ch] ]);
+
     int mod_target = AMP_LEVEL;
-    switch (mode[ch]) {
-      default:
-      case PASSTHRU:
-      case VCA_MODE:
-      case LPG_MODE:
-        break;
+    switch (audio_cursor[ch]) {
       case VCF_MODE:
         mod_target = FILTER_CUTOFF;
+        gfxIcon(x + 22, 25, filter_enabled[ch] ? CHECK_ON_ICON : CHECK_OFF_ICON);
         break;
       case WAVEFOLDER:
         mod_target = WAVEFOLD_MOD;
         break;
-      case WAV_PLAYER:
-        break;
+      default: break;
     }
 
-    // Channel mode
-    gfxPrint(8 + 82*ch, 15, "Mode");
-    gfxPrint(8 + 82*ch, 25, mode_names[ mode[ch] ]);
+    if (WAV_PLAYER == audio_cursor[ch]) {
+      gfxPrint(x, 35, GetFileNum(ch));
+      if (FileIsPlaying()) {
+        gfxIcon(x, 45, PLAY_ICON);
 
-    if (WAV_PLAYER == mode[ch]) {
-      gfxIcon(8 + 82*ch, 45, FileIsPlaying() ? PLAY_ICON : STOP_ICON);
+        uint32_t tmilli = GetFileTime(ch);
+        uint32_t tsec = tmilli / 1000;
+        uint32_t tmin = tsec / 60;
+        tmilli %= 1000;
+        tsec %= 60;
+
+        graphics.setPrintPos(x, 55);
+        graphics.printf("%02lu:%02lu.%03lu", tmin, tsec, tmilli);
+      } else
+        gfxIcon(x, 45, STOP_ICON);
     } else {
       // Modulation assignment
-      gfxPrint(8 + 82*ch, 35, "Map");
-      gfxPrint(8 + 82*ch, 45, OC::Strings::cv_input_names_none[ mod_map[ch][mod_target] + 1 ] );
+      gfxPrint(x, 35, "Map");
+      gfxPrint(x, 45, OC::Strings::cv_input_names_none[ mod_map[ch][mod_target] + 1 ] );
     }
 
     // cursor
-    gfxIcon(120*ch, 25 + audio_cursor[ch]*20, ch ? LEFT_ICON : RIGHT_ICON);
+    gfxIcon(120*ch, 25 + isEditing[ch]*20, ch ? LEFT_ICON : RIGHT_ICON);
   }
 
 }
