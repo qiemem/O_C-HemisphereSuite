@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#pragma once
 #ifndef _HEM_APP_HEMISPHERE_H_
 #define _HEM_APP_HEMISPHERE_H_
 
@@ -41,6 +42,9 @@
 #endif
 
 #include "hemisphere_config.h"
+
+// We depend on Calibr8or now
+#include "APP_CALIBR8OR.h"
 
 // The settings specify the selected applets, and 64 bits of data for each applet,
 // plus 64 bits of data for the ClockSetup applet (which includes some misc config).
@@ -288,14 +292,14 @@ public:
 
         if (hem_active_preset->StoreInputMap()) doSave = 1;
 
+        if (doSave) {
+        }
+
         // initiate actual EEPROM save - ONLY if necessary!
         if (doSave && !skip_eeprom) {
-            OC::CORE::app_isr_enabled = false;
-            OC::draw_save_message(60);
-            delay(1);
-            OC::save_app_data();
-            delay(1);
-            OC::CORE::app_isr_enabled = true;
+          // call Calibr8or so it remembers quantizer settings
+          // this also takes care of the EEPROM save
+          Calibr8or_instance.SavePreset();
         }
 
     }

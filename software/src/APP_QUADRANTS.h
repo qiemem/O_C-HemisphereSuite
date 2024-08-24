@@ -39,6 +39,9 @@
 
 #include "hemisphere_config.h"
 
+// We depend on Calibr8or now
+#include "APP_CALIBR8OR.h"
+
 // The settings specify the selected applets, and 64 bits of data for each applet,
 // plus 64 bits of data for the ClockSetup applet (which includes some misc config).
 // This is the structure of a QuadrantsPreset in eeprom.
@@ -296,15 +299,7 @@ public:
 
         // initiate actual EEPROM save - ONLY if necessary!
         if (doSave && !skip_eeprom) {
-            OC::CORE::app_isr_enabled = false;
-            OC::draw_save_message(16);
-            delay(1);
-            OC::draw_save_message(32);
-            OC::save_app_data();
-            OC::draw_save_message(64);
-            delay(1);
-            OC::draw_save_message(96);
-            OC::CORE::app_isr_enabled = true;
+          Calibr8or_instance.SavePreset();
         }
 
     }
