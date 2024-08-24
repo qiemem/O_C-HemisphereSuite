@@ -25,6 +25,7 @@ namespace OC {
       LPG_MODE,
       VCF_MODE,
       WAVEFOLDER,
+      WAV_PLAYER,
 
       MODE_COUNT
     };
@@ -32,6 +33,7 @@ namespace OC {
 
     const int MAX_CV = 9216; // 6V
 
+    extern bool wavplayer_available;
     extern uint8_t mods_enabled; // DAC outputs bitmask
     extern ChannelMode mode[2]; // mode for each channel
     extern int mod_map[2][TARGET_COUNT]; // CV modulation sources (as channel indexes for [inputs..outputs])
@@ -44,6 +46,7 @@ namespace OC {
     void SwitchMode(int ch, ChannelMode newmode);
     void AudioMenuAdjust(int ch, int direction);
     void DrawAudioSetup();
+    bool FileIsPlaying();
 
     static inline void AudioSetupButtonAction(int ch) {
       ++audio_cursor[ch] %= CURSOR_MAX;

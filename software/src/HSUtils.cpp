@@ -299,22 +299,26 @@ void OC::AudioDSP::DrawAudioSetup() {
       case WAVEFOLDER:
         mod_target = WAVEFOLD_MOD;
         break;
+      case WAV_PLAYER:
+        break;
     }
 
     // Channel mode
     gfxPrint(8 + 82*ch, 15, "Mode");
     gfxPrint(8 + 82*ch, 25, mode_names[ mode[ch] ]);
 
-    // Modulation assignment
-    gfxPrint(8 + 82*ch, 35, "Map");
-    gfxPrint(8 + 82*ch, 45, OC::Strings::cv_input_names_none[ mod_map[ch][mod_target] + 1 ] );
+    if (WAV_PLAYER == mode[ch]) {
+      gfxIcon(8 + 82*ch, 45, FileIsPlaying() ? PLAY_ICON : STOP_ICON);
+    } else {
+      // Modulation assignment
+      gfxPrint(8 + 82*ch, 35, "Map");
+      gfxPrint(8 + 82*ch, 45, OC::Strings::cv_input_names_none[ mod_map[ch][mod_target] + 1 ] );
+    }
 
     // cursor
     gfxIcon(120*ch, 25 + audio_cursor[ch]*20, ch ? LEFT_ICON : RIGHT_ICON);
   }
 
-  // Reverb params (size, damping, level?)
-  // careful, because level is also feedback...
 }
 #endif
 

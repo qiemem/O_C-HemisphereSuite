@@ -9,77 +9,90 @@
 
 // Use the web GUI tool as a guide: https://www.pjrc.com/teensy/gui/
 
+#include <Audio.h>
+#include <Wire.h>
+#include <SPI.h>
+#include <SD.h>
+#include <SerialFlash.h>
+
 // GUItool: begin automatically generated code
-AudioInputI2S2           i2s1;           //xy=67,259
-AudioAmplifier           amp2;           //xy=249,406
-AudioAmplifier           amp1;           //xy=252,143
-AudioFilterStateVariable svfilter1;      //xy=424,341
-AudioFilterLadder        ladder1;        //xy=444,63
-AudioSynthWaveformDc     dc1;            //xy=612,200
-AudioMixer4              mixer2;         //xy=615,370
-AudioMixer4              mixer1;         //xy=617,120
-AudioSynthWaveformDc     dc2;            //xy=631,498
-AudioEffectWaveFolder    wavefolder2;    //xy=859.8889083862305,425.22222232818604
-AudioEffectWaveFolder    wavefolder1;    //xy=874.7777633666992,155.22220993041992
-AudioMixer4              mixer4;         //xy=1130.2223625183105,375.33338928222656
-AudioMixer4              mixer3;         //xy=1132.3332710266113,80.22221755981445
+AudioPlaySdWav           wavplayer1;     //xy=108,191
+AudioSynthWaveform       waveform2;      //xy=128,321
+AudioSynthWaveform       waveform1;      //xy=129,139
+AudioInputI2S2           i2s1;           //xy=129,245
+AudioSynthWaveformDc     dc2;            //xy=376.66668701171875,359.4444580078125
+AudioMixer4              mixer1;         //xy=380.4444580078125,164.3333282470703
+AudioMixer4              mixer2;         //xy=380.3333740234375,292.6666564941406
+AudioSynthWaveformDc     dc1;            //xy=381.4444580078125,222.88888549804688
+AudioEffectWaveFolder    wavefolder2;    //xy=571.4444580078125,334.888916015625
+AudioEffectWaveFolder    wavefolder1;    //xy=575.2222290039062,217.44442749023438
+AudioMixer4              mixer4;         //xy=743.000244140625,311.77783203125
+AudioMixer4              mixer3;         //xy=750.4443359375,181.3333282470703
+AudioAmplifier           amp1;           //xy=818,81
+AudioAmplifier           amp2;           //xy=884,357
+AudioFilterStateVariable svfilter1;        //xy=964,248
+AudioFilterLadder        ladder1;        //xy=970,96.88888549804688
+AudioMixer4              mixer6;         //xy=1106,310
+AudioMixer4              mixer5;         //xy=1113,156
+AudioOutputI2S2          i2s2;           //xy=1270.2222900390625,227.88890075683594
+AudioConnection          patchCord1(wavplayer1, 0, mixer5, 2);
+AudioConnection          patchCord2(wavplayer1, 1, mixer6, 2);
+AudioConnection          patchCord3(waveform2, 0, mixer2, 1);
+AudioConnection          patchCord4(waveform1, 0, mixer1, 1);
+AudioConnection          patchCord5(i2s1, 0, mixer1, 0);
+AudioConnection          patchCord6(i2s1, 1, mixer2, 0);
+AudioConnection          patchCord7(dc2, 0, wavefolder2, 1);
+AudioConnection          patchCord8(mixer1, 0, wavefolder1, 0);
+AudioConnection          patchCord9(mixer1, 0, mixer3, 0);
+AudioConnection          patchCord10(mixer2, 0, wavefolder2, 0);
+AudioConnection          patchCord11(mixer2, 0, mixer4, 0);
+AudioConnection          patchCord12(dc1, 0, wavefolder1, 1);
+AudioConnection          patchCord13(wavefolder2, 0, mixer4, 3);
+AudioConnection          patchCord14(wavefolder1, 0, mixer3, 3);
+AudioConnection          patchCord15(mixer4, 0, mixer6, 3);
+AudioConnection          patchCord16(mixer4, amp2);
+AudioConnection          patchCord17(mixer3, 0, mixer5, 3);
+AudioConnection          patchCord18(mixer3, amp1);
+AudioConnection          patchCord19(amp1, 0, ladder1, 0);
+AudioConnection          patchCord20(amp2, 0, svfilter1, 0);
+AudioConnection          patchCord21(svfilter1, 0, mixer6, 0);
+AudioConnection          patchCord24(svfilter1, 0, mixer5, 1);
+AudioConnection          patchCord22(ladder1, 0, mixer5, 0);
+AudioConnection          patchCord26(ladder1, 0, mixer6, 1);
+AudioConnection          patchCord23(mixer6, 0, i2s2, 1);
+AudioConnection          patchCord25(mixer5, 0, i2s2, 0);
+// GUItool: end automatically generated code
+
+// Some time ago...
+// These reverbs were fed from the final outputs and looped back into BOTH mixers...
+// mixer3 and mixer4 controlled the balance:
+// 0 - dry
+// 1 - this reverb
+// 2 - other reverb
+// 3 - wavefold
 //AudioEffectFreeverb      freeverb2;      //xy=1132.5553283691406,255.11116409301758
 //AudioEffectFreeverb      freeverb1;      //xy=1135.6664810180664,188.5555362701416
-AudioOutputI2S2          i2s2;           //xy=1434.77783203125,232.5555591583252
-
-AudioConnection          patchCord1(i2s1, 0, amp1, 0);
-AudioConnection          patchCord2(i2s1, 1, amp2, 0);
-AudioConnection          patchCord3(amp2, 0, svfilter1, 0);
-AudioConnection          patchCord4(amp2, 0, mixer2, 3);
-AudioConnection          patchCord5(amp1, 0, ladder1, 0);
-AudioConnection          patchCord6(amp1, 0, mixer1, 3);
-AudioConnection          patchCord7(svfilter1, 0, mixer2, 0);
-AudioConnection          patchCord8(svfilter1, 1, mixer2, 1);
-AudioConnection          patchCord9(svfilter1, 2, mixer2, 2);
-AudioConnection          patchCord10(ladder1, 0, mixer1, 0);
-AudioConnection          patchCord11(dc1, 0, wavefolder1, 1);
-AudioConnection          patchCord12(mixer2, 0, wavefolder2, 0);
-AudioConnection          patchCord13(mixer2, 0, mixer4, 0);
-AudioConnection          patchCord14(mixer1, 0, wavefolder1, 0);
-AudioConnection          patchCord15(mixer1, 0, mixer3, 0);
-AudioConnection          patchCord16(dc2, 0, wavefolder2, 1);
-AudioConnection          patchCord17(wavefolder2, 0, mixer4, 3);
-AudioConnection          patchCord18(wavefolder1, 0, mixer3, 3);
-AudioConnection          patchCord19(mixer4, 0, i2s2, 1);
-AudioConnection          patchCord21(mixer3, 0, i2s2, 0);
 //AudioConnection          patchCord20(mixer4, freeverb2);
 //AudioConnection          patchCord22(mixer3, freeverb1);
 //AudioConnection          patchCord23(freeverb2, 0, mixer4, 1);
 //AudioConnection          patchCord24(freeverb2, 0, mixer3, 2);
 //AudioConnection          patchCord25(freeverb1, 0, mixer3, 1);
 //AudioConnection          patchCord26(freeverb1, 0, mixer4, 2);
-// GUItool: end automatically generated code
 
 // Notes:
 //
 // amp1 and amp2 are beginning of chain, for pre-filter attenuation
 // dc1 and dc2 are control signals for modulating the wavefold amount.
 //
-// The reverbs are fed from the final outputs and looped back into BOTH mixers...
-// mixer3 and mixer4 control the balance:
-// 0 - dry
-// 1 - this reverb
-// 2 - other reverb
-// 3 - wavefold
-//
 // Every mixer input is a VCA.
 // VCA modulation could control all of them.
 //
-
-// this could be used for the Tuner or other pitch-tracking tricks
-//AudioAnalyzeNoteFrequency notefreq1;
-//AudioConnection          patchCord8(i2s1, 1, notefreq1, 0);
 
 namespace OC {
   namespace AudioDSP {
 
     const char * const mode_names[] = {
-      "Off", "VCA", "LPG", "VCF", "FOLD",
+      "Off", "VCA", "LPG", "VCF", "FOLD", "File"
     };
 
     /* Mod Targets:
@@ -102,49 +115,25 @@ namespace OC {
     float amplevel[2] = { 1.0, 1.0 };
     float foldamt[2] = { 0.0, 0.0 };
 
-
-    // Right side state variable filter functions
-    void SelectHPF() {
-      mixer2.gain(0, 0.0); // LPF
-      mixer2.gain(1, 0.0); // BPF
-      mixer2.gain(2, 1.0); // HPF
-      mixer2.gain(3, 0.0); // Dry
-    }
-    void SelectBPF() {
-      mixer2.gain(0, 0.0); // LPF
-      mixer2.gain(1, 1.0); // BPF
-      mixer2.gain(2, 0.0); // HPF
-      mixer2.gain(3, 0.0); // Dry
-    }
-    void SelectLPF() {
-      mixer2.gain(0, 1.0); // LPF
-      mixer2.gain(1, 0.0); // BPF
-      mixer2.gain(2, 0.0); // HPF
-      mixer2.gain(3, 0.0); // Dry
-    }
+    bool wavplayer_available = false;
 
     void BypassFilter(int ch) {
       if (ch == 0) {
-        mixer1.gain(0, 0.0); // LPF
-        mixer1.gain(1, 0.0); // unused
-        mixer1.gain(2, 0.0); // unused
-        mixer1.gain(3, 1.0); // Dry
+        mixer5.gain(0, 0.0); // VCF
+        mixer5.gain(3, 1.0); // Dry
       } else {
-        mixer2.gain(0, 0.0); // LPF
-        mixer2.gain(1, 0.0); // BPF
-        mixer2.gain(2, 0.0); // HPF
-        mixer2.gain(3, 1.0); // Dry
+        mixer6.gain(0, 0.0); // VCF
+        mixer6.gain(3, 1.0); // Dry
       }
     }
 
     void EnableFilter(int ch) {
       if (ch == 0) {
-        mixer1.gain(0, 1.0); // LPF
-        mixer1.gain(1, 0.0); // unused
-        mixer1.gain(2, 0.0); // unused
-        mixer1.gain(3, 0.0); // Dry
+        mixer5.gain(0, 1.0); // VCF
+        mixer5.gain(3, 0.0); // Dry
       } else {
-        SelectLPF();
+        mixer6.gain(0, 1.0); // VCF
+        mixer6.gain(3, 0.0); // Dry
       }
     }
 
@@ -190,21 +179,31 @@ namespace OC {
     void Init() {
       AudioMemory(128);
 
-      amp1.gain(0.85); // attenuate before filter
-      amp2.gain(0.85); // attenuate before filter
-
-      // --Filters
-      BypassFilter(0);
-      BypassFilter(1);
-
-      svfilter1.resonance(1.05);
-      ladder1.resonance(0.65);
-
       // --Wavefolders
       dc1.amplitude(0.00);
       dc2.amplitude(0.00);
       mixer3.gain(3, 0.9);
       mixer4.gain(3, 0.9);
+
+      // --Filters
+      amp1.gain(0.85); // attenuate before ladder filter
+      amp2.gain(0.85); // attenuate before svfilter1
+      svfilter1.resonance(1.05);
+      ladder1.resonance(0.65);
+      BypassFilter(0);
+      BypassFilter(1);
+
+      // mono-to-stereo from the filters
+      mixer5.gain(1, 1.0);
+      mixer6.gain(1, 1.0);
+
+      // -- SD card WAV player
+      mixer5.gain(2, 1.0);
+      mixer6.gain(2, 1.0);
+      wavplayer_available = SD.begin(BUILTIN_SDCARD);
+      if (!wavplayer_available) {
+        Serial.println("Unable to access the SD card");
+      }
 
       // --Reverbs
       /*
@@ -275,7 +274,11 @@ namespace OC {
 
           case WAVEFOLDER:
             AmpLevel(ch, MAX_CV);
-            BypassFilter(ch);
+            //BypassFilter(ch);
+            break;
+          case WAV_PLAYER:
+            if (wavplayer_available && !wavplayer1.isPlaying())
+              wavplayer1.play("DEFAULT.WAV");
             break;
           default: break;
       }
@@ -291,6 +294,15 @@ namespace OC {
           case WAVEFOLDER:
             mod_target = WAVEFOLD_MOD;
             break;
+          case WAV_PLAYER:
+            if (wavplayer1.isPlaying())
+              wavplayer1.stop();
+            else if (wavplayer_available)
+              wavplayer1.play("DEFAULT.WAV");
+              // TODO: beat-sync start
+
+            return; // no other mapping to change
+            break;
           default: break;
         }
 
@@ -301,6 +313,10 @@ namespace OC {
         CONSTRAIN(newmode, 0, MODE_COUNT - 1);
         SwitchMode(ch, ChannelMode(newmode));
       }
+    }
+
+    bool FileIsPlaying() {
+      return wavplayer1.isPlaying();
     }
 
   } // AudioDSP namespace
