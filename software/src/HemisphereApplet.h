@@ -315,6 +315,14 @@ public:
         graphics.setPrintPos(x + gfx_offset, y);
     }
 
+    inline int gfxGetPrintPosX() {
+        return graphics.getPrintPosX() - gfx_offset;
+    }
+
+    inline int gfxGetPrintPosY() {
+        return graphics.getPrintPosY();
+    }
+
     void gfxPrint(int x, int y, const char *str) {
         graphics.setPrintPos(x + gfx_offset, y);
         graphics.print(str);
@@ -329,6 +337,26 @@ public:
     void gfxPrint(int num) {
         graphics.print(num);
     }
+
+    void gfxStartCursor(int x, int y) {
+        gfxPos(x, y);
+        gfxStartCursor();
+    }
+
+    void gfxStartCursor() {
+        cursor_start_x = gfxGetPrintPosX();
+        cursor_start_y = gfxGetPrintPosY();
+    }
+
+    void gfxEndCursor(bool selected) {
+        if (selected) {
+            int16_t w = gfxGetPrintPosX() - cursor_start_x;
+            int16_t y = gfxGetPrintPosY() + 8;
+            int h = y - cursor_start_y;
+            gfxCursor(cursor_start_x, y, w, h);
+        }
+    }
+
     void gfxPrint(int x_adv, int num) { // Print number with character padding
         for (int c = 0; c < (x_adv / 6); c++) gfxPrint(" ");
         gfxPrint(num);
@@ -389,6 +417,11 @@ public:
 
     void gfxIcon(int x, int y, const uint8_t *data) {
         gfxBitmap(x, y, 8, data);
+    }
+
+    void gfxPrintIcon(const uint8_t *data, int16_t w = 8) {
+        gfxIcon(gfxGetPrintPosY(), gfxGetPrintPosX(), data);
+        gfxPos(gfxGetPrintPosX() + w, gfxGetPrintPosY());
     }
 
     //////////////// Hemisphere-specific graphics methods
@@ -455,6 +488,8 @@ protected:
 
 private:
     bool applet_started; // Allow the app to maintain state during switching
+    int16_t cursor_start_x;
+    int16_t cursor_start_y;
 };
 
 #endif // _HEM_APPLET_H_

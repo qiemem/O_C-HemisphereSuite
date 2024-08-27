@@ -78,6 +78,8 @@ public:
 
   void setPrintPos(coord_t x, coord_t y);
   void movePrintPos(coord_t dx, coord_t dy);
+  coord_t getPrintPosX();
+  coord_t getPrintPosY();
 
   void print(char);
   void print(int);
@@ -145,6 +147,16 @@ inline void Graphics::movePrintPos(coord_t dx, coord_t dy)
 {
   text_x_ += dx;
   text_y_ += dy;
+}
+
+inline coord_t Graphics::getPrintPosX()
+{
+  return text_x_;
+}
+
+inline coord_t Graphics::getPrintPosY()
+{
+  return text_y_;
 }
 
 inline uint8_t *Graphics::get_frame_ptr(const coord_t x, const coord_t y)
