@@ -226,7 +226,12 @@ public:
     }
 
     void Controller() {
-        midi_in();
+        midi_in(usbMIDI);
+#ifdef ARDUINO_TEENSY41
+        midi_in(usbHostMIDI);
+        midi_in(MIDI1);
+        thisUSB.Task();
+#endif
         midi_out();
 
         // Handle clock timing
@@ -302,13 +307,14 @@ public:
 
     void Panic() {
         Reset();
+        auto &hMIDI = HS::frame.MIDIState;
 
         // Send all notes off on every channel
         for (int note = 0; note < 128; note++)
         {
             for (int channel = 1; channel <= 16; channel++)
             {
-                usbMIDI.sendNoteOff(note, 0, channel);
+                hMIDI.SendNoteOff(channel, note);
             }
         }
     }
@@ -535,6 +541,7 @@ private:
     }
 
     void midi_out() {
+        auto &hMIDI = HS::frame.MIDIState;
         for (int ch = 0; ch < 4; ch++)
         {
             int out_fn = get_out_assign(ch);
@@ -557,7 +564,7 @@ private:
 
                     if (legato_on[ch] && midi_note != note_out[ch]) {
                         // Send note off if the note has changed
-                        usbMIDI.sendNoteOff(note_out[ch], 0, last_channel[ch]);
+                        hMIDI.SendNoteOff(last_channel[ch], note_out[ch]);
                         UpdateLog(0, ch, 1, last_channel[ch], note_out[ch], 0);
                         note_out[ch] = -1;
                         indicator = 1;
@@ -576,7 +583,7 @@ private:
                             }
                         }
                         velocity = constrain(velocity, 0, 127);
-                        usbMIDI.sendNoteOn(midi_note, velocity, out_ch);
+                        hMIDI.SendNoteOn(out_ch, midi_note, velocity);
                         UpdateLog(0, ch, 0, out_ch, midi_note, velocity);
                         indicator = 1;
                         note_out[ch] = midi_note;
@@ -586,7 +593,7 @@ private:
                 }
 
                 if (!read_gate && gated[ch]) { // A note off message should be sent
-                    usbMIDI.sendNoteOff(note_out[ch], 0, last_channel[ch]);
+                    hMIDI.SendNoteOff(last_channel[ch], note_out[ch], 0);
                     UpdateLog(0, ch, 1, last_channel[ch], note_out[ch], 0);
                     note_out[ch] = -1;
                     indicator = 1;
@@ -611,7 +618,7 @@ private:
                     value = constrain(value, 0, 127);
                     if (cc == 64) value = (value >= 60) ? 127 : 0; // On or off for sustain pedal
 
-                    usbMIDI.sendControlChange(cc, value, out_ch);
+                    hMIDI.SendCC(out_ch, cc, value);
                     UpdateLog(0, ch, 2, out_ch, cc, value);
                     indicator = 1;
                 }
@@ -620,7 +627,7 @@ private:
                 if (out_fn == MIDI_OUT_AFTERTOUCH) {
                     int value = Proportion(In(ch), HSAPPLICATION_5V, 127);
                     value = constrain(value, 0, 127);
-                    usbMIDI.sendAfterTouch(value, out_ch);
+                    hMIDI.SendAfterTouch(out_ch, value);
                     UpdateLog(0, ch, 3, out_ch, 0, value);
                     indicator = 1;
                 }
@@ -629,7 +636,7 @@ private:
                 if (out_fn == MIDI_OUT_PITCHBEND) {
                     int16_t bend = Proportion(In(ch) + HSAPPLICATION_3V, HSAPPLICATION_3V * 2, 16383);
                     bend = constrain(bend, 0, 16383);
-                    usbMIDI.sendPitchBend(bend, out_ch);
+                    hMIDI.SendPitchBend(out_ch, bend);
                     UpdateLog(0, ch, 4, out_ch, 0, bend - 8192);
                     indicator = 1;
                 }
@@ -639,133 +646,138 @@ private:
         }
     }
 
-    void midi_in() {
-        if (usbMIDI.read()) {
-            int message = usbMIDI.getType();
-            int channel = usbMIDI.getChannel();
-            int data1 = usbMIDI.getData1();
-            int data2 = usbMIDI.getData2();
+    template <typename T1>
+    void midi_in(T1 &device) {
+        if (device.read()) {
+            int message = device.getType();
+            int channel = device.getChannel();
+            int data1 = device.getData1();
+            int data2 = device.getData2();
 
-            // Handle system exclusive dump for Setup data
-            if (message == HEM_MIDI_SYSEX) OnReceiveSysEx();
+            process_midi_in(message, channel, data1, data2);
+        }
+    }
 
-            // Listen for incoming clock
-            if (message == HEM_MIDI_CLOCK) {
-                if (++clock_count >= 24) clock_count = 0;
-            }
+    void process_midi_in(int message, int channel, int data1, int data2) {
+        // Handle system exclusive dump for Setup data
+        if (message == HEM_MIDI_SYSEX) OnReceiveSysEx();
 
-            bool note_captured = 0; // A note or gate should only be captured by
-            bool gate_captured = 0; // one assignment, to allow polyphony in the interface
+        // Listen for incoming clock
+        if (message == HEM_MIDI_CLOCK) {
+            if (++clock_count >= 24) clock_count = 0;
+        }
 
-            // A MIDI message has been received; go through each channel to see if it
-            // needs to be routed to any of the CV outputs
-            for (int ch = 0; ch < 4; ch++)
-            {
-                int in_fn = get_in_assign(ch);
-                int in_ch = get_in_channel(ch);
-                bool indicator = 0;
-                if (message == HEM_MIDI_NOTE_ON && in_ch == channel) {
-                    if (note_in[ch] == -1) { // If this channel isn't already occupied with another note, handle Note On
-                        if (in_fn == MIDI_IN_NOTE && !note_captured) {
-                            // Send quantized pitch CV. Isolate transposition to quantizer so that it notes off aren't
-                            // misinterpreted if transposition is changed during the note.
-                            int note = data1 + get_in_transpose(ch);
-                            note = constrain(note, 0, 127);
-                            if (in_in_range(ch, note)) {
-                                Out(ch, MIDIQuantizer::CV(note));
-                                UpdateLog(1, ch, 0, in_ch, note, data2);
-                                indicator = 1;
-                                note_captured = 1;
-                                note_in[ch] = data1;
-                            } else note_in[ch] = -1;
-                        }
+        bool note_captured = 0; // A note or gate should only be captured by
+        bool gate_captured = 0; // one assignment, to allow polyphony in the interface
 
-                        if (in_fn == MIDI_IN_GATE && !gate_captured) {
-                            // Send a gate at Note On
-                            GateOut(ch, 1);
+        // A MIDI message has been received; go through each channel to see if it
+        // needs to be routed to any of the CV outputs
+        for (int ch = 0; ch < 4; ch++)
+        {
+            int in_fn = get_in_assign(ch);
+            int in_ch = get_in_channel(ch);
+            bool indicator = 0;
+            if (message == HEM_MIDI_NOTE_ON && in_ch == channel) {
+                if (note_in[ch] == -1) { // If this channel isn't already occupied with another note, handle Note On
+                    if (in_fn == MIDI_IN_NOTE && !note_captured) {
+                        // Send quantized pitch CV. Isolate transposition to quantizer so that it notes off aren't
+                        // misinterpreted if transposition is changed during the note.
+                        int note = data1 + get_in_transpose(ch);
+                        note = constrain(note, 0, 127);
+                        if (in_in_range(ch, note)) {
+                            Out(ch, MIDIQuantizer::CV(note));
+                            UpdateLog(1, ch, 0, in_ch, note, data2);
                             indicator = 1;
-                            gate_captured = 1;
+                            note_captured = 1;
                             note_in[ch] = data1;
-                        }
-
-                        if (in_fn == MIDI_IN_TRIGGER) {
-                            // Send a trigger pulse to CV
-                            ClockOut(ch);
-                            indicator = 1;
-                            gate_captured = 1;
-                        }
-
-                        if (in_fn == MIDI_IN_VELOCITY) {
-                            // Send velocity data to CV
-                            Out(ch, Proportion(data2, 127, HSAPPLICATION_5V));
-                            indicator = 1;
-                        }
+                        } else note_in[ch] = -1;
                     }
-                }
 
-                if (message == HEM_MIDI_NOTE_OFF && in_ch == channel) {
-                    if (note_in[ch] == data1) { // If the note off matches the note on assingned to this output
-                        note_in[ch] = -1;
-                        if (in_fn == MIDI_IN_GATE) {
-                            // Turn off gate on Note Off
-                            GateOut(ch, 0);
-                            indicator = 1;
-                        } else if (in_fn == MIDI_IN_NOTE) {
-                            // Log Note Off on the note assignment
-                            UpdateLog(1, ch, 1, in_ch, data1, 0);
-                        } else if (in_fn == MIDI_IN_VELOCITY) {
-                            Out(ch, 0);
-                        }
+                    if (in_fn == MIDI_IN_GATE && !gate_captured) {
+                        // Send a gate at Note On
+                        GateOut(ch, 1);
+                        indicator = 1;
+                        gate_captured = 1;
+                        note_in[ch] = data1;
                     }
-                }
 
-                bool cc = (in_fn == MIDI_IN_MOD || in_fn >= MIDI_IN_EXPRESSION);
-                if (cc && message == HEM_MIDI_CC && in_ch == channel) {
-                    uint8_t cc = 1; // Modulation wheel
-                    if (in_fn == MIDI_IN_EXPRESSION) cc = 11;
-                    if (in_fn == MIDI_IN_PAN) cc = 10;
-                    if (in_fn == MIDI_IN_HOLD) cc = 64;
-                    if (in_fn == MIDI_IN_BREATH) cc = 2;
-                    if (in_fn == MIDI_IN_Y_AXIS) cc = 74;
+                    if (in_fn == MIDI_IN_TRIGGER) {
+                        // Send a trigger pulse to CV
+                        ClockOut(ch);
+                        indicator = 1;
+                        gate_captured = 1;
+                    }
 
-                    // Send CC wheel to CV
-                    if (data1 == cc) {
-                        if (in_fn == MIDI_IN_HOLD && data2 > 0) data2 = 127;
+                    if (in_fn == MIDI_IN_VELOCITY) {
+                        // Send velocity data to CV
                         Out(ch, Proportion(data2, 127, HSAPPLICATION_5V));
-                        UpdateLog(1, ch, 2, in_ch, data1, data2);
                         indicator = 1;
                     }
                 }
-
-                if (message == HEM_MIDI_AFTERTOUCH && in_fn == MIDI_IN_AFTERTOUCH && in_ch == channel) {
-                    // Send aftertouch to CV
-                    Out(ch, Proportion(data1, 127, HSAPPLICATION_5V));
-                    UpdateLog(1, ch, 3, in_ch, data1, data2);
-                    indicator = 1;
-                }
-
-                if (message == HEM_MIDI_PITCHBEND && in_fn == MIDI_IN_PITCHBEND && in_ch == channel) {
-                    // Send pitch bend to CV
-                    int data = (data2 << 7) + data1 - 8192;
-                    Out(ch, Proportion(data, 0x7fff, HSAPPLICATION_3V));
-                    UpdateLog(1, ch, 4, in_ch, 0, data);
-                    indicator = 1;
-                }
-
-                if (in_fn >= MIDI_IN_CLOCK_4TH) {
-                    // Clock is unlogged because there can be a lot of it
-                    uint8_t mod = get_clock_mod(in_fn);
-                    if (clock_count % mod == 0) ClockOut(ch);
-                }
-
-                #ifdef MIDI_DIAGNOTIC
-                if (message > 0) {
-                    UpdateLog(1, ch, 6, message, data1, data2);
-                }
-                #endif
-
-                if (indicator) indicator_in[ch] = MIDI_INDICATOR_COUNTDOWN;
             }
+
+            if (message == HEM_MIDI_NOTE_OFF && in_ch == channel) {
+                if (note_in[ch] == data1) { // If the note off matches the note on assingned to this output
+                    note_in[ch] = -1;
+                    if (in_fn == MIDI_IN_GATE) {
+                        // Turn off gate on Note Off
+                        GateOut(ch, 0);
+                        indicator = 1;
+                    } else if (in_fn == MIDI_IN_NOTE) {
+                        // Log Note Off on the note assignment
+                        UpdateLog(1, ch, 1, in_ch, data1, 0);
+                    } else if (in_fn == MIDI_IN_VELOCITY) {
+                        Out(ch, 0);
+                    }
+                }
+            }
+
+            bool cc = (in_fn == MIDI_IN_MOD || in_fn >= MIDI_IN_EXPRESSION);
+            if (cc && message == HEM_MIDI_CC && in_ch == channel) {
+                uint8_t cc = 1; // Modulation wheel
+                if (in_fn == MIDI_IN_EXPRESSION) cc = 11;
+                if (in_fn == MIDI_IN_PAN) cc = 10;
+                if (in_fn == MIDI_IN_HOLD) cc = 64;
+                if (in_fn == MIDI_IN_BREATH) cc = 2;
+                if (in_fn == MIDI_IN_Y_AXIS) cc = 74;
+
+                // Send CC wheel to CV
+                if (data1 == cc) {
+                    if (in_fn == MIDI_IN_HOLD && data2 > 0) data2 = 127;
+                    Out(ch, Proportion(data2, 127, HSAPPLICATION_5V));
+                    UpdateLog(1, ch, 2, in_ch, data1, data2);
+                    indicator = 1;
+                }
+            }
+
+            if (message == HEM_MIDI_AFTERTOUCH && in_fn == MIDI_IN_AFTERTOUCH && in_ch == channel) {
+                // Send aftertouch to CV
+                Out(ch, Proportion(data1, 127, HSAPPLICATION_5V));
+                UpdateLog(1, ch, 3, in_ch, data1, data2);
+                indicator = 1;
+            }
+
+            if (message == HEM_MIDI_PITCHBEND && in_fn == MIDI_IN_PITCHBEND && in_ch == channel) {
+                // Send pitch bend to CV
+                int data = (data2 << 7) + data1 - 8192;
+                Out(ch, Proportion(data, 0x7fff, HSAPPLICATION_3V));
+                UpdateLog(1, ch, 4, in_ch, 0, data);
+                indicator = 1;
+            }
+
+            if (in_fn >= MIDI_IN_CLOCK_4TH) {
+                // Clock is unlogged because there can be a lot of it
+                uint8_t mod = get_clock_mod(in_fn);
+                if (clock_count % mod == 0) ClockOut(ch);
+            }
+
+            #ifdef MIDI_DIAGNOTIC
+            if (message > 0) {
+                UpdateLog(1, ch, 6, message, data1, data2);
+            }
+            #endif
+
+            if (indicator) indicator_in[ch] = MIDI_INDICATOR_COUNTDOWN;
         }
     }
 
