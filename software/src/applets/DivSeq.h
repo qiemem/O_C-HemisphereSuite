@@ -62,6 +62,7 @@ public:
         // reset case
         if (clocked && step_index < 0) {
             step_index = 0;
+            divmult[step_index].last_clock = last_clock;
             last_clock = OC::CORE::ticks;
             return StepActive(step_index) && divmult[step_index].Tick(true);
         }
