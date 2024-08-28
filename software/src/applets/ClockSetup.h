@@ -73,7 +73,6 @@ public:
         // Paused means wait for clock-sync to start
         if (clock_m.IsPaused() && clock_sync)
             clock_m.Start();
-        // TODO: automatically stop...
 
         // Advance internal clock, sync to external clock / reset
         if (clock_m.IsRunning())
@@ -213,12 +212,17 @@ public:
 
     uint64_t GetGlobals() {
         uint64_t data = 0;
+        // only the first 16 bits are actually stored on T3.2
         Pack(data, PackLocation { 0, 1 }, HS::auto_save_enabled);
         Pack(data, PackLocation { 1, 1 }, HS::cursor_wrap);
         Pack(data, PackLocation { 2, 2 }, HS::screensaver_mode);
         Pack(data, PackLocation { 4, 7 }, HS::trig_length);
-        // TODO: VOR - remember Vbias per preset?
-        //Pack(data, PackLocation { 11, 2 }, vbias);
+
+#ifdef VOR
+        // remember Vbias per preset
+        VBiasManager *v = v->get();
+        Pack(data, PackLocation { 11, 2 }, v->GetState());
+#endif
         return data;
     }
     void SetGlobals(const uint64_t &data) {
@@ -226,6 +230,12 @@ public:
         HS::cursor_wrap = Unpack(data, PackLocation { 1, 1 });
         HS::screensaver_mode = Unpack(data, PackLocation { 2, 2 });
         HS::trig_length = constrain( Unpack(data, PackLocation { 4, 7 }), 1, 127);
+
+#ifdef VOR
+        VBiasManager *v = v->get();
+        VBiasManager::VState bias_state = (VBiasManager::VState)Unpack(data, PackLocation { 11, 2 });
+        v->SetState( bias_state );
+#endif
     }
 
 

@@ -129,7 +129,6 @@ public:
             break;
         */
         // Bi-polar +/-5V
-        case TWOCC<'H','S'>::value: // Hemisphere
         case TWOCC<'L','R'>::value: // Low-rents (or) Lorenz
             new_state = VBiasManager::BI;
             break;
@@ -141,6 +140,7 @@ public:
             new_state = VBiasManager::UNI;
             break;
         case TWOCC<'P','L'>::value: // Quadraturia (or) Quadrature LFO
+        case TWOCC<'H','S'>::value: // Hemisphere
             return; // cancel, it has its own VBias setting
         }
         instance->SetState(new_state);
