@@ -47,7 +47,7 @@ namespace OC {
     void SwitchMode(int ch, ChannelMode newmode);
     void AudioMenuAdjust(int ch, int direction);
     void DrawAudioSetup();
-    bool FileIsPlaying();
+    bool FileIsPlaying(int ch);
     uint8_t GetFileNum(int ch);
     uint32_t GetFileTime(int ch);
     void AudioSetupAuxButton(int ch);

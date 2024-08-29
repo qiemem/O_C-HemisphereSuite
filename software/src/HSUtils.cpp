@@ -306,7 +306,7 @@ void OC::AudioDSP::DrawAudioSetup() {
 
     if (WAV_PLAYER == audio_cursor[ch]) {
       gfxPrint(x, 35, GetFileNum(ch));
-      if (FileIsPlaying()) {
+      if (FileIsPlaying(ch)) {
         gfxIcon(x, 45, PLAY_ICON);
 
         uint32_t tmilli = GetFileTime(ch);

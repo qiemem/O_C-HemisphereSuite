@@ -12,7 +12,7 @@
 // Use the web GUI tool as a guide: https://www.pjrc.com/teensy/gui/
 
 // GUItool: begin automatically generated code
-AudioPlaySdWav           wavplayer1;     //xy=108,191
+AudioPlaySdWav           wavplayer[2];     //xy=108,191
 AudioSynthWaveform       waveform2;      //xy=128,321
 AudioSynthWaveform       waveform1;      //xy=129,139
 AudioInputI2S2           i2s1;           //xy=129,245
@@ -28,13 +28,16 @@ AudioAmplifier           amp1;           //xy=818,81
 AudioAmplifier           amp2;           //xy=884,357
 AudioFilterStateVariable svfilter1;        //xy=964,248
 AudioFilterLadder        ladder1;        //xy=970,96.88888549804688
-AudioMixer4              mixer6;         //xy=1106,310
 AudioMixer4              mixer5;         //xy=1113,156
+AudioMixer4              mixer6;         //xy=1106,310
+AudioMixer4              finalmixer[2];         //xy=1106,310
 AudioEffectDynamics      complimiter[2];
 AudioOutputI2S2          i2s2;           //xy=1270.2222900390625,227.88890075683594
 
-AudioConnection          patchCord1(wavplayer1, 0, mixer5, 2);
-AudioConnection          patchCord2(wavplayer1, 1, mixer6, 2);
+AudioConnection          patchCordWav1L(wavplayer[0], 0, finalmixer[0], 1);
+AudioConnection          patchCordWav1R(wavplayer[0], 1, finalmixer[1], 1);
+AudioConnection          patchCordWav2L(wavplayer[1], 0, finalmixer[0], 2);
+AudioConnection          patchCordWav2R(wavplayer[1], 1, finalmixer[1], 2);
 AudioConnection          patchCord3(waveform2, 0, mixer2, 1);
 AudioConnection          patchCord4(waveform1, 0, mixer1, 1);
 AudioConnection          patchCord5(i2s1, 0, mixer1, 0);
@@ -54,14 +57,16 @@ AudioConnection          patchCord18(mixer3, amp1);
 AudioConnection          patchCord19(amp1, 0, ladder1, 0);
 AudioConnection          patchCord20(amp2, 0, svfilter1, 0);
 AudioConnection          patchCord21(svfilter1, 0, mixer6, 0);
-AudioConnection          patchCord24(svfilter1, 0, mixer5, 1);
-AudioConnection          patchCord22(ladder1, 0, mixer5, 0);
-AudioConnection          patchCord26(ladder1, 0, mixer6, 1);
+AudioConnection          patchCord22(svfilter1, 0, mixer5, 1);
+AudioConnection          patchCord23(ladder1, 0, mixer5, 0);
+AudioConnection          patchCord24(ladder1, 0, mixer6, 1);
 
-AudioConnection          patchCord25(mixer5, 0, complimiter[0], 0);
-AudioConnection          patchCord23(mixer6, 0, complimiter[1], 0);
-AudioConnection          patchCord27(complimiter[0], 0, i2s2, 0);
-AudioConnection          patchCord28(complimiter[1], 0, i2s2, 1);
+AudioConnection          patchCord25(mixer5, 0, finalmixer[0], 0);
+AudioConnection          patchCord26(mixer6, 0, finalmixer[1], 0);
+AudioConnection          patchCord27(finalmixer[0], 0, complimiter[0], 0);
+AudioConnection          patchCord28(finalmixer[1], 0, complimiter[1], 0);
+AudioConnection          patchCord29(complimiter[0], 0, i2s2, 0);
+AudioConnection          patchCord30(complimiter[1], 0, i2s2, 1);
 
 // GUItool: end automatically generated code
 
@@ -188,33 +193,44 @@ namespace OC {
         mixer4.gain(0, amplevel[ch] * (1.0 - abs(foldamt[ch])));
     }
 
-    bool FileIsPlaying() {
-      return wavplayer1.isPlaying();
+    // SD file player functions
+    void StartPlaying(int ch) {
+      char filename[] = "000.WAV";
+      filename[1] += wavplayer_select[ch] / 10;
+      filename[2] += wavplayer_select[ch] % 10;
+      wavplayer[ch].play(filename);
+    }
+    bool FileIsPlaying(int ch = 0) {
+      return wavplayer[ch].isPlaying();
     }
     void ToggleFilePlayer(int ch = 0) {
-      if (wavplayer1.isPlaying()) {
-        wavplayer1.stop();
+      if (wavplayer[ch].isPlaying()) {
+        wavplayer[ch].stop();
       } else if (wavplayer_available) {
-        char filename[] = "000.WAV";
-        filename[2] += wavplayer_select[ch];
-        wavplayer1.play(filename);
+        StartPlaying(ch);
       }
     }
-    void PlayFile1() { ToggleFilePlayer(0); }
-    void PlayFile2() { ToggleFilePlayer(1); }
+
+    // simple hooks for beat-sync callbacks
+    void FileToggle1() { ToggleFilePlayer(0); }
+    void FileToggle2() { ToggleFilePlayer(1); }
+    void FilePlay1() { StartPlaying(0); }
+    void FilePlay2() { StartPlaying(1); }
+
     void ChangeToFile(int ch, int select) {
-      wavplayer_select[ch] = (uint8_t)constrain(select, 0, 9);
-      if (wavplayer1.isPlaying()) {
-        char filename[] = "000.WAV";
-        filename[2] += wavplayer_select[ch];
-        wavplayer1.play(filename);
+      wavplayer_select[ch] = (uint8_t)constrain(select, 0, 99);
+      if (wavplayer[ch].isPlaying()) {
+        if (HS::clock_m.IsRunning()) {
+          HS::clock_m.BeatSync( ch ? &FilePlay2 : &FilePlay1 );
+        } else
+          StartPlaying(ch);
       }
     }
     uint8_t GetFileNum(int ch) {
       return wavplayer_select[ch];
     }
     uint32_t GetFileTime(int ch) {
-      return wavplayer1.positionMillis();
+      return wavplayer[ch].positionMillis();
     }
 
     // Designated Integration Functions
@@ -236,9 +252,11 @@ namespace OC {
       BypassFilter(0);
       BypassFilter(1);
 
-      // -- SD card WAV player
-      mixer5.gain(2, 0.9);
-      mixer6.gain(2, 0.9);
+      // -- SD card WAV players
+      finalmixer[0].gain(1, 0.9);
+      finalmixer[1].gain(1, 0.9);
+      finalmixer[0].gain(2, 0.9);
+      finalmixer[1].gain(2, 0.9);
       wavplayer_available = SD.begin(BUILTIN_SDCARD);
       if (!wavplayer_available) {
         Serial.println("Unable to access the SD card");
@@ -281,6 +299,7 @@ namespace OC {
       }
     }
 
+    // Encoder action
     void AudioMenuAdjust(int ch, int direction) {
       if (!isEditing[ch]) {
         audio_cursor[ch] = (ChannelMode)constrain(audio_cursor[ch] + direction, 0, MODE_COUNT - 1);
@@ -325,7 +344,7 @@ namespace OC {
 
         case WAV_PLAYER:
           if (HS::clock_m.IsRunning()) {
-            HS::clock_m.BeatSync( ch ? &PlayFile2 : &PlayFile1 );
+            HS::clock_m.BeatSync( ch ? &FileToggle2 : &FileToggle1 );
           } else
             ToggleFilePlayer(ch);
           break;
