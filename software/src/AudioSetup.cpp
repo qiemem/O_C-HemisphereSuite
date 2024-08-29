@@ -99,21 +99,22 @@ namespace OC {
   namespace AudioDSP {
 
     const char * const mode_names[MODE_COUNT] = {
-      "Off", "VCA", "VCF", "FOLD", "File"
+      "Off", "VCA", "VCF", "FOLD", "File", "FileVCA"
     };
 
     /* Mod Targets:
-      AMP_LEVEL
+      AMP_LEVEL,
       FILTER_CUTOFF,
       FILTER_RESONANCE,
       WAVEFOLD_MOD,
+      WAV_LEVEL,
       REVERB_LEVEL,
       REVERB_SIZE,
       REVERB_DAMP,
      */
     int mod_map[2][TARGET_COUNT] = {
-      { -1, -1, -1, -1, -1, -1, -1 },
-      { -1, -1, -1, -1, -1, -1, -1 },
+      { -1, -1, -1, -1, -1, -1, -1, -1 },
+      { -1, -1, -1, -1, -1, -1, -1, -1 },
     };
     float bias[2][TARGET_COUNT];
     ChannelMode audio_cursor[2] = { PASSTHRU, PASSTHRU };
@@ -125,6 +126,7 @@ namespace OC {
     bool filter_enabled[2];
     bool wavplayer_available = false;
     uint8_t wavplayer_select[2] = { 1, 2 };
+    float wavlevel[2] = { 1.0, 1.0 };
 
     void BypassFilter(int ch) {
       if (ch == 0) {
@@ -232,6 +234,11 @@ namespace OC {
     uint32_t GetFileTime(int ch) {
       return wavplayer[ch].positionMillis();
     }
+    void FileLevel(int ch, int cv) {
+      wavlevel[ch] = (float)cv / MAX_CV + bias[ch][WAV_LEVEL];
+      finalmixer[0].gain(1 + ch, 0.9 * wavlevel[ch]);
+      finalmixer[1].gain(1 + ch, 0.9 * wavlevel[ch]);
+    }
 
     // Designated Integration Functions
     // ----- called from setup() in Main.cpp
@@ -296,6 +303,9 @@ namespace OC {
         if (mod_map[i][FILTER_CUTOFF] >= 0)
           ModFilter(i, values[mod_map[i][FILTER_CUTOFF]]);
 
+        if (mod_map[i][WAV_LEVEL] >= 0)
+          FileLevel(i, values[mod_map[i][WAV_LEVEL]]);
+
       }
     }
 
@@ -318,6 +328,9 @@ namespace OC {
         case WAVEFOLDER:
           mod_target = WAVEFOLD_MOD;
           break;
+        case WAV_PLAYER_VCA:
+          mod_target = WAV_LEVEL;
+          break;
         case WAV_PLAYER:
           ChangeToFile(ch, wavplayer_select[ch] + direction);
 
@@ -330,8 +343,14 @@ namespace OC {
       int &targ = mod_map[ch][mod_target];
       targ = constrain(targ + direction + 1, 0, ADC_CHANNEL_LAST + DAC_CHANNEL_LAST) - 1;
 
+      if (audio_cursor[ch] == VCF_MODE && targ < 0)
+        ModFilter(ch, MAX_CV);
+
       if (audio_cursor[ch] == VCA_MODE && targ < 0)
         AmpLevel(ch, MAX_CV);
+
+      if (audio_cursor[ch] == WAV_PLAYER_VCA && targ < 0)
+        FileLevel(ch, MAX_CV);
     }
 
     void AudioSetupAuxButton(int ch) {

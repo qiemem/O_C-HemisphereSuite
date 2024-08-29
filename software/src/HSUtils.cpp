@@ -286,7 +286,7 @@ namespace HS {
 void OC::AudioDSP::DrawAudioSetup() {
   for (int ch = 0; ch < 2; ++ch)
   {
-    const int x = 8 + 82*ch;
+    const int x = 8 + 64*ch;
 
     // Channel mode
     gfxPrint(x, 15, "Mod");
@@ -300,6 +300,9 @@ void OC::AudioDSP::DrawAudioSetup() {
         break;
       case WAVEFOLDER:
         mod_target = WAVEFOLD_MOD;
+        break;
+      case WAV_PLAYER_VCA:
+        mod_target = WAV_LEVEL;
         break;
       default: break;
     }
@@ -326,7 +329,7 @@ void OC::AudioDSP::DrawAudioSetup() {
     }
 
     // cursor
-    gfxIcon(120*ch, 25 + isEditing[ch]*20, ch ? LEFT_ICON : RIGHT_ICON);
+    gfxIcon(64*ch, 25 + isEditing[ch]*20, RIGHT_ICON);
   }
 
 }

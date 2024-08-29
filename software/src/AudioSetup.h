@@ -13,6 +13,7 @@ namespace OC {
       FILTER_CUTOFF,
       FILTER_RESONANCE,
       WAVEFOLD_MOD,
+      WAV_LEVEL,
       REVERB_LEVEL,
       REVERB_SIZE,
       REVERB_DAMP,
@@ -26,6 +27,7 @@ namespace OC {
       VCF_MODE,
       WAVEFOLDER,
       WAV_PLAYER,
+      WAV_PLAYER_VCA,
 
       MODE_COUNT
     };
