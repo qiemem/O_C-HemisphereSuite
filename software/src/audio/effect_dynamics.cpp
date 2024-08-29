@@ -25,7 +25,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#if !defined(KINETISL)
+#if defined(ARDUINO_TEENSY41)
 
 #include "effect_dynamics.h"
 #include "utility/dspinst.h"
