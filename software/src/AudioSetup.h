@@ -2,6 +2,7 @@
 
 #include <Audio.h>
 #include <Wire.h>
+#include "audio/effect_dynamics.h"
 
 // --- Audio-related functions accessible from elsewhere in the O_C codebase
 namespace OC {

@@ -30,7 +30,9 @@ AudioFilterStateVariable svfilter1;        //xy=964,248
 AudioFilterLadder        ladder1;        //xy=970,96.88888549804688
 AudioMixer4              mixer6;         //xy=1106,310
 AudioMixer4              mixer5;         //xy=1113,156
+AudioEffectDynamics      complimiter[2];
 AudioOutputI2S2          i2s2;           //xy=1270.2222900390625,227.88890075683594
+
 AudioConnection          patchCord1(wavplayer1, 0, mixer5, 2);
 AudioConnection          patchCord2(wavplayer1, 1, mixer6, 2);
 AudioConnection          patchCord3(waveform2, 0, mixer2, 1);
@@ -55,8 +57,12 @@ AudioConnection          patchCord21(svfilter1, 0, mixer6, 0);
 AudioConnection          patchCord24(svfilter1, 0, mixer5, 1);
 AudioConnection          patchCord22(ladder1, 0, mixer5, 0);
 AudioConnection          patchCord26(ladder1, 0, mixer6, 1);
-AudioConnection          patchCord23(mixer6, 0, i2s2, 1);
-AudioConnection          patchCord25(mixer5, 0, i2s2, 0);
+
+AudioConnection          patchCord25(mixer5, 0, complimiter[0], 0);
+AudioConnection          patchCord23(mixer6, 0, complimiter[1], 0);
+AudioConnection          patchCord27(complimiter[0], 0, i2s2, 0);
+AudioConnection          patchCord28(complimiter[1], 0, i2s2, 1);
+
 // GUItool: end automatically generated code
 
 // Some time ago...
@@ -120,12 +126,12 @@ namespace OC {
         mixer5.gain(0, 0.0); // VCF
         mixer6.gain(1, 0.0); // VCF
 
-        mixer5.gain(3, 1.0); // Dry
+        mixer5.gain(3, 0.9); // Dry
       } else {
         mixer6.gain(0, 0.0); // VCF
         mixer5.gain(1, 0.0); // VCF
 
-        mixer6.gain(3, 1.0); // Dry
+        mixer6.gain(3, 0.9); // Dry
       }
       filter_enabled[ch] = false;
     }
@@ -231,8 +237,8 @@ namespace OC {
       BypassFilter(1);
 
       // -- SD card WAV player
-      mixer5.gain(2, 1.0);
-      mixer6.gain(2, 1.0);
+      mixer5.gain(2, 0.9);
+      mixer6.gain(2, 0.9);
       wavplayer_available = SD.begin(BUILTIN_SDCARD);
       if (!wavplayer_available) {
         Serial.println("Unable to access the SD card");
@@ -251,6 +257,12 @@ namespace OC {
       mixer4.gain(2, 0.05); // verb1
       */
       
+      // -- Master Compressor / Limiter
+      for (int ch = 0; ch < 2; ++ch) {
+        complimiter[ch].compression(-20.0f);
+        complimiter[ch].makeupGain(0.0);
+        // default gate() and limit() settings
+      }
     }
 
     // ----- called from Controller thread
