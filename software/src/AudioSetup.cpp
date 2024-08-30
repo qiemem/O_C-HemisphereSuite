@@ -101,7 +101,7 @@ namespace OC {
   namespace AudioDSP {
 
     const char * const mode_names[MODE_COUNT] = {
-      "Off", "VCA", "VCF", "FOLD", "File", "FileVCA"
+      "Off", "VCA", "VCF", "FOLD", "File", "FileVCA", "Speed"
     };
 
     /* Mod Targets:
@@ -115,8 +115,8 @@ namespace OC {
       REVERB_DAMP,
      */
     int mod_map[2][TARGET_COUNT] = {
-      { -1, -1, -1, -1, -1, -1, -1, -1 },
-      { -1, -1, -1, -1, -1, -1, -1, -1 },
+      { -1, -1, -1, -1, -1, -1, -1, -1, -1 },
+      { -1, -1, -1, -1, -1, -1, -1, -1, -1 },
     };
     float bias[2][TARGET_COUNT];
     ChannelMode audio_cursor[2] = { PASSTHRU, PASSTHRU };
@@ -241,9 +241,9 @@ namespace OC {
       finalmixer[0].gain(1 + ch, 0.9 * wavlevel[ch]);
       finalmixer[1].gain(1 + ch, 0.9 * wavlevel[ch]);
     }
-    void SetFileRate(int ch, int cv) {
-      // bipolar CV has +/- 0.05% pitch bend
-      wavplayer[ch].setPlaybackRate((float)cv / MAX_CV * 0.05 + 1.0);
+    void FileRate(int ch, int cv) {
+      // bipolar CV has +/- 50% pitch bend
+      wavplayer[ch].setPlaybackRate((float)cv / MAX_CV * 0.5 + 1.0);
     }
 
     // Designated Integration Functions
@@ -316,6 +316,9 @@ namespace OC {
         if (mod_map[i][WAV_LEVEL] >= 0)
           FileLevel(i, values[mod_map[i][WAV_LEVEL]]);
 
+        if (mod_map[i][WAV_RATE] >= 0)
+          FileRate(i, values[mod_map[i][WAV_RATE]]);
+
       }
     }
 
@@ -341,6 +344,9 @@ namespace OC {
         case WAV_PLAYER_VCA:
           mod_target = WAV_LEVEL;
           break;
+        case WAV_PLAYER_RATE:
+          mod_target = WAV_RATE;
+          break;
         case WAV_PLAYER:
           ChangeToFile(ch, wavplayer_select[ch] + direction);
 
@@ -361,6 +367,9 @@ namespace OC {
 
       if (audio_cursor[ch] == WAV_PLAYER_VCA && targ < 0)
         FileLevel(ch, MAX_CV);
+
+      if (audio_cursor[ch] == WAV_PLAYER_RATE && targ < 0)
+        FileRate(ch, 0);
     }
 
     void AudioSetupAuxButton(int ch) {

@@ -304,6 +304,9 @@ void OC::AudioDSP::DrawAudioSetup() {
       case WAV_PLAYER_VCA:
         mod_target = WAV_LEVEL;
         break;
+      case WAV_PLAYER_RATE:
+        mod_target = WAV_RATE;
+        break;
       default: break;
     }
 
