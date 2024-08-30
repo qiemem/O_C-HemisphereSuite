@@ -1,6 +1,8 @@
 #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
 
 #include "extern/dspinst.h"
+#include "extern/TeensyVariablePlayback.h"
+
 #include "AudioSetup.h"
 #include "OC_ADC.h"
 #include "OC_DAC.h"
@@ -12,7 +14,7 @@
 // Use the web GUI tool as a guide: https://www.pjrc.com/teensy/gui/
 
 // GUItool: begin automatically generated code
-AudioPlaySdWav           wavplayer[2];     //xy=108,191
+AudioPlaySdResmp         wavplayer[2];     //xy=108,191
 AudioSynthWaveform       waveform2;      //xy=128,321
 AudioSynthWaveform       waveform1;      //xy=129,139
 AudioInputI2S2           i2s1;           //xy=129,245
@@ -200,7 +202,7 @@ namespace OC {
       char filename[] = "000.WAV";
       filename[1] += wavplayer_select[ch] / 10;
       filename[2] += wavplayer_select[ch] % 10;
-      wavplayer[ch].play(filename);
+      wavplayer[ch].playWav(filename);
     }
     bool FileIsPlaying(int ch = 0) {
       return wavplayer[ch].isPlaying();
@@ -239,6 +241,10 @@ namespace OC {
       finalmixer[0].gain(1 + ch, 0.9 * wavlevel[ch]);
       finalmixer[1].gain(1 + ch, 0.9 * wavlevel[ch]);
     }
+    void SetFileRate(int ch, int cv) {
+      // bipolar CV has +/- 0.05% pitch bend
+      wavplayer[ch].setPlaybackRate((float)cv / MAX_CV * 0.05 + 1.0);
+    }
 
     // Designated Integration Functions
     // ----- called from setup() in Main.cpp
@@ -267,6 +273,10 @@ namespace OC {
       wavplayer_available = SD.begin(BUILTIN_SDCARD);
       if (!wavplayer_available) {
         Serial.println("Unable to access the SD card");
+      }
+      else {
+        wavplayer[0].enableInterpolation(true);
+        wavplayer[1].enableInterpolation(true);
       }
 
       // --Reverbs
