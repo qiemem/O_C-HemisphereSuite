@@ -108,6 +108,7 @@ public:
             return false;
         }
 
+        _tempo_bpm = 0.0;
         _file_size = file.size();
         if (isWave) {
             wav_header wav_header;
@@ -126,22 +127,68 @@ public:
             
             bytesRead = file.read(buffer, 8);
             if (bytesRead != 8) return false;
-            unsigned infoTagsSize = 0, chunkSize = 0;
+
+            unsigned dataChunkOffset = 0, chunkSize = 0;
             while (!wavHeaderParser.readInfoTags((unsigned char *)buffer, 0, chunkSize))
             {
+                if (    buffer[0] == 'i' 
+                     && buffer[1] == 'd' 
+                     && buffer[2] == '3' )
+                {
+                  Serial.println("Found 'id3' chunk");
+
+                  size_t sz = 512;
+                  char id3buf[sz];
+                  sz = file.read(id3buf, chunkSize > sz ? sz : chunkSize);
+                  uint16_t tempo = wavHeaderParser.getBPM(id3buf, sz);
+                  if (tempo) _tempo_bpm = tempo;
+                }
+
                 Serial.printf("Skipping chunk, size %u bytes\n", chunkSize);
-                infoTagsSize += chunkSize;
-                file.seek(36 + infoTagsSize);
+                dataChunkOffset += chunkSize;
+                file.seek(36 + dataChunkOffset);
                 bytesRead = file.read(buffer, 8);
                 if (bytesRead != 8) return false;
             }
+            Serial.printf("Found 'data' chunk at %u, size: %u bytes", 36 + dataChunkOffset, chunkSize);
+
+            unsigned afterData = 36 + dataChunkOffset + chunkSize;
+            // check for metadata after the data chunk
+            do {
+              file.seek(afterData);
+              bytesRead = file.read(buffer, 8);
+              if (bytesRead != 8) break;
+
+              if (    buffer[0] == 'i' 
+                   && buffer[1] == 'd' 
+                   && buffer[2] == '3' )
+              {
+                Serial.println("Found 'id3' chunk after 'data'");
+
+                size_t sz = 512;
+                char id3buf[sz];
+                sz = file.read(id3buf, chunkSize > sz ? sz : chunkSize);
+                uint16_t tempo = wavHeaderParser.getBPM(id3buf, sz);
+                if (tempo) _tempo_bpm = tempo;
+
+                break;
+              }
+
+              afterData += static_cast<uint32_t>(buffer[7] << 24 | buffer[6] << 16 | buffer[5] << 8 | buffer[4]);
+              afterData += 8;
+            } while (afterData < _file_size);
+
+            // jump back to data chunk
+            file.seek(36 + dataChunkOffset);
+            bytesRead = file.read(buffer, 8);
+            if (bytesRead != 8) return false;
 
             if (!wavHeaderParser.readDataHeader((unsigned char *)buffer, 0, data_header)) {
                 Serial.println("Not able to read header! Aborting...");
                 return false;
             }
 
-            _header_offset = (44 + infoTagsSize) / 2;
+            _header_offset = (44 + dataChunkOffset) / 2;
             _loop_finish = ((data_header.data_bytes) / 2) + _header_offset; 
         } else 
             _loop_finish = _file_size / 2;
@@ -649,13 +696,22 @@ public:
     int32_t getLoopFinish() {
         return  _loop_finish / _numChannels - _header_offset;
     }
-    
+
+    float getBPM() {
+      return _tempo_bpm;
+    }
+    void matchTempo(float target) {
+      if (_tempo_bpm > 0.0)
+        setPlaybackRate(target / _tempo_bpm);
+    }
+
 protected:
     volatile bool _playing = false;
 
     int32_t _file_size;
     int32_t _header_offset = 0; // == (header size in bytes ) / 2
 
+    float _tempo_bpm = 0.0;
     double _playbackRate = 1.0;
     double _remainder = 0.0;
     loop_type _loopType = loop_type::looptype_none;

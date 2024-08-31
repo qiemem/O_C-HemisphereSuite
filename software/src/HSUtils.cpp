@@ -315,6 +315,8 @@ void OC::AudioDSP::DrawAudioSetup() {
       if (FileIsPlaying(ch)) {
         gfxIcon(x, 45, PLAY_ICON);
 
+        gfxPrint(x + 10, 45, GetFileBPM(ch));
+
         uint32_t tmilli = GetFileTime(ch);
         uint32_t tsec = tmilli / 1000;
         uint32_t tmin = tsec / 60;

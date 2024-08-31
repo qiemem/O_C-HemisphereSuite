@@ -236,6 +236,12 @@ namespace OC {
     uint32_t GetFileTime(int ch) {
       return wavplayer[ch].positionMillis();
     }
+    uint16_t GetFileBPM(int ch) {
+      return (uint16_t)wavplayer[ch].getBPM();
+    }
+    void FileMatchTempo(int ch) {
+      wavplayer[ch].matchTempo(HS::clock_m.GetTempo());
+    }
     void FileLevel(int ch, int cv) {
       wavlevel[ch] = (float)cv / MAX_CV + bias[ch][WAV_LEVEL];
       finalmixer[0].gain(1 + ch, 0.9 * wavlevel[ch]);
@@ -319,6 +325,8 @@ namespace OC {
 
         if (mod_map[i][WAV_RATE] >= 0)
           FileRate(i, values[mod_map[i][WAV_RATE]]);
+        else
+          FileMatchTempo(i);
 
       }
     }

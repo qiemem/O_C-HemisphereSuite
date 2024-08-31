@@ -35,6 +35,36 @@ struct wav_data_header {
 
 class WaveHeaderParser {
 public:
+  uint16_t getBPM(char* buf, size_t len = 1024) {
+    Serial.println("Looking for Tempo...");
+    uint16_t val = 0;
+    size_t idx = 0;
+
+    do {
+      if (buf[idx] == 'T') {
+        if (   buf[idx+1] == 'B'
+            && buf[idx+2] == 'P'
+            && buf[idx+3] == 'M')
+        {
+          break;
+        }
+      }
+    } while (++idx < len);
+
+    if (idx < len) {
+      Serial.println("Found TBPM string...\n");
+      idx += 10;
+      for (size_t i = idx; i < idx + 8; ++i) {
+        if (buf[i] >= '0' && buf[i] <= '9') {
+          val *= 10;
+          val += (buf[i] - '0');
+        }
+      }
+      return val;
+    } else
+      return 0;
+  }
+
     bool readWaveHeader(const char *filename, wav_header &header, wav_data_header &wav_data_header) {
         File wavFile = SD.open(filename);
         if (!wavFile) {
@@ -136,19 +166,17 @@ public:
     }
 
     bool readInfoTags(unsigned char *buffer, size_t offset, unsigned &infoTagsSize) {
-        if (    buffer[offset+0] == 'd' 
-             && buffer[offset+1] == 'a' 
-             && buffer[offset+2] == 't' 
-             && buffer[offset+3] == 'a') {
-            infoTagsSize = 0;
-            return true;
-        }
-
         // report chunk size
         infoTagsSize = static_cast<uint32_t>(buffer[offset+7] << 24 | buffer[offset+6] << 16 | buffer[offset+5] << 8 | buffer[offset+4]);    
         infoTagsSize += 8;
 
         //Serial.println("expected 'data'... skipping chunk");
+        if (    buffer[offset+0] == 'd' 
+             && buffer[offset+1] == 'a' 
+             && buffer[offset+2] == 't' 
+             && buffer[offset+3] == 'a') {
+            return true;
+        }
         return false;
     }
 

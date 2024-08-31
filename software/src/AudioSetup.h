@@ -54,6 +54,8 @@ namespace OC {
     bool FileIsPlaying(int ch);
     uint8_t GetFileNum(int ch);
     uint32_t GetFileTime(int ch);
+    uint16_t GetFileBPM(int ch);
+    void FileMatchTempo(int ch);
     void AudioSetupAuxButton(int ch);
 
     static inline void AudioSetupButtonAction(int ch) {
