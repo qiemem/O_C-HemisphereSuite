@@ -52,19 +52,18 @@ public:
             }
 
             if (result) {
-                unsigned infoTagsSize;
-                result = readInfoTags(buffer, 0, infoTagsSize);
-
-                if (result) {
+                unsigned infoTagsSize = 0, chunkSize;
+                while (!readInfoTags(buffer, 0, chunkSize)) {
+                    infoTagsSize += chunkSize;
                     wavFile.seek(36 + infoTagsSize);
                     bytesRead = wavFile.read(buffer, 8);
                     if (bytesRead != 8) {
                         Serial.printf("Not able to read header... %s\n", filename);
                         return false;
                     }
+                };
 
-                    result = readDataHeader(buffer, 0, wav_data_header);
-                }
+                result = readDataHeader(buffer, 0, wav_data_header);
             }
         }
         wavFile.close();
@@ -137,15 +136,6 @@ public:
     }
 
     bool readInfoTags(unsigned char *buffer, size_t offset, unsigned &infoTagsSize) {
-        if (    buffer[offset+0] == 'L' 
-             && buffer[offset+1] == 'I' 
-             && buffer[offset+2] == 'S' 
-             && buffer[offset+3] == 'T') {
-            infoTagsSize = static_cast<uint32_t>(buffer[offset+7] << 24 | buffer[offset+6] << 16 | buffer[offset+5] << 8 | buffer[offset+4]);    
-            infoTagsSize += 8;
-            return true;
-        }
-
         if (    buffer[offset+0] == 'd' 
              && buffer[offset+1] == 'a' 
              && buffer[offset+2] == 't' 
@@ -154,7 +144,11 @@ public:
             return true;
         }
 
-        Serial.println("expected 'data' or 'LIST'...");
+        // report chunk size
+        infoTagsSize = static_cast<uint32_t>(buffer[offset+7] << 24 | buffer[offset+6] << 16 | buffer[offset+5] << 8 | buffer[offset+4]);    
+        infoTagsSize += 8;
+
+        //Serial.println("expected 'data'... skipping chunk");
         return false;
     }
 

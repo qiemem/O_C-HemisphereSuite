@@ -125,15 +125,16 @@ public:
             setNumChannels(wav_header.num_channels);
             
             bytesRead = file.read(buffer, 8);
-            unsigned infoTagsSize;
-            if (!wavHeaderParser.readInfoTags((unsigned char *)buffer, 0, infoTagsSize))
+            if (bytesRead != 8) return false;
+            unsigned infoTagsSize = 0, chunkSize = 0;
+            while (!wavHeaderParser.readInfoTags((unsigned char *)buffer, 0, chunkSize))
             {
-                Serial.println("Not able to read header! Aborting...");
-                return false;
+                Serial.printf("Skipping chunk, size %u bytes\n", chunkSize);
+                infoTagsSize += chunkSize;
+                file.seek(36 + infoTagsSize);
+                bytesRead = file.read(buffer, 8);
+                if (bytesRead != 8) return false;
             }
-
-            file.seek(36 + infoTagsSize);
-            bytesRead = file.read(buffer, 8);
 
             if (!wavHeaderParser.readDataHeader((unsigned char *)buffer, 0, data_header)) {
                 Serial.println("Not able to read header! Aborting...");
