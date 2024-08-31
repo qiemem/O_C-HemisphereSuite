@@ -294,9 +294,10 @@ namespace OC {
       
       // -- Master Compressor / Limiter
       for (int ch = 0; ch < 2; ++ch) {
-        complimiter[ch].compression(-20.0f);
+        complimiter[ch].compression(-18.0f);
+        complimiter[ch].limit(-6.0f);
         complimiter[ch].makeupGain(0.0);
-        // default gate() and limit() settings
+        // default gate() settings
       }
     }
 
