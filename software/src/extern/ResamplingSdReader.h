@@ -76,7 +76,7 @@ public:
     }
 
     uint32_t lengthMillis(void) {
-        return ((uint64_t)_file_size * B2M) >> 32;
+        return ((uint64_t)_file_size * B2M / getNumChannels()) >> 32;
     }
     
 protected:    
