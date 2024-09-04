@@ -15,8 +15,7 @@
 
 // GUItool: begin automatically generated code
 AudioPlaySdResmp         wavplayer[2];     //xy=108,191
-AudioSynthWaveform       waveform2;      //xy=128,321
-AudioSynthWaveform       waveform1;      //xy=129,139
+AudioSynthWaveform       waveform[2];      //xy=128,321
 AudioInputI2S2           i2s1;           //xy=129,245
 AudioSynthWaveformDc     dc2;            //xy=376.66668701171875,359.4444580078125
 AudioMixer4              mixer1;         //xy=380.4444580078125,164.3333282470703
@@ -40,8 +39,8 @@ AudioConnection          patchCordWav1L(wavplayer[0], 0, finalmixer[0], 1);
 AudioConnection          patchCordWav1R(wavplayer[0], 1, finalmixer[1], 1);
 AudioConnection          patchCordWav2L(wavplayer[1], 0, finalmixer[0], 2);
 AudioConnection          patchCordWav2R(wavplayer[1], 1, finalmixer[1], 2);
-AudioConnection          patchCord3(waveform2, 0, mixer2, 1);
-AudioConnection          patchCord4(waveform1, 0, mixer1, 1);
+AudioConnection          patchCord3(waveform[1], 0, mixer2, 1);
+AudioConnection          patchCord4(waveform[0], 0, mixer1, 1);
 AudioConnection          patchCord5(i2s1, 0, mixer1, 0);
 AudioConnection          patchCord6(i2s1, 1, mixer2, 0);
 AudioConnection          patchCord7(dc2, 0, wavefolder2, 1);
@@ -101,7 +100,7 @@ namespace OC {
   namespace AudioDSP {
 
     const char * const mode_names[MODE_COUNT] = {
-      "Off", "VCA", "VCF", "FOLD", "File", "FileVCA", "Speed"
+      "Off", "Osc", "VCA", "VCF", "FOLD", "File", "FileVCA", "Speed"
     };
 
     /* Mod Targets:
@@ -119,7 +118,7 @@ namespace OC {
       { -1, -1, -1, -1, -1, -1, -1, -1, -1 },
     };
     float bias[2][TARGET_COUNT];
-    ChannelMode audio_cursor[2] = { PASSTHRU, PASSTHRU };
+    ChannelSetting audio_cursor[2] = { PASSTHRU, PASSTHRU };
     bool isEditing[2] = { false, false };
 
     float amplevel[2] = { 1.0, 1.0 };
@@ -129,6 +128,11 @@ namespace OC {
     bool wavplayer_available = false;
     uint8_t wavplayer_select[2] = { 1, 2 };
     float wavlevel[2] = { 1.0, 1.0 };
+
+    void SetOscPitch(int ch, int cv) {
+      float freq = 220.0 * powf(2.0, (cv - (9*128)) / (12.0 * 128));
+      waveform[ch].frequency(freq);
+    }
 
     void BypassFilter(int ch) {
       if (ch == 0) {
@@ -257,6 +261,10 @@ namespace OC {
     void Init() {
       AudioMemory(128);
 
+      // --Oscillators
+      waveform[0].begin(0.0, 65.4, WAVEFORM_TRIANGLE_VARIABLE);
+      waveform[1].begin(0.0, 110.0, WAVEFORM_SQUARE);
+
       // --Wavefolders
       dc1.amplitude(0.00);
       dc2.amplitude(0.00);
@@ -311,6 +319,9 @@ namespace OC {
     void Process(const int *values) {
       for (int i = 0; i < 2; ++i) {
 
+        if (mod_map[i][OSC_PITCH] >= 0)
+          SetOscPitch(i, values[mod_map[i][OSC_PITCH]]);
+
         if (mod_map[i][AMP_LEVEL] >= 0)
           AmpLevel(i, values[mod_map[i][AMP_LEVEL]]);
 
@@ -334,16 +345,21 @@ namespace OC {
     // Encoder action
     void AudioMenuAdjust(int ch, int direction) {
       if (!isEditing[ch]) {
-        audio_cursor[ch] = (ChannelMode)constrain(audio_cursor[ch] + direction, 0, MODE_COUNT - 1);
+        audio_cursor[ch] = (ChannelSetting)constrain(audio_cursor[ch] + direction, 0, MODE_COUNT - 1);
         return;
       }
 
       int mod_target = AMP_LEVEL;
       switch (audio_cursor[ch]) {
-        case PASSTHRU: {
+        case PASSTHRU:
+        {
           return;
           break;
         }
+        case OSCILLATOR:
+          mod_target = OSC_PITCH;
+          if (direction > 0) waveform[ch].amplitude(0.8);
+          break;
         case VCF_MODE:
           mod_target = FILTER_CUTOFF;
           break;
@@ -368,17 +384,30 @@ namespace OC {
       int &targ = mod_map[ch][mod_target];
       targ = constrain(targ + direction + 1, 0, ADC_CHANNEL_LAST + DAC_CHANNEL_LAST) - 1;
 
-      if (audio_cursor[ch] == VCF_MODE && targ < 0)
-        ModFilter(ch, MAX_CV);
+      // turning off each mode restores a default value
+      if (targ < 0) {
+        switch (audio_cursor[ch]) {
+          case OSCILLATOR:
+            waveform[ch].amplitude(0.0);
+            break;
 
-      if (audio_cursor[ch] == VCA_MODE && targ < 0)
-        AmpLevel(ch, MAX_CV);
+          case VCF_MODE:
+            ModFilter(ch, MAX_CV);
+            break;
 
-      if (audio_cursor[ch] == WAV_PLAYER_VCA && targ < 0)
-        FileLevel(ch, MAX_CV);
+          case VCA_MODE:
+            AmpLevel(ch, MAX_CV);
+            break;
 
-      if (audio_cursor[ch] == WAV_PLAYER_RATE && targ < 0)
-        FileRate(ch, 0);
+          case WAV_PLAYER_VCA:
+            FileLevel(ch, MAX_CV);
+            break;
+
+          case WAV_PLAYER_RATE:
+            FileRate(ch, 0);
+            break;
+        }
+      }
     }
 
     void AudioSetupAuxButton(int ch) {

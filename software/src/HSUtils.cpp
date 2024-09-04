@@ -294,6 +294,9 @@ void OC::AudioDSP::DrawAudioSetup() {
 
     int mod_target = AMP_LEVEL;
     switch (audio_cursor[ch]) {
+      case OSCILLATOR:
+        mod_target = OSC_PITCH;
+        break;
       case VCF_MODE:
         mod_target = FILTER_CUTOFF;
         gfxIcon(x + 22, 25, filter_enabled[ch] ? CHECK_ON_ICON : CHECK_OFF_ICON);
