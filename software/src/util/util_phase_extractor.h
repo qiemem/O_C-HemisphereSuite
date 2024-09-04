@@ -20,12 +20,21 @@ public:
   }
 
   // -2 => /3, -1 => /2, 0 => 1, 1 => x2, 2 => x3, etc
-  uint32_t Advance(bool clock, int simple_ratio) {
-    return Advance(clock, {static_cast<int16_t>(max(simple_ratio + 1, 1)),
-                           static_cast<uint16_t>(max(-simple_ratio + 1, 1))});
+  uint32_t Advance(bool clock, bool reset, int simple_ratio) {
+    return Advance(clock, reset,
+                   {static_cast<int16_t>(max(simple_ratio + 1, 1)),
+                    static_cast<uint16_t>(max(-simple_ratio + 1, 1))});
   }
 
-  uint32_t Advance(bool clock, Ratio r) {
+  uint32_t Advance(bool clock, bool reset, Ratio r) {
+    if (reset) {
+      // TODO: should offset phase as well. This will support oneshot mode too.
+      clocks_received = ratio.den - 1;
+      // phase_offset = -phase;
+      phase = 0;
+      phase_offset = 0;
+      set_offset = true;
+    }
     if (clock) {
       next_clock_tick = predictor.Predict(ticks);
       ticks = 0;
@@ -35,6 +44,8 @@ public:
         // discontinuities in the phase
         clocks_received = 0;
         ratio = r;
+        if (set_offset) phase_offset = phase;
+        set_offset = false;
         phase = 0;
       }
       phase_inc = 0xffffffff / (ratio.den * next_clock_tick) * ratio.num;
@@ -51,7 +62,7 @@ public:
       else if (phase_inc < 0 && phase >= static_cast<uint32_t>(phase_inc))
         phase = 0;
     }
-    return phase;
+    return phase + phase_offset;
   }
 
 private:
@@ -62,4 +73,6 @@ private:
   uint32_t ticks;
   uint32_t phase;
   int32_t phase_inc;
+  uint32_t phase_offset;
+  bool set_offset = false;
 };

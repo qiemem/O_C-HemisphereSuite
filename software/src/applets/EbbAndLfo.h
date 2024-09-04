@@ -28,7 +28,8 @@ public:
     if (knob_accel > (1 << 8))
       knob_accel--;
 
-    if (Clock(1)) { // reset/retrigger
+    bool reset = Clock(1);
+    if (reset) { // reset/retrigger
       phase = 0;
       oneshot_active = true;
     }
@@ -36,7 +37,11 @@ public:
     int freq_div_mul = ratio;
     pitch_mod = pitch;
     bool got_clock = Clock(0);
-    oneshot_active |= got_clock;
+
+    // In clocked mode, Clock(0) is just used to set rate. In unclocked, it will
+    // start a oneshot but not restart it.
+    if (!clocked)
+      oneshot_active |= got_clock;
 
     // handle CV inputs
     slope_mod = slope * (65535 / 127);
@@ -72,17 +77,16 @@ public:
       }
     }
 
-    // TODO: Make oneshot and clocked mode more compatible so you can trigger a
-    // shot with one trig and have it synced to clock on the other trig.
-    if (oneshot_mode && !oneshot_active)
-      return;
-
     uint32_t oldphase = phase;
     if (clocked) {
-      phase = phase_extractor.Advance(got_clock, freq_div_mul);
+      phase = phase_extractor.Advance(got_clock, reset, freq_div_mul);
     } else {
       uint32_t phase_increment = ComputePhaseIncrement(pitch_mod);
       phase += phase_increment;
+    }
+    if (oneshot_mode && !oneshot_active) {
+      phase = 0;
+      return;
     }
 
     // check for rollover and stop for one-shot mode
@@ -150,10 +154,11 @@ public:
         if (i > 0)
           gfxLine(i - 1, last, i, next);
         last = next;
-        // gfxPixel(i, 50 - disp_sample.unipolar * 35 / 65536);
       }
     }
-    uint32_t p = phase / (0xffffffff / 64);
+
+    // position is first 6 bits of phase, which gives 0 through 63.
+    uint32_t p = phase >> 26;
     gfxLine(p, 15, p, 50);
 
     const int param_y = 55;
