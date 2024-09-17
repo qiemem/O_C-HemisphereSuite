@@ -43,6 +43,10 @@
 
 #include "hemisphere_config.h"
 
+#ifdef ARDUINO_TEENSY41
+#include "hemisphere_audio_config.h"
+#endif
+
 // We depend on Calibr8or now
 #include "APP_CALIBR8OR.h"
 
