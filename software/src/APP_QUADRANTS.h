@@ -707,6 +707,13 @@ public:
         // tracks whether X or Y are being held down
         select_mode = (event.mask & (OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_Y));
 
+        if ((event.control == OC::CONTROL_BUTTON_L || event.control== OC::CONTROL_BUTTON_R)
+            && view_state == AUDIO_SETUP) {
+          // OC::AudioDSP::AudioSetupButtonAction(h);
+          audio_app.HandleEncoderButtonEvent(event);
+          return;
+        }
+
         switch (event.type) {
         case UI::EVENT_BUTTON_DOWN:
 
