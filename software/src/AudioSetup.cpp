@@ -16,7 +16,7 @@
 // GUItool: begin automatically generated code
 AudioPlaySdResmp         wavplayer[2];     //xy=108,191
 AudioSynthWaveform       waveform[2];      //xy=128,321
-AudioInputI2S2           i2s1;           //xy=129,245
+// AudioInputI2S2           i2s1;           //xy=129,245
 AudioSynthWaveformDc     dc2;            //xy=376.66668701171875,359.4444580078125
 AudioMixer4              mixer1;         //xy=380.4444580078125,164.3333282470703
 AudioMixer4              mixer2;         //xy=380.3333740234375,292.6666564941406
@@ -33,7 +33,7 @@ AudioMixer4              mixer5;         //xy=1113,156
 AudioMixer4              mixer6;         //xy=1106,310
 AudioMixer4              finalmixer[2];         //xy=1106,310
 AudioEffectDynamics      complimiter[2];
-AudioOutputI2S2          i2s2;           //xy=1270.2222900390625,227.88890075683594
+// AudioOutputI2S2          i2s2;           //xy=1270.2222900390625,227.88890075683594
 
 AudioConnection          patchCordWav1L(wavplayer[0], 0, finalmixer[0], 1);
 AudioConnection          patchCordWav1R(wavplayer[0], 1, finalmixer[1], 1);
@@ -41,8 +41,8 @@ AudioConnection          patchCordWav2L(wavplayer[1], 0, finalmixer[0], 2);
 AudioConnection          patchCordWav2R(wavplayer[1], 1, finalmixer[1], 2);
 AudioConnection          patchCord3(waveform[1], 0, mixer2, 1);
 AudioConnection          patchCord4(waveform[0], 0, mixer1, 1);
-AudioConnection          patchCord5(i2s1, 0, mixer1, 0);
-AudioConnection          patchCord6(i2s1, 1, mixer2, 0);
+// AudioConnection          patchCord5(i2s1, 0, mixer1, 0);
+// AudioConnection          patchCord6(i2s1, 1, mixer2, 0);
 AudioConnection          patchCord7(dc2, 0, wavefolder2, 1);
 AudioConnection          patchCord8(mixer1, 0, wavefolder1, 0);
 AudioConnection          patchCord9(mixer1, 0, mixer3, 0);
@@ -66,8 +66,8 @@ AudioConnection          patchCord25(mixer5, 0, finalmixer[0], 0);
 AudioConnection          patchCord26(mixer6, 0, finalmixer[1], 0);
 AudioConnection          patchCord27(finalmixer[0], 0, complimiter[0], 0);
 AudioConnection          patchCord28(finalmixer[1], 0, complimiter[1], 0);
-AudioConnection          patchCord29(complimiter[0], 0, i2s2, 0);
-AudioConnection          patchCord30(complimiter[1], 0, i2s2, 1);
+// AudioConnection          patchCord29(complimiter[0], 0, i2s2, 0);
+// AudioConnection          patchCord30(complimiter[1], 0, i2s2, 1);
 
 // GUItool: end automatically generated code
 

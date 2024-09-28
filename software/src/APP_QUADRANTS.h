@@ -35,7 +35,7 @@
 #include "HSicons.h"
 #include "HSMIDI.h"
 #include "HSClockManager.h"
-#include "AudioSetup.h"
+// #include "AudioSetup.h"
 
 #include "hemisphere_config.h"
 #include "hemisphere_audio_config.h"
@@ -246,6 +246,7 @@ class QuadAppletManager : public HSApplication {
 public:
     void Start() {
         audio_app.SetParentApp(this);
+        audio_app.Init();
 
         for (int i = 0; i < 4; ++i) {
             quant_scale[i] = OC::Scales::SCALE_SEMI;
@@ -531,7 +532,7 @@ public:
         }
         if (view_state == AUDIO_SETUP) {
           // OC::AudioDSP::AudioSetupButtonAction(h);
-          audio_app.HandleButtonEvent(event);
+          // audio_app.HandleButtonEvent(event);
           return;
         }
 
@@ -597,13 +598,13 @@ public:
         }
 
         if (event.mask & (OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_Y)) {
-          if (AUDIO_SETUP == view_state) {
-            const int h = (OC::CONTROL_BUTTON_Y == event.control);
-            if (OC::AudioDSP::isEditing[h]) {
-              OC::AudioDSP::AudioSetupAuxButton(h);
-              return true;
-            }
-          }
+          // if (AUDIO_SETUP == view_state) {
+          //   const int h = (OC::CONTROL_BUTTON_Y == event.control);
+          //   if (OC::AudioDSP::isEditing[h]) {
+          //     OC::AudioDSP::AudioSetupAuxButton(h);
+          //     return true;
+          //   }
+          // }
         }
 
         // cancel other view layers
@@ -704,6 +705,7 @@ public:
     }
 
     void HandleButtonEvent(const UI::Event &event) {
+        serial_printf("mask=%d type=%d value=%d control=%d\n", event.mask, event.type, event.value, event.control);
         // tracks whether X or Y are being held down
         select_mode = (event.mask & (OC::CONTROL_BUTTON_X | OC::CONTROL_BUTTON_Y));
 
