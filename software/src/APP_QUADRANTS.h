@@ -430,6 +430,7 @@ public:
             }
             active_applet[h]->BaseController();
         }
+        audio_app.Controller();
     }
 
     void View() {
