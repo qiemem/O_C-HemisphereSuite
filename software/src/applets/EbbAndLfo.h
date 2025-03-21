@@ -1,3 +1,4 @@
+#include "HemisphereApplet.h"
 #include "../tideslite.h"
 #include "../util/util_phase_extractor.h"
 
@@ -188,7 +189,7 @@ public:
           gfxPrint(-ratio + 1);
         }
       } else {
-        gfxPrintFreq(pitch);
+        gfxPrintFreqFromPitch(pitch);
       }
       gfxEndCursor(cursor == FREQUENCY);
 
@@ -413,40 +414,4 @@ private:
 
   CV cv_type(int ch) { return (CV)((cv >> ((1 - ch) * 2)) & 0b11); }
 
-  void gfxPrintFreq(int16_t pitch) {
-    uint32_t num = ComputePhaseIncrement(pitch);
-    uint32_t denom = 0xffffffff / 16666;
-    bool swap = num < denom;
-    if (swap) {
-      uint32_t t = num;
-      num = denom;
-      denom = t;
-    }
-    int int_part = num / denom;
-    int digits = 0;
-    if (int_part < 10)
-      digits = 1;
-    else if (int_part < 100)
-      digits = 2;
-    else if (int_part < 1000)
-      digits = 3;
-    else
-      digits = 4;
-
-    gfxPrint(int_part);
-    gfxPrint(".");
-
-    num %= denom;
-    while (digits < 4) {
-      num *= 10;
-      gfxPrint(num / denom);
-      num %= denom;
-      digits++;
-    }
-    if (swap) {
-      gfxPrint("s");
-    } else {
-      gfxPrint("Hz");
-    }
-  }
 };

@@ -110,12 +110,6 @@ public:
         SetPhaseIncrement(0xffffffff / 1666667 * frequency_);
     }
 
-    // Frequency in 10ths of millihertz
-    // TODO: This is going to be quite innaccurate and should just be removed
-    void SetFrequency_4dec(uint32_t frequency_) {
-        phase_increment = 0xffffffff / 166666667 * frequency_;
-    }
-    
     void SetPhaseIncrement(uint32_t phase_inc) {
         phase_increment = phase_inc;
     }
