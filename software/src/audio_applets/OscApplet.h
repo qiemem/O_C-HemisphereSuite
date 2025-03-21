@@ -23,12 +23,16 @@ public:
     mod_vca.rectify(true);
     SetModType(mod_type);
     SetModDepth(mod_depth);
-    AllowRestart();
+    vca_cv.Acquire();
+    vca_cv.Method(INTERPOLATION_LINEAR);
+    vca.rectify(true);
   }
 
   void Unload() override {
     pwm_stream.Release();
     mod_cv_stream.Release();
+    vca_cv.Release();
+    AllowRestart();
   }
 
   void Controller() override {
@@ -38,14 +42,22 @@ public:
     pwm_stream.Push(
       float_to_q15(0.01f * static_cast<float>(pw * 2 - 100) + pw_cv.InF())
     );
-    mod_cv_stream.Push(float_to_q15(mod_cv.InF()));
+    if (mod_cv.source) mod_cv_stream.Push(float_to_q15(mod_cv.InF()));
 
     float m
       = constrain(static_cast<float>(mix) * 0.01f + mix_cv.InF(), 0.0f, 1.0f);
-    float gain = dbToScalar(level) * level_cv.InF(1.0f);
+    float gain = dbToScalar(level);
+    if (level_cv.source) {
+      vca.bias(0.0f);
+      vca.level(gain);
+      vca_cv.Push(float_to_q15(dbToScalar(LVL_MIN_DB * (1.0f - level_cv.InF()))));
+    } else {
+      vca.bias(dbToScalar(level));
+      vca.level(0.0f);
+    }
     // There's a good chance of phase correlation if the incoming signal is
     // internal, so use equal amplitude
-    mixer.gain(1, gain * m);
+    mixer.gain(1, m);
     mixer.gain(0, 1.0f - m);
   }
 
@@ -261,12 +273,16 @@ private:
   InterpolatingStream<> mod_cv_stream;
   AudioVCA mod_vca;
   AudioSynthWaveformModulated synth;
+  InterpolatingStream<> vca_cv;
+  AudioVCA vca;
   AudioMixer<2> mixer;
 
-  AudioConnection synthConn{synth, 0, mixer, 1};
   AudioConnection input_to_mod_vca{input_stream, 0, mod_vca, 0};
   AudioConnection mod_cv_to_mod_vca{mod_cv_stream, 0, mod_vca, 1};
   AudioConnection mod_vca_to_synth{mod_vca, 0, synth, 0};
   AudioConnection in_conn{input_stream, 0, mixer, 0};
   AudioConnection pwm_conn{pwm_stream, 0, synth, 1};
+  AudioConnection cv_to_vca{vca_cv, 0, vca, 1};
+  AudioConnection synth_to_vca{synth, 0, vca, 0};
+  AudioConnection vca_to_mixer{vca, 0, mixer, 1};
 };
