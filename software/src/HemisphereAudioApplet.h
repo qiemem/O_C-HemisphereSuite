@@ -1,118 +1,10 @@
 #pragma once
 
-#include "HSUtils.h"
 #include "HemisphereApplet.h"
 #include "dsputils.h"
 #include "CVInputMap.h"
 #include <AudioStream.h>
 #include <cstdint>
-#include <type_traits>
-
-struct DigitalInputMap {
-  enum DigitalSourceType {
-    NONE,
-    CLOCK,
-    DIGITAL_INPUT,
-    CV_OUTPUT,
-  };
-
-  int8_t source = 0;
-  int8_t division = 0; // -2 = /3, -1 = /2, 0 = x1, 1 = x2, 2 = x3...
-  bool last_gate_state = true; // for detecting clocks
-  static const int ppqn = 4;
-  static constexpr float internal_clocked_gate_pw = 0.5f;
-  static const int num_sources = 2 + OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST;
-
-  static constexpr size_t Size = 16; // Make this compatible with Packable
-
-  void ChangeSource(int dir) {
-    source = constrain(source + dir, 0, num_sources);
-  }
-
-  bool Gate() {
-    switch (source_type()) {
-      case CLOCK: {
-        uint32_t ticks_since_beat = OC::CORE::ticks - clock_m.beat_tick;
-        uint32_t tick_phase
-          = (ppqn * ticks_since_beat) % clock_m.ticks_per_beat;
-        bool gate
-          = tick_phase < internal_clocked_gate_pw * clock_m.ticks_per_beat;
-        return gate;
-      }
-      case DIGITAL_INPUT:
-        return frame.gate_high[digital_input_index()];
-      case CV_OUTPUT:
-        return frame.outputs[cv_output_index()] > GATE_THRESHOLD;
-      case NONE:
-      default:
-        return false;
-    }
-  }
-
-  /**
-   * Returns true on rising gate input. Will return true once and then go back
-   * to false until the gate goes low again.
-   **/
-  bool Clock() {
-    bool gate = Gate();
-    bool tock = !last_gate_state && gate;
-    last_gate_state = gate;
-    return tock;
-  }
-
-  uint8_t const* Icon() const {
-    switch (source_type()) {
-      case CLOCK:
-        return clock_m.cycle ? METRO_L_ICON : METRO_R_ICON;
-      case DIGITAL_INPUT:
-        return DIGITAL_INPUT_ICONS + digital_input_index() * 8;
-      case CV_OUTPUT:
-        return PARAM_MAP_ICONS + (1 + ADC_CHANNEL_LAST + cv_output_index()) * 8;
-      case NONE:
-      default:
-        return PARAM_MAP_ICONS + 0;
-    }
-  }
-
-  uint16_t Pack() const {
-    return source | as_unsigned(division << 8);
-  }
-
-  void Unpack(uint16_t data) {
-    source = data & 0xFF;
-    division = extract_value<int8_t>(data >> 8);
-  }
-
-private:
-  DigitalSourceType source_type() const {
-    switch (source) {
-      case 0:
-        return NONE;
-      case 1:
-        return CLOCK;
-      default: {
-        if (source < 2 + OC::DIGITAL_INPUT_LAST) {
-          return DIGITAL_INPUT;
-        } else {
-          return CV_OUTPUT;
-        }
-      }
-    }
-  }
-
-  inline int8_t digital_input_index() const {
-    return source - 2;
-  }
-
-  inline int8_t cv_output_index() const {
-    return source - 2 - OC::DIGITAL_INPUT_LAST;
-  }
-};
-
-// Let's PackingUtils know this is Packable as is.
-constexpr DigitalInputMap& pack(DigitalInputMap& input) {
-  return input;
-}
 
 // For ascii strings of 9 characters or less, will just be the ascii bits
 // concatenated together. More characters than that and the xor plus misaligned
@@ -126,7 +18,7 @@ constexpr uint64_t strhash(const char* str) {
   return id;
 }
 
-enum AudioChannels {
+enum AudioChannels : uint8_t {
   NONE,
   MONO,
   STEREO,
@@ -192,7 +84,6 @@ public:
     if (int_part > 9999) graphics.printf("%6d", int_part);
     else graphics.printf("%4d.%01d", int_part, dec);
     gfxPrintIcon(HZ);
-    // gfxPrint("Hz");
   }
   void gfxPrintDb(int db) {
     if (db < LVL_MIN_DB) gfxPrint("    - ");
