@@ -1,7 +1,7 @@
-#include "Audio/AudioPassthrough.h"
 #include "HSUtils.h"
 #include "HemisphereAudioApplet.h"
 #include "dsputils.h"
+#include "Audio/AudioPassthrough.h"
 #include <Audio.h>
 
 template <AudioChannels Channels>
@@ -22,13 +22,13 @@ public:
   void Controller() {
     for (int i = 0; i < Channels; i++) {
       filters[i].frequency(PitchToRatio(pitch + pitch_cv.In()) * C3);
-      filters[i].resonance(0.01f * (res + res_cv.InRescaled(100)));
-      filters[i].inputDrive(0.01f * (gain + gain_cv.InRescaled(100)));
+      filters[i].resonance(0.01f * res + res_cv.InF());
+      filters[i].inputDrive(0.01f * gain + gain_cv.InF());
       filters[i].passbandGain(0.01f * pb_gain);
     }
   }
 
-  void View() {
+  void View() override {
     const int label_x = 1;
     gfxStartCursor(label_x, 15);
     gfxPrintPitchHz(pitch);
@@ -57,13 +57,27 @@ public:
     gfxStartCursor();
     graphics.printf("%3d", pb_gain);
     gfxEndCursor(cursor == 6);
+
+    gfxDisplayInputMapEditor();
   }
 
-  void OnEncoderMove(int direction) {
+  void OnButtonPress() override {
+    if (CheckEditInputMapPress(
+          cursor,
+          IndexedInput(1, pitch_cv),
+          IndexedInput(3, res_cv),
+          IndexedInput(5, gain_cv)
+        ))
+      return;
+    CursorToggle();
+  }
+
+  void OnEncoderMove(int direction) override {
     if (!EditMode()) {
       MoveCursor(cursor, direction, 6);
       return;
     }
+    if(EditSelectedInputMap(direction)) return;
     switch (cursor) {
       case 0:
         pitch = constrain(pitch + direction * 16, -8 * 12 * 128, 8 * 12 * 128);
