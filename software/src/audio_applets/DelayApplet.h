@@ -208,23 +208,29 @@ public:
     gfxStartCursor(1, 55);
     gfxPrint(delay_mod_type == CROSSFADE ? "Crossfade" : "Stretch  ");
     gfxEndCursor(cursor == TIME_MOD);
+
+    gfxDisplayInputMapEditor();
   }
 
-  void OnButtonPress() {
-    // if (cursor == FREEZE) {
-    //   frozen = !frozen;
-    // } else {
+  void OnButtonPress() override {
+    if (CheckEditInputMapPress(
+          cursor,
+          IndexedInput(TIME_CV, delay_time_cv),
+          IndexedInput(FEEDBACK_CV, feedback_cv),
+          IndexedInput(WET_CV, wet_cv)
+        ))
+      return;
     CursorToggle();
-    // }
   }
 
-  void OnEncoderMove(int direction) {
+  void OnEncoderMove(int direction) override {
     if (!EditMode()) {
       MoveCursor(cursor, direction, CURSOR_LENGTH - 1);
       if (cursor == CLOCK_SOURCE && time_units != CLOCK)
         MoveCursor(cursor, direction, CURSOR_LENGTH - 1);
       return;
     }
+    if (EditSelectedInputMap(direction)) return;
 
     knob_accel += direction - direction * (millis_since_turn / 10);
     if (direction * knob_accel <= 0) knob_accel = direction;
@@ -297,6 +303,7 @@ public:
 #define DELAY_PARAMS \
   delay_time, pack<3>(time_units), ratio, pack<1>(delay_mod_type), feedback, \
     wet, pack<4>(taps)
+
   void OnDataRequest(std::array<uint64_t, CONFIG_SIZE>& data) override {
     data[0] = PackPackables(DELAY_PARAMS);
     data[1] = PackPackables(delay_time_cv, feedback_cv, wet_cv, clock_source);
@@ -440,7 +447,8 @@ private:
     AudioConnection dry_conn;
     AudioConnection mix_to_output;
 
-    DelayChannel() : delaystream(external_psram_size? DELAY_LENGTH : DELAY_LENGTH / 16) { }
+    DelayChannel()
+      : delaystream(external_psram_size ? DELAY_LENGTH : DELAY_LENGTH / 16) {}
 
     void Start(int channel, AudioStream& input, AudioStream& output) {
       delaystream.Acquire();
