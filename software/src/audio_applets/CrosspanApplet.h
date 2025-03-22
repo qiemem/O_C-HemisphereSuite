@@ -66,6 +66,14 @@ public:
     gfxStartCursor(32 - 3 * 9, 55);
     gfxPrint(xfade_shape == EQUAL_POWER ? "Equal pow" : "Equal amp");
     gfxEndCursor(cursor == 2);
+
+    gfxDisplayInputMapEditor();
+  }
+
+  void OnButtonPress() override {
+    if (CheckEditInputMapPress(cursor, IndexedInput(1, crosspan_cv)))
+      return;
+    CursorToggle();
   }
 
   void OnEncoderMove(int direction) override {
@@ -73,6 +81,7 @@ public:
       MoveCursor(cursor, direction, 2);
       return;
     }
+    if (EditSelectedInputMap(direction)) return;
     switch (cursor) {
       case 0:
         crosspan = constrain(crosspan + direction, 0, 100);
