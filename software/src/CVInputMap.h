@@ -14,16 +14,20 @@ struct CVInputMap {
 
   static constexpr size_t Size = 16; // Make this compatible with Packable
 
-  int In(int default_value = 0) {
-    if (!source) return default_value;
+  int RawIn() {
     return source <= ADC_CHANNEL_LAST
       ? frame.inputs[source - 1]
       : frame.outputs[source - 1 - ADC_CHANNEL_LAST];
   }
 
+  int In(int default_value = 0) {
+    if (!source) return default_value;
+    return RawIn() * attenuversion / 100;
+  }
+
   float InF(float default_value = 0.0f) {
     if (!source) return default_value;
-    return static_cast<float>(In())
+    return 0.01f * attenuversion * static_cast<float>(RawIn())
       / static_cast<float>(HEMISPHERE_MAX_INPUT_CV);
   }
 

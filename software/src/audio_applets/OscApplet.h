@@ -50,7 +50,8 @@ public:
     if (level_cv.source) {
       vca.bias(0.0f);
       vca.level(gain);
-      vca_cv.Push(float_to_q15(dbToScalar(LVL_MIN_DB * (1.0f - level_cv.InF()))));
+      vca_cv.Push(float_to_q15(dbToScalar(LVL_MIN_DB * (1.0f - level_cv.InF())))
+      );
     } else {
       vca.bias(dbToScalar(level));
       vca.level(0.0f);
@@ -117,6 +118,8 @@ public:
     gfxStartCursor();
     gfxPrintIcon(mix_cv.Icon());
     gfxEndCursor(cursor == MIX_CV);
+
+    gfxDisplayInputMapEditor();
   }
 
 #define OSC_PARAMS \
@@ -137,6 +140,14 @@ public:
     UnpackPackables(data[2], mix_cv);
   }
 
+  void OnButtonPress() override {
+    if (CheckEditInputMapPress(
+          cursor, IndexedInput(PW_CV, pw_cv), IndexedInput(MIX_CV, mix_cv)
+        ))
+      return;
+    CursorToggle();
+  }
+
   void OnEncoderMove(int direction) override {
     if (!EditMode()) {
       do {
@@ -145,6 +156,8 @@ public:
                && WAVEFORMS[waveform] == WAVEFORM_SINE);
       return;
     }
+    if (EditSelectedInputMap(direction)) return;
+
     const int max_pitch = 7 * 12 * 128;
     const int min_pitch = -3 * 12 * 128;
     switch (cursor) {
@@ -250,8 +263,8 @@ private:
   static const int MOD_DEPTH_MAX = 500;
   // 5 octaves; empirically about what Plaits max FM corresponds to
   static constexpr float FM_DEPTH = 5.0f;
-  // 5 periods; for reference, parasite Warps uses 4 but I liked the ability to
-  // go a bit deeper
+  // 5 periods; for reference, parasite Warps uses 4 but I liked the ability
+  // to go a bit deeper
   static constexpr float PM_DEPTH = 180.0f * 5.0f;
 
   uint8_t waveform;
