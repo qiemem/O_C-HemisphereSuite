@@ -76,10 +76,10 @@ public:
     }
   }
   uint64_t OnDataRequest() override {
-    return PackPackables(pack<4>(mono_mode), pack(level), pack<1>(mixtomono));
+    return PackPackables(pack<4>(mono_mode), pack(level), pack<1>(mixtomono), level_cv);
   }
   void OnDataReceive(uint64_t data) override {
-    UnpackPackables(data, pack<4>(mono_mode), pack(level), pack<1>(mixtomono));
+    UnpackPackables(data, pack<4>(mono_mode), pack(level), pack<1>(mixtomono), level_cv);
   }
 
   void OnEncoderMove(int direction) override {
