@@ -34,6 +34,9 @@ public:
       //wavplayer[1].setBufferInPSRAM(true);
     }
   }
+  void Unload() {
+    wavplayer[0].stop();
+  }
 
   void Controller() {
     float gain = dbToScalar(level) * level_cv.InF(1.0f);
