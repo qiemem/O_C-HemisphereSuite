@@ -110,7 +110,7 @@ public:
             MoveCursor(cursor, direction, 3);
             return;
         }
-        
+
         switch (cursor) {
         case 0: {
             int16_t fs = start; // Former start value
@@ -133,7 +133,7 @@ public:
             break;
         }
     }
-        
+
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         Pack(data, PackLocation {0,9}, start);
@@ -143,8 +143,8 @@ public:
     }
 
     void OnDataReceive(uint64_t data) {
-        start = Unpack(data, PackLocation {0,9});
-        end = Unpack(data, PackLocation {9,9});
+        start = constrain(Unpack(data, PackLocation {0,9}), 0, CVREC_MAX_STEP - 2);
+        end = constrain(Unpack(data, PackLocation {9,9}), start + 1, CVREC_MAX_STEP - 1);
         smooth = Unpack(data, PackLocation {18,1});
     }
 
@@ -178,7 +178,7 @@ private:
     int16_t end = 63; // End step number
     int16_t step = 0; // Current step
     int16_t punch_out = 0;
-    
+
     void DrawInterface() {
         // Range
         gfxIcon(1, 15, LOOP_ICON);

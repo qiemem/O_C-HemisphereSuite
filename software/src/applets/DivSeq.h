@@ -244,7 +244,7 @@ public:
             int offset = Unpack(data, PackLocation { size_t(60 + ch*2), 1 }) ? 16 : 0;
             for (size_t i = 0; i < NUM_STEPS; i++) {
                 div_seq[ch].divmult[i].steps = Unpack(data, PackLocation {ch*NUM_STEPS*b + i*b, b}) - offset;
-                div_seq[ch].divmult[i].steps = constrain(div_seq[ch].divmult[i].steps, -MAX_DIV, MAX_DIV);
+                CONSTRAIN(div_seq[ch].divmult[i].steps, -MAX_DIV, MAX_DIV);
             }
             // step 1 cannot be zero
             if (div_seq[ch].divmult[0].steps == 0) ++div_seq[ch].divmult[0].steps;
@@ -270,7 +270,7 @@ protected:
   }
 
 private:
-    int cursor; // DivSeqCursor 
+    int cursor; // DivSeqCursor
 
     int pulse_animation[2] = {0,0};
 
