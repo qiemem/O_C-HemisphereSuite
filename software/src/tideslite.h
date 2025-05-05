@@ -28,6 +28,18 @@ increments = excursion / sample_rate * pitches
 
 increments.astype(int)
 */
+// TODO: The Python code -> hardcoded numbers could be replaced with a
+// `constexpr` function that returns the lut and stores it in the `constexpr`
+// global instead. The tough thing is most of the floating point math stuff is
+// not `constexpr`. So we'd need `constexpr` versions. There's probably a
+// library out there, though writing a `constexpr` version based on Taylor
+// series expansion wouldn't be too hard. Would have to just set the iterations
+// high enough to equal or exceed the precision of the standard library
+// functions. The upshot of this would be we could base the calculations off our
+// sample rate constants or whatever. Alternatively, looks like a lot of the
+// standard library functions will become `constexpr` in c++26... so I guess we
+// could do it if we ever update to that...
+
 constexpr uint32_t lut_increments[]
   = {2106971, 2122239, 2137618, 2153108, 2168710, 2184425, 2200255, 2216199,
      2232258, 2248434, 2264727, 2281138, 2297668, 2314318, 2331089, 2347981,
