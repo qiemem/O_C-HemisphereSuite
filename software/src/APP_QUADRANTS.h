@@ -375,7 +375,7 @@ public:
                 ForEachChannel(ch) {
                     int chan = h*2 + ch;
                     // mix CV inputs with applicable MIDI signals
-                    switch (HS::frame.MIDIState.function[chan]) {
+                    switch (HS::frame.MIDIState.mapping[chan].function) {
                     case HEM_MIDI_CC_OUT:
                     case HEM_MIDI_NOTE_OUT:
                     case HEM_MIDI_NOTE_POLY_OUT:
@@ -388,20 +388,20 @@ public:
                     case HEM_MIDI_AT_CHAN_OUT:
                     case HEM_MIDI_AT_KEY_POLY_OUT:
                     case HEM_MIDI_PB_OUT:
-                        HS::frame.inputs[chan] += HS::frame.MIDIState.outputs[chan];
+                        HS::frame.inputs[chan] += HS::frame.MIDIState.mapping[chan].output;
                         break;
                     case HEM_MIDI_GATE_OUT:
                     case HEM_MIDI_GATE_POLY_OUT:
                     case HEM_MIDI_GATE_INV_OUT:
-                        HS::frame.gate_high[chan] |= (HS::frame.MIDIState.outputs[chan] > (12 << 7));
+                        HS::frame.gate_high[chan] |= (HS::frame.MIDIState.mapping[chan].output > (12 << 7));
                         break;
                     case HEM_MIDI_TRIG_OUT:
                     case HEM_MIDI_TRIG_1ST_OUT:
                     case HEM_MIDI_TRIG_ALWAYS_OUT:
                     case HEM_MIDI_CLOCK_OUT:
                     case HEM_MIDI_START_OUT:
-                        HS::frame.clocked[chan] |= HS::frame.MIDIState.trigout_q[chan];
-                        HS::frame.MIDIState.trigout_q[chan] = 0;
+                        HS::frame.clocked[chan] |= HS::frame.MIDIState.mapping[chan].trigout_q;
+                        HS::frame.MIDIState.mapping[chan].trigout_q = 0;
                         break;
                     }
                 }

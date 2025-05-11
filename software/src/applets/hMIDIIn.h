@@ -48,11 +48,11 @@ public:
     void Start() {
         // int v = 2 * hemisphere;
         ForEachChannel(ch) {
-            int ch_ = ch + io_offset;
-            frame.MIDIState.channel[ch_] = 0; // Default channel 1
-            frame.MIDIState.function[ch_] = 0; // (ch_ % 2) ? HEM_MIDI_GATE_POLY_OUT : HEM_MIDI_NOTE_POLY_OUT;
-            frame.MIDIState.outputs[ch_] = 0;
-            frame.MIDIState.dac_polyvoice[ch_] = 0; // hemisphere;
+            MIDIMapping &map = frame.MIDIState.mapping[ch + io_offset];
+            map.channel = 0; // Default channel 1
+            map.function = 0; // (ch % 2) ? HEM_MIDI_GATE_POLY_OUT : HEM_MIDI_NOTE_POLY_OUT;
+            map.output = 0;
+            map.dac_polyvoice = 0; // hemisphere;
             Out(ch, 0);
         }
 
@@ -70,7 +70,8 @@ public:
         // here, we just pass the MIDI signals on to physical outputs
         ForEachChannel(ch) {
             int ch_ = ch + io_offset;
-            switch (frame.MIDIState.function[ch_]) {
+            MIDIMapping &map = frame.MIDIState.mapping[ch_];
+            switch (map.function) {
                 case HEM_MIDI_NOOP:
                     break;
                 case HEM_MIDI_CLOCK_OUT:
@@ -78,8 +79,8 @@ public:
                 case HEM_MIDI_TRIG_OUT:
                 case HEM_MIDI_TRIG_1ST_OUT:
                 case HEM_MIDI_TRIG_ALWAYS_OUT:
-                    if (frame.MIDIState.trigout_q[ch_]) {
-                        frame.MIDIState.trigout_q[ch_] = 0;
+                    if (map.trigout_q) {
+                        map.trigout_q = 0;
                         ClockOut(ch);
                     }
                     break;
@@ -87,7 +88,7 @@ public:
                     GateOut(ch, frame.MIDIState.clock_run);
                     break;
                 default:
-                    Out(ch, frame.MIDIState.outputs[ch_]);
+                    Out(ch, map.output);
                     break;
             }
         }
@@ -124,21 +125,22 @@ public:
             return;
         }
         int ch = io_offset + io_page;
+        MIDIMapping &map = frame.MIDIState.mapping[ch];
         switch (cursor) {
             case hMIDIIn_A_MIDI_CHANNEL:
             case hMIDIIn_B_MIDI_CHANNEL:
-                frame.MIDIState.channel[ch] = constrain(frame.MIDIState.channel[ch] + direction, 0, 16); // 16 = omni
+                map.channel = constrain(map.channel + direction, 0, 16); // 16 = omni
                 frame.MIDIState.UpdateMidiChannelFilter();
                 break;
             case hMIDIIn_A_OUTPUT_MODE:
             case hMIDIIn_B_OUTPUT_MODE:
-                frame.MIDIState.function[ch] = constrain(frame.MIDIState.function[ch] + direction, 0, HEM_MIDI_MAX_FUNCTION);
-                frame.MIDIState.function_cc[ch] = -1; // auto-learn MIDI CC
+                map.function = constrain(map.function + direction, 0, HEM_MIDI_MAX_FUNCTION);
+                map.function_cc = -1; // auto-learn MIDI CC
                 frame.MIDIState.clock_count = 0;
                 break;
             case hMIDIIn_A_POLY_VOICE:
             case hMIDIIn_B_POLY_VOICE:
-                frame.MIDIState.dac_polyvoice[ch] = constrain(frame.MIDIState.dac_polyvoice[ch] + direction, 0, DAC_CHANNEL_LAST - 1);
+                map.dac_polyvoice = constrain(map.dac_polyvoice + direction, 0, DAC_CHANNEL_LAST - 1);
                 frame.MIDIState.UpdateMaxPolyphony();
                 break;
             case hMIDIIn_GLOBAL_POLY_MODE:
@@ -156,31 +158,31 @@ public:
 
     uint64_t OnDataRequest() {
         uint64_t data = 0;
-        Pack(data, PackLocation {0,5}, frame.MIDIState.channel[io_offset + 0]);
-        Pack(data, PackLocation {5,5}, frame.MIDIState.channel[io_offset + 1]);
+        Pack(data, PackLocation {0,5}, frame.MIDIState.mapping[io_offset + 0].channel);
+        Pack(data, PackLocation {5,5}, frame.MIDIState.mapping[io_offset + 1].channel);
         // 6 bits empty here
-        Pack(data, PackLocation {14,7}, frame.MIDIState.function_cc[io_offset + 0] + 1);
-        Pack(data, PackLocation {21,7}, frame.MIDIState.function_cc[io_offset + 1] + 1);
+        Pack(data, PackLocation {14,7}, frame.MIDIState.mapping[io_offset + 0].function_cc + 1);
+        Pack(data, PackLocation {21,7}, frame.MIDIState.mapping[io_offset + 1].function_cc + 1);
 
-        Pack(data, PackLocation {28,5}, frame.MIDIState.function[io_offset + 0]);
-        Pack(data, PackLocation {33,5}, frame.MIDIState.function[io_offset + 1]);
+        Pack(data, PackLocation {28,5}, frame.MIDIState.mapping[io_offset + 0].function);
+        Pack(data, PackLocation {33,5}, frame.MIDIState.mapping[io_offset + 1].function);
 
-        Pack(data, PackLocation {38,3}, frame.MIDIState.dac_polyvoice[io_offset + 0]);
-        Pack(data, PackLocation {41,3}, frame.MIDIState.dac_polyvoice[io_offset + 1]);
+        Pack(data, PackLocation {38,3}, frame.MIDIState.mapping[io_offset + 0].dac_polyvoice);
+        Pack(data, PackLocation {41,3}, frame.MIDIState.mapping[io_offset + 1].dac_polyvoice);
 
         Pack(data, PackLocation {44,4}, frame.MIDIState.poly_mode);
         return data;
     }
 
     void OnDataReceive(uint64_t data) {
-        frame.MIDIState.channel[io_offset + 0] = constrain(Unpack(data, PackLocation {0,5}), 0, 16);
-        frame.MIDIState.channel[io_offset + 1] = constrain(Unpack(data, PackLocation {5,5}), 0, 16);
-        frame.MIDIState.function[io_offset + 0] = constrain(Unpack(data, PackLocation {28,5}), 0, HEM_MIDI_MAX_FUNCTION);
-        frame.MIDIState.function[io_offset + 1] = constrain(Unpack(data, PackLocation {33,5}), 0, HEM_MIDI_MAX_FUNCTION);
-        frame.MIDIState.function_cc[io_offset + 0] = constrain(Unpack(data, PackLocation {14,7}) - 1, -1, 127);
-        frame.MIDIState.function_cc[io_offset + 1] = constrain(Unpack(data, PackLocation {21,7}) - 1, -1, 127);
-        frame.MIDIState.dac_polyvoice[io_offset + 0] = constrain(Unpack(data, PackLocation {38,3}), 0, DAC_CHANNEL_LAST - 1);
-        frame.MIDIState.dac_polyvoice[io_offset + 1] = constrain(Unpack(data, PackLocation {41,3}), 0, DAC_CHANNEL_LAST - 1);
+        frame.MIDIState.mapping[io_offset + 0].channel = constrain(Unpack(data, PackLocation {0,5}), 0, 16);
+        frame.MIDIState.mapping[io_offset + 1].channel = constrain(Unpack(data, PackLocation {5,5}), 0, 16);
+        frame.MIDIState.mapping[io_offset + 0].function = constrain(Unpack(data, PackLocation {28,5}), 0, HEM_MIDI_MAX_FUNCTION);
+        frame.MIDIState.mapping[io_offset + 1].function = constrain(Unpack(data, PackLocation {33,5}), 0, HEM_MIDI_MAX_FUNCTION);
+        frame.MIDIState.mapping[io_offset + 0].function_cc = constrain(Unpack(data, PackLocation {14,7}) - 1, -1, 127);
+        frame.MIDIState.mapping[io_offset + 1].function_cc = constrain(Unpack(data, PackLocation {21,7}) - 1, -1, 127);
+        frame.MIDIState.mapping[io_offset + 0].dac_polyvoice = constrain(Unpack(data, PackLocation {38,3}), 0, DAC_CHANNEL_LAST - 1);
+        frame.MIDIState.mapping[io_offset + 1].dac_polyvoice = constrain(Unpack(data, PackLocation {41,3}), 0, DAC_CHANNEL_LAST - 1);
         frame.MIDIState.poly_mode = constrain(Unpack(data, PackLocation {44,4}), 0, POLY_LAST);
         frame.MIDIState.UpdateMidiChannelFilter();
         frame.MIDIState.UpdateMaxPolyphony();
@@ -193,8 +195,8 @@ protected:
         //help[HELP_DIGITAL2] = "";
         //help[HELP_CV1]      = "";
         //help[HELP_CV2]      = "";
-        help[HELP_OUT1]       = midi_fn_name[frame.MIDIState.function[io_offset + 0]];
-        help[HELP_OUT2]       = midi_fn_name[frame.MIDIState.function[io_offset + 1]];
+        help[HELP_OUT1]       = midi_fn_name[frame.MIDIState.mapping[io_offset + 0].function];
+        help[HELP_OUT2]       = midi_fn_name[frame.MIDIState.mapping[io_offset + 1].function];
         //help[HELP_EXTRA1]   = "";
         //help[HELP_EXTRA2]   = "";
         //                      "---------------------" <-- Extra text size guide
@@ -209,9 +211,9 @@ private:
     void DrawMonitor() {
         if ((OC::CORE::ticks - frame.MIDIState.last_msg_tick) < 100) {
             // reset icon display timers
-            if (frame.MIDIState.channel[io_offset + 0] == frame.MIDIState.last_midi_channel)
+            if (frame.MIDIState.mapping[io_offset + 0].channel == frame.MIDIState.last_midi_channel)
                 last_icon_ticks[0] = OC::CORE::ticks;
-            if (frame.MIDIState.channel[io_offset + 1] == frame.MIDIState.last_midi_channel)
+            if (frame.MIDIState.mapping[io_offset + 1].channel == frame.MIDIState.last_midi_channel)
                 last_icon_ticks[1] = OC::CORE::ticks;
         }
 
@@ -224,16 +226,17 @@ private:
         gfxPrint(1, 13, out_label); gfxPrint(":");
         gfxLine(1, 22, 63, 22);
 
-        uint8_t m_ch = frame.MIDIState.channel[io_offset + io_page];
+        MIDIMapping &map = frame.MIDIState.mapping[io_offset + io_page];
+        uint8_t m_ch = map.channel;
         gfxPrint(1, 25, "MIDICh:");
         if (m_ch > 15) graphics.printf("%3s", "Om");
         else graphics.printf("%3d", m_ch + 1);
 
-        gfxIcon(2, 34, MIDI_ICON); gfxPrint(13, 35, midi_fn_name[frame.MIDIState.function[io_offset + io_page]]);
-        if (frame.MIDIState.function[io_offset + io_page] == HEM_MIDI_CC_OUT)
-            gfxPrint(frame.MIDIState.function_cc[io_offset + io_page]);
+        gfxIcon(2, 34, MIDI_ICON); gfxPrint(13, 35, midi_fn_name[map.function]);
+        if (map.function == HEM_MIDI_CC_OUT)
+            gfxPrint(map.function_cc);
 
-        gfxPrint(1, 45, "Voice:"); gfxPrint(55, 45, frame.MIDIState.dac_polyvoice[io_offset + io_page] + 1);
+        gfxPrint(1, 45, "Voice:"); gfxPrint(55, 45, map.dac_polyvoice + 1);
 
         // Cursor
         switch (cursor) {
