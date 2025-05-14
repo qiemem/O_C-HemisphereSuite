@@ -93,6 +93,15 @@ namespace OC {
 #ifdef ARDUINO_TEENSY41
     "E", "F", "G", "H",
 #endif
+    // Midi Maps in MIDIFrame::mapping[]
+    "M 1","M 2","M 3","M 4",
+    "M 5","M 6","M 7","M 8",
+    "M 9","M10","M11","M12",
+    "M13","M14","M15","M16",
+    "M17","M18","M19","M20",
+    "M21","M22","M23","M24",
+    "M25","M26","M27","M28",
+    "M29","M30","M31","M32"
   };
 
   const char * const channel_id[4] = { "#A", "#B", "#C", "#D" };

@@ -34,7 +34,7 @@ public:
     gfxEndCursor(cursor == 0);
     gfxStartCursor();
     gfxPrintIcon(pitch_cv.Icon());
-    gfxEndCursor(cursor == 1);
+    gfxEndCursor(cursor == 1, false, pitch_cv.InputName());
 
     gfxPrint(label_x, 25, "Res: ");
     gfxStartCursor();
@@ -42,7 +42,7 @@ public:
     gfxEndCursor(cursor == 2);
     gfxStartCursor();
     gfxPrintIcon(res_cv.Icon());
-    gfxEndCursor(cursor == 3);
+    gfxEndCursor(cursor == 3, false, res_cv.InputName());
 
     gfxPrint(label_x, 35, "Fld: ");
     gfxStartCursor();
@@ -50,7 +50,7 @@ public:
     gfxEndCursor(cursor == 4);
     gfxStartCursor();
     gfxPrintIcon(fold_cv.Icon());
-    gfxEndCursor(cursor == 5);
+    gfxEndCursor(cursor == 5, false, fold_cv.InputName());
 
     gfxPrint(label_x, 45, "Amp:");
     gfxStartCursor();
@@ -58,7 +58,7 @@ public:
     gfxEndCursor(cursor == 6);
     gfxStartCursor();
     gfxPrintIcon(amp_cv.Icon());
-    gfxEndCursor(cursor == 7);
+    gfxEndCursor(cursor == 7, false, amp_cv.InputName());
   }
 
   void OnEncoderMove(int direction) {

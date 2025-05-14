@@ -119,6 +119,8 @@ public:
 
         PC_CHANNEL_KEY  = 110,
 
+        MIDI_MAPS_KEY   = 150, // + 0..32
+
         // 200s = Quantizers
         Q_ENGINE_KEY    = 200, // + slot number
 
@@ -141,13 +143,13 @@ public:
         uint64_t data = 0;
         // Input Mappings
         for (size_t i = 0; i < 8; ++i) {
-          Pack(data, PackLocation{i*5, 5}, HS::trigger_mapping[i] + 1);
+          Pack(data, PackLocation{i*8, 8}, HS::trigger_mapping[i] + 1);
         }
         PhzConfig::setValue(preset_key | TRIGMAP_KEY, data);
 
         data = 0;
         for (size_t i = 0; i < 8; ++i) {
-          Pack(data, PackLocation{i*5, 5}, HS::cvmapping[i] + 1);
+          Pack(data, PackLocation{i*8, 8}, HS::cvmapping[i] + 1);
         }
         PhzConfig::setValue(preset_key | CVMAP_KEY, data);
 
@@ -191,6 +193,12 @@ public:
               HS::root_note[qslot],
               HS::q_mask[qslot]);
           PhzConfig::setValue(Q_ENGINE_KEY + qslot, data);
+        }
+
+        // Global MIDI Maps
+        for (size_t midx = 0; midx < MIDIMAP_MAX / 2; ++midx) {
+          data = PackPackables(frame.MIDIState.mapping[midx*2], frame.MIDIState.mapping[midx*2+1]);
+          PhzConfig::setValue(MIDI_MAPS_KEY + midx, data);
         }
 
         // User Patterns aka Sequences
@@ -251,14 +259,14 @@ public:
         PhzConfig::getValue(preset_key | TRIGMAP_KEY, data);
         for (size_t i = 0; i < 8; ++i)
         {
-          const int val = Unpack(data, PackLocation{i*5, 5});
+          const int val = Unpack(data, PackLocation{i*8, 8});
           if (val != 0) HS::trigger_mapping[i] = constrain(val - 1, 0, TRIGMAP_MAX);
         }
 
         PhzConfig::getValue(preset_key | CVMAP_KEY, data);
         for (size_t i = 0; i < 8; ++i)
         {
-          const int val = Unpack(data, PackLocation{i*5, 5});
+          const int val = Unpack(data, PackLocation{i*8, 8});
           if (val != 0) HS::cvmapping[i] = constrain(val - 1, 0, CVMAP_MAX);
         }
 
@@ -284,6 +292,15 @@ public:
               HS::root_note[qslot],
               HS::q_mask[qslot]);
           QuantizerConfigure(qslot, quant_scale[qslot], q_mask[qslot]);
+        }
+
+        // Global MIDI Maps
+        for (size_t midx = 0; midx < MIDIMAP_MAX / 2; ++midx) {
+          if (!PhzConfig::getValue(MIDI_MAPS_KEY + midx, data))
+              break;
+          UnpackPackables(data,
+              frame.MIDIState.mapping[midx*2],
+              frame.MIDIState.mapping[midx*2+1]);
         }
 
         // User Patterns aka Sequences
@@ -369,43 +386,6 @@ public:
         // execute Applets
         for (int h = 0; h < APPLET_SLOTS; h++)
         {
-            // MIDI signals mixed with inputs to applets
-            if (HS::available_applets[ active_applet_index[h] ].id != 150) // not MIDI In
-            {
-                ForEachChannel(ch) {
-                    int chan = h*2 + ch;
-                    // mix CV inputs with applicable MIDI signals
-                    switch (HS::frame.MIDIState.mapping[chan].function) {
-                    case HEM_MIDI_CC_OUT:
-                    case HEM_MIDI_NOTE_OUT:
-                    case HEM_MIDI_NOTE_POLY_OUT:
-                    case HEM_MIDI_NOTE_MIN_OUT:
-                    case HEM_MIDI_NOTE_MAX_OUT:
-                    case HEM_MIDI_NOTE_PEDAL_OUT:
-                    case HEM_MIDI_NOTE_INV_OUT:
-                    case HEM_MIDI_VEL_OUT:
-                    case HEM_MIDI_VEL_POLY_OUT:
-                    case HEM_MIDI_AT_CHAN_OUT:
-                    case HEM_MIDI_AT_KEY_POLY_OUT:
-                    case HEM_MIDI_PB_OUT:
-                        HS::frame.inputs[chan] += HS::frame.MIDIState.mapping[chan].output;
-                        break;
-                    case HEM_MIDI_GATE_OUT:
-                    case HEM_MIDI_GATE_POLY_OUT:
-                    case HEM_MIDI_GATE_INV_OUT:
-                        HS::frame.gate_high[chan] |= (HS::frame.MIDIState.mapping[chan].output > (12 << 7));
-                        break;
-                    case HEM_MIDI_TRIG_OUT:
-                    case HEM_MIDI_TRIG_1ST_OUT:
-                    case HEM_MIDI_TRIG_ALWAYS_OUT:
-                    case HEM_MIDI_CLOCK_OUT:
-                    case HEM_MIDI_START_OUT:
-                        HS::frame.clocked[chan] |= HS::frame.MIDIState.mapping[chan].trigout_q;
-                        HS::frame.MIDIState.mapping[chan].trigout_q = 0;
-                        break;
-                    }
-                }
-            }
             if (HS::clock_m.auto_reset)
                 active_applet[h]->Reset();
 

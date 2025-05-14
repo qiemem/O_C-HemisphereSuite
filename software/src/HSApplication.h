@@ -135,7 +135,11 @@ public:
     int In(int ch) {
         const int c = cvmapping[ch];
         if (!c) return 0;
-        return (c <= ADC_CHANNEL_LAST) ? frame.inputs[c - 1] : frame.outputs[c - 1 - ADC_CHANNEL_LAST];
+        return (c <= ADC_CHANNEL_LAST)
+          ? frame.inputs[c - 1]
+          : (c - ADC_CHANNEL_LAST <= DAC_CHANNEL_LAST)
+            ? frame.outputs[c - 1 - ADC_CHANNEL_LAST]
+            : frame.MIDIState.mapping[c - 1 - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST].output;
     }
 
     // Apply small center detent to input, so it reads zero before a threshold

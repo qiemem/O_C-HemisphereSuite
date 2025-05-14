@@ -141,7 +141,7 @@ public:
     gfxEndCursor(cursor == LEVEL);
     gfxStartCursor();
     gfxPrintIcon(level_cv.Icon());
-    gfxEndCursor(cursor == LEVEL_CV);
+    gfxEndCursor(cursor == LEVEL_CV, false, level_cv.InputName());
 
     y += 10;
     if (tempo_sync) {
@@ -154,7 +154,7 @@ public:
     gfxEndCursor(cursor == PLAYRATE, true);
     gfxStartCursor();
     gfxPrintIcon(playrate_cv.Icon());
-    gfxEndCursor(cursor == PLAYRATE_CV);
+    gfxEndCursor(cursor == PLAYRATE_CV, false, playrate_cv.InputName());
 
     y += 10;
     gfxPrint(1, y, "Loop:");

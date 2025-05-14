@@ -3,7 +3,8 @@
 #include "HemisphereApplet.h"
 #include "PackingUtils.h"
 
-const int NUM_CV_INPUTS = ADC_CHANNEL_LAST * 2 + 1;
+const int NUM_CV_INPUTS = CVMAP_MAX + 1;
+//const int NUM_CV_INPUTS = ADC_CHANNEL_LAST * 2 + 1;
 // We *could* reuse HS::input_quant for inputs, but easier to just do it
 // independently, and semitone quantizers are lightwieght.
 inline std::array<OC::SemitoneQuantizer, NUM_CV_INPUTS> cv_semitone_quants;
@@ -17,7 +18,9 @@ struct CVInputMap {
   int RawIn() {
     return source <= ADC_CHANNEL_LAST
       ? frame.inputs[source - 1]
-      : frame.outputs[source - 1 - ADC_CHANNEL_LAST];
+      : (source - ADC_CHANNEL_LAST <= DAC_CHANNEL_LAST)
+        ? frame.outputs[source - 1 - ADC_CHANNEL_LAST]
+        : frame.MIDIState.mapping[source - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST - 1].output;
   }
 
   int In(int default_value = 0) {
@@ -55,7 +58,9 @@ struct CVInputMap {
   }
 
   uint8_t const* Icon() const {
-    return PARAM_MAP_ICONS + 8 * source;
+    return source <= ADC_CHANNEL_LAST + DAC_CHANNEL_LAST
+      ? PARAM_MAP_ICONS + 8 * source
+      : PhzIcons::midiIn;
   }
 
   uint16_t Pack() const {

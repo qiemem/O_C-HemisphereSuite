@@ -209,7 +209,11 @@ public:
     int In(const int ch) {
         const int c = cvmapping[ch + io_offset];
         if (!c) return 0;
-        return (c <= ADC_CHANNEL_LAST) ? frame.inputs[c - 1] : frame.outputs[c - 1 - ADC_CHANNEL_LAST];
+        return (c <= ADC_CHANNEL_LAST)
+          ? frame.inputs[c - 1]
+          : (c - ADC_CHANNEL_LAST <= DAC_CHANNEL_LAST)
+            ? frame.outputs[c - 1 - ADC_CHANNEL_LAST]
+            : frame.MIDIState.mapping[c - 1 - ADC_CHANNEL_LAST - DAC_CHANNEL_LAST].output;
     }
 
     #ifdef ARDUINO_TEENSY41
@@ -397,8 +401,15 @@ public:
         cursor_start_y = gfxGetPrintPosY();
     }
 
-    void gfxEndCursor(bool selected, bool spicy = false) {
+    void gfxEndCursor(bool selected, bool spicy = false, const char *str = nullptr) {
         if (selected) {
+          if (str) {
+            gfxClear(cursor_start_x - 14, cursor_start_y, 24, 10);
+            gfxFrame(cursor_start_x - 13, cursor_start_y, 22, 10, spicy);
+            gfxPrint(cursor_start_x - 11, cursor_start_y+2, str);
+            if (EditMode())
+              gfxInvert(cursor_start_x - 14, cursor_start_y, 24, 10);
+          } else {
             int16_t w = gfxGetPrintPosX() - cursor_start_x;
             int16_t y = gfxGetPrintPosY() + 8;
             int h = y - cursor_start_y;
@@ -406,6 +417,7 @@ public:
               gfxSpicyCursor(cursor_start_x, y, w, h);
             else
               gfxCursor(cursor_start_x, y, w, h);
+          }
         }
     }
 

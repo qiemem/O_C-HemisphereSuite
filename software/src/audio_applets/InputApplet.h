@@ -68,7 +68,7 @@ public:
     if (cursor == IN_LEVEL) gfxCursor(26, 53, 26);
     gfxStartCursor();
     gfxPrintIcon(level_cv.Icon());
-    gfxEndCursor(cursor == LEVEL_CV);
+    gfxEndCursor(cursor == LEVEL_CV, false, level_cv.InputName());
 
     if (peakmeter[0].available()) {
       int peaklvl = peakmeter[0].read() * 64;

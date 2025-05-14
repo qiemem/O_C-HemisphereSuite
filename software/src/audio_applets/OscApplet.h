@@ -74,7 +74,7 @@ public:
 
       gfxStartCursor();
       gfxPrintIcon(pw_cv.Icon());
-      gfxEndCursor(cursor == PW_CV);
+      gfxEndCursor(cursor == PW_CV, false, pw_cv.InputName());
     }
 
     gfxStartCursor(1, 25);
@@ -86,7 +86,7 @@ public:
 
     gfxStartCursor();
     gfxPrintIcon(pitch_cv.Icon());
-    gfxEndCursor(cursor == PITCH_CV);
+    gfxEndCursor(cursor == PITCH_CV, false, pitch_cv.InputName());
 
     gfxStartCursor(1, 35);
     gfxPrint(MOD_TYPE_NAMES[mod_type]);
@@ -99,7 +99,7 @@ public:
 
     gfxStartCursor();
     gfxPrintIcon(mod_cv.Icon());
-    gfxEndCursor(cursor == MOD_CV);
+    gfxEndCursor(cursor == MOD_CV, false, mod_cv.InputName());
 
     gfxPrint(1, 45, "Lvl:");
     gfxStartCursor();
@@ -108,7 +108,7 @@ public:
 
     gfxStartCursor();
     gfxPrintIcon(level_cv.Icon());
-    gfxEndCursor(cursor == LEVEL_CV);
+    gfxEndCursor(cursor == LEVEL_CV, false, level_cv.InputName());
 
     gfxPrint(1, 55, "Mix: ");
     gfxStartCursor();
@@ -117,7 +117,7 @@ public:
 
     gfxStartCursor();
     gfxPrintIcon(mix_cv.Icon());
-    gfxEndCursor(cursor == MIX_CV);
+    gfxEndCursor(cursor == MIX_CV, false, mix_cv.InputName());
 
     gfxDisplayInputMapEditor();
   }

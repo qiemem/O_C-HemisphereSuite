@@ -61,7 +61,7 @@ public:
 
     gfxStartCursor(28, 42);
     gfxPrintIcon(PARAM_MAP_ICONS + 8 * crosspan_cv.source, 9);
-    gfxEndCursor(cursor == 1);
+    gfxEndCursor(cursor == 1, false, crosspan_cv.InputName());
 
     gfxStartCursor(32 - 3 * 9, 55);
     gfxPrint(xfade_shape == EQUAL_POWER ? "Equal pow" : "Equal amp");

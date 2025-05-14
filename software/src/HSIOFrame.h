@@ -17,9 +17,9 @@
 namespace HS {
 
 static constexpr int GATE_THRESHOLD = 15 << 7; // 1.25 volts
-static constexpr int TRIGMAP_MAX = OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST + DAC_CHANNEL_LAST;
-static constexpr int CVMAP_MAX = ADC_CHANNEL_LAST + DAC_CHANNEL_LAST;
 static constexpr int MIDIMAP_MAX = 32;
+static constexpr int TRIGMAP_MAX = OC::DIGITAL_INPUT_LAST + ADC_CHANNEL_LAST + DAC_CHANNEL_LAST;
+static constexpr int CVMAP_MAX = ADC_CHANNEL_LAST + DAC_CHANNEL_LAST + MIDIMAP_MAX;
 
 struct MIDILogEntry {
     uint8_t message;
@@ -39,14 +39,35 @@ struct PolyphonyData {
 };
 
 struct MIDIMapping {
-  int function;
-  int16_t function_cc;
+  // settings
+  int8_t function_cc;
+  uint8_t function;
   uint8_t channel; // MIDI channel number
   uint8_t dac_polyvoice; // select which voice to send from output
-  uint16_t semitone_mask; // which notes are currently on
+
+  static constexpr size_t Size = 32; // Make this compatible with Packable
+
+  // state
   bool trigout_q; // TRIGGA
-  int output; // translated CV values
+  uint16_t semitone_mask; // which notes are currently on
+  int16_t output; // translated CV values
+
+  uint32_t Pack() const {
+    return function_cc | (function << 8)
+      | (channel << 16) | (dac_polyvoice << 24);
+  }
+  void Unpack(uint32_t data) {
+    function_cc = data & 0x7F;
+    function = extract_value<uint8_t>(data >> 8);
+    channel = extract_value<uint8_t>(data >> 16);
+    dac_polyvoice = extract_value<uint8_t>(data >> 24);
+  }
 };
+
+// Lets PackingUtils know this is Packable as is.
+constexpr MIDIMapping& pack(MIDIMapping& input) {
+  return input;
+}
 
 using NoteBuffer = std::vector<MIDINoteData>;
 

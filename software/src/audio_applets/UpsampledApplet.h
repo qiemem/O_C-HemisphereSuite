@@ -43,7 +43,7 @@ public:
     gfxPrint(1, 15, "Source:");
     gfxStartCursor();
     gfxPrintIcon(input.Icon());
-    gfxEndCursor(cursor == 0);
+    gfxEndCursor(cursor == 0, false, input.InputName());
 
     gfxPrint(1, 25, "Interp:");
     gfxStartCursor();
@@ -67,7 +67,7 @@ public:
     gfxEndCursor(cursor == 2);
     gfxStartCursor();
     gfxPrintIcon(gain_cv.Icon());
-    gfxEndCursor(cursor == 3);
+    gfxEndCursor(cursor == 3, false, gain_cv.InputName());
 
     gfxPrint(1, 45, "AC:    ");
     gfxStartCursor();

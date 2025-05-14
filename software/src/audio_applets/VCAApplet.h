@@ -49,7 +49,7 @@ public:
     gfxEndCursor(cursor == 0);
     gfxStartCursor();
     gfxPrintIcon(level_cv.Icon());
-    gfxEndCursor(cursor == 1);
+    gfxEndCursor(cursor == 1, false, level_cv.InputName());
 
     gfxPrint(1, 25, "Off:");
     gfxStartCursor();
@@ -61,8 +61,8 @@ public:
     graphics.printf("%3d%%", shape);
     gfxEndCursor(cursor == 3);
     gfxStartCursor();
-    gfxPrintIcon(PARAM_MAP_ICONS + 8 * shape_cv.source);
-    gfxEndCursor(cursor == 4);
+    gfxPrintIcon(shape_cv.Icon());
+    gfxEndCursor(cursor == 4, false, shape_cv.InputName());
 
     gfxPrint(1, 45, "Rectify: ");
     gfxStartCursor();

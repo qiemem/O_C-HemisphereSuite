@@ -203,7 +203,7 @@ public:
         if(cursor > DUOTET_PARAM_OFFSET) {
           gfxStartCursor();
           gfxPrintIcon(cv_inputs[cursor].Icon());
-          gfxEndCursor(EditMode() && aux_cursor);
+          gfxEndCursor(EditMode() && aux_cursor, false, cv_inputs[cursor].InputName());
         }
 
         for(int i=0; i<tet; i++) {
