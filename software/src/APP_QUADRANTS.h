@@ -104,9 +104,11 @@ public:
         APPLET_METADATA_KEY = 0, // applet ids
         CLOCK_DATA_KEY = 1,
         GLOBALS_KEY = 2,
-        TRIGMAP_KEY = 3,
-        CVMAP_KEY = 4,
+        OLD_TRIGMAP_KEY = 3,
+        OLD_CVMAP_KEY = 4,
         OUTSKIP_KEY = 5,
+        TRIGMAP_KEY = 6,
+        CVMAP_KEY = 7,
 
         APPLET_L1_DATA_KEY = 10,
         APPLET_R1_DATA_KEY = 11,
@@ -256,17 +258,24 @@ public:
         ClockSetup_instance.SetGlobals(global_data);
 
         // Input Mappings
-        PhzConfig::getValue(preset_key | TRIGMAP_KEY, data);
-        for (size_t i = 0; i < 8; ++i)
-        {
-          const int val = Unpack(data, PackLocation{i*8, 8});
+        size_t bitsize = 8;
+        if (!PhzConfig::getValue(preset_key | TRIGMAP_KEY, data)) {
+          PhzConfig::getValue(preset_key | OLD_TRIGMAP_KEY, data);
+          bitsize = 5;
+        }
+        for (size_t i = 0; i < 8; ++i) {
+          const int val = Unpack(data, PackLocation{i*bitsize, bitsize});
           if (val != 0) HS::trigger_mapping[i] = constrain(val - 1, 0, TRIGMAP_MAX);
         }
 
-        PhzConfig::getValue(preset_key | CVMAP_KEY, data);
-        for (size_t i = 0; i < 8; ++i)
-        {
-          const int val = Unpack(data, PackLocation{i*8, 8});
+        if (!PhzConfig::getValue(preset_key | CVMAP_KEY, data)) {
+          PhzConfig::getValue(preset_key | OLD_CVMAP_KEY, data);
+          bitsize = 5;
+        } else
+          bitsize = 8;
+
+        for (size_t i = 0; i < 8; ++i) {
+          const int val = Unpack(data, PackLocation{i*bitsize, bitsize});
           if (val != 0) HS::cvmapping[i] = constrain(val - 1, 0, CVMAP_MAX);
         }
 
